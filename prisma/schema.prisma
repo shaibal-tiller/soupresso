@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Chart of accounts
+// ---------------------------------------------------------------------------
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model Account {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  name        String
+  type        AccountType
+  // true for accounts the posting engine depends on (Cash, Bank, AP, AR, Sales Income...).
+  // Prevents accidental deletion from the Chart of Accounts UI.
+  isSystem    Boolean     @default(false)
+  isActive    Boolean     @default(true)
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  journalLines JournalLine[]
+  partner      Partner?
+
+  @@index([type])
+}
+
+// ---------------------------------------------------------------------------
+// Partners (the 15 co-owners)
+// ---------------------------------------------------------------------------
+
+model Partner {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String?
+  sharePercent Decimal? @db.Decimal(6, 3)
+  isActive     Boolean  @default(true)
+  joinedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Every partner gets a dedicated Equity account, e.g. "Owner's Equity - Rahim".
+  equityAccountId String  @unique
+  equityAccount   Account @relation(fields: [equityAccountId], references: [id])
+
+  entries Entry[]
+}
+
+// ---------------------------------------------------------------------------
+// Menu (customizable, used only for approximate item-level sales analytics)
+// ---------------------------------------------------------------------------
+
+enum MenuCategory {
+  SOUP
+  MAIN
+  SNACK
+  DRINK
+  OTHER
+}
+
+model MenuItem {
+  id           String       @id @default(cuid())
+  name         String
+  price        Decimal      @db.Decimal(10, 2)
+  parcelPrice  Decimal?     @db.Decimal(10, 2)
+  category     MenuCategory @default(OTHER)
+  isActive     Boolean      @default(true)
+  sortOrder    Int          @default(0)
+  costEstimate Decimal?     @db.Decimal(10, 2)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  saleItems DailySaleItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Ledger core: Entry (user-facing, single record) + JournalLine (double entry)
+// ---------------------------------------------------------------------------
+
+enum EntryCategory {
+  INVESTMENT
+  ASSET_PURCHASE
+  RAW_MATERIAL
+  PACKAGING_SUPPLIES
+  CHEF_SALARY
+  RENT
+  UTILITY
+  CLEANING_MAINTENANCE
+  OTHER_EXPENSE
+  SALES
+  LOAN_RECEIVED
+  LOAN_REPAYMENT
+  PAYABLE_SETTLEMENT
+  RECEIVABLE_COLLECTION
+  WITHDRAWAL
+  ADJUSTMENT
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CREDIT // unpaid: Accounts Payable (expense/asset side) or Accounts Receivable (sales side)
+  MIXED // cash + bank split, used by daily sales close-out
+}
+
+model Entry {
+  id            String        @id @default(cuid())
+  date          DateTime      @db.Date
+  category      EntryCategory
+  description   String
+  vendor        String?
+  quantity      Decimal?      @db.Decimal(10, 2)
+  unit          String?
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod
+
+  partnerId String?
+  partner   Partner? @relation(fields: [partnerId], references: [id])
+
+  dailySale DailySale?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  journalLines JournalLine[]
+
+  @@index([date])
+  @@index([category])
+}
+
+model JournalLine {
+  id        String  @id @default(cuid())
+  entryId   String
+  entry     Entry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+  debit     Decimal @default(0) @db.Decimal(12, 2)
+  credit    Decimal @default(0) @db.Decimal(12, 2)
+
+  @@index([accountId])
+  @@index([entryId])
+}
+
+// ---------------------------------------------------------------------------
+// Daily sales (end-of-day close-out)
+// ---------------------------------------------------------------------------
+
+model DailySale {
+  id          String   @id @default(cuid())
+  date        DateTime @unique @db.Date
+  cashAmount  Decimal  @default(0) @db.Decimal(12, 2)
+  bankAmount  Decimal  @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal  @db.Decimal(12, 2)
+  notes       String?
+
+  entryId String @unique
+  entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  items DailySaleItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DailySaleItem {
+  id          String    @id @default(cuid())
+  dailySaleId String
+  dailySale   DailySale @relation(fields: [dailySaleId], references: [id], onDelete: Cascade)
+  menuItemId  String
+  menuItem    MenuItem  @relation(fields: [menuItemId], references: [id])
+  quantity    Int
+  isParcel    Boolean   @default(false)
+  unitPrice   Decimal   @db.Decimal(10, 2)
+  lineTotal   Decimal   @db.Decimal(10, 2)
+
+  @@index([dailySaleId])
+  @@index([menuItemId])
+}
