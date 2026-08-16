@@ -276,6 +276,125 @@ export async function deleteEntry(entryId: string, actor: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Quick Purchase: tap a shortlist of common items instead of retyping a
+// description every time. One shared vendor/payment method/fund source per
+// trip, but each item still becomes its own ordinary, fully audited Entry.
+// ---------------------------------------------------------------------------
+
+const QUICK_PURCHASE_ACCOUNT_CODE: Partial<Record<EntryCategory, string>> = {
+  RAW_MATERIAL: ACCOUNT_CODES.RAW_MATERIAL,
+  PACKAGING_SUPPLIES: ACCOUNT_CODES.PACKAGING,
+  CLEANING_MAINTENANCE: ACCOUNT_CODES.CLEANING,
+  OTHER_EXPENSE: ACCOUNT_CODES.OTHER_EXPENSE,
+  ASSET_PURCHASE: ACCOUNT_CODES.FIXED_ASSETS,
+};
+
+export interface QuickPurchaseLineInput {
+  category: EntryCategory;
+  description: string;
+  quantity?: number | null;
+  unit?: string | null;
+  amount: number;
+}
+
+export interface CreateQuickPurchaseBatchInput {
+  date: Date;
+  vendor?: string | null;
+  paymentMethod: PaymentMethod;
+  fundSourceAccountId?: string | null;
+  items: QuickPurchaseLineInput[];
+}
+
+export async function createQuickPurchaseBatch(input: CreateQuickPurchaseBatchInput, actor: string) {
+  const validItems = input.items.filter((i) => i.amount > 0);
+  if (validItems.length === 0) throw new Error("Add at least one item with an amount");
+
+  for (const item of validItems) {
+    if (!isPaymentMethodAllowed(item.category, input.paymentMethod)) {
+      throw new Error(`Payment method ${input.paymentMethod} is not valid for ${item.category}`);
+    }
+    if (!QUICK_PURCHASE_ACCOUNT_CODE[item.category]) {
+      throw new Error(`${item.category} isn't supported for quick purchases`);
+    }
+  }
+
+  const creditAccountId = await resolveFundOrCreditAccountId(input.paymentMethod, input.fundSourceAccountId, "out");
+  const debitAccountIds = await Promise.all(
+    validItems.map((item) => getAccountId(QUICK_PURCHASE_ACCOUNT_CODE[item.category]!)),
+  );
+
+  return prisma.$transaction(async (tx) => {
+    const created = [];
+    for (let i = 0; i < validItems.length; i++) {
+      const item = validItems[i];
+      const entry = await tx.entry.create({
+        data: {
+          date: input.date,
+          category: item.category,
+          description: item.description,
+          vendor: input.vendor ?? null,
+          quantity: item.quantity ?? null,
+          unit: item.unit ?? null,
+          amount: item.amount,
+          paymentMethod: input.paymentMethod,
+          fundSourceAccountId: input.paymentMethod === "FUND_SOURCE" ? input.fundSourceAccountId : null,
+          journalLines: {
+            create: [
+              { accountId: debitAccountIds[i], debit: item.amount, credit: 0 },
+              { accountId: creditAccountId, debit: 0, credit: item.amount },
+            ],
+          },
+        },
+      });
+
+      await logAudit(tx, {
+        actor,
+        action: "CREATE",
+        entityType: "Entry",
+        entityId: entry.id,
+        summary: `${CATEGORY_LABELS[item.category] ?? item.category} ${formatTaka(item.amount)} — ${item.description}`,
+        amount: item.amount,
+        detail: entrySnapshot(entry),
+      });
+
+      created.push(entry);
+    }
+    return created;
+  });
+}
+
+export interface SavePurchaseItemInput {
+  id?: string | null;
+  name: string;
+  category: EntryCategory;
+  unit?: string | null;
+}
+
+export async function savePurchaseItem(input: SavePurchaseItemInput) {
+  const name = input.name.trim();
+  if (!name) throw new Error("Name is required");
+
+  if (input.id) {
+    return prisma.purchaseItem.update({
+      where: { id: input.id },
+      data: { name, category: input.category, unit: input.unit || null },
+    });
+  }
+  const maxSort = await prisma.purchaseItem.aggregate({ _max: { sortOrder: true } });
+  return prisma.purchaseItem.create({
+    data: { name, category: input.category, unit: input.unit || null, sortOrder: (maxSort._max.sortOrder ?? 0) + 1 },
+  });
+}
+
+export async function setPurchaseItemActive(id: string, isActive: boolean) {
+  return prisma.purchaseItem.update({ where: { id }, data: { isActive } });
+}
+
+export async function deletePurchaseItem(id: string) {
+  return prisma.purchaseItem.delete({ where: { id } });
+}
+
+// ---------------------------------------------------------------------------
 // Cash & Bank: fund source accounts, opening/adjusted balances, transfers
 // ---------------------------------------------------------------------------
 

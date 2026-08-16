@@ -54,6 +54,15 @@ export const CREDIT_ELIGIBLE_CATEGORIES: EntryCategoryValue[] = [
   "SALES",
 ];
 
+// Categories the Quick Purchase tile picker can post to.
+export const QUICK_PURCHASE_CATEGORIES: EntryCategoryValue[] = [
+  "RAW_MATERIAL",
+  "PACKAGING_SUPPLIES",
+  "CLEANING_MAINTENANCE",
+  "ASSET_PURCHASE",
+  "OTHER_EXPENSE",
+];
+
 export const CATEGORIES_REQUIRING_PARTNER: EntryCategoryValue[] = ["INVESTMENT", "WITHDRAWAL"];
 
 export const CATEGORY_REQUIRES_MANUAL_ACCOUNTS: EntryCategoryValue = "ADJUSTMENT";

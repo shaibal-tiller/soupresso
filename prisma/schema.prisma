@@ -224,6 +224,25 @@ model DailySaleItem {
 }
 
 // ---------------------------------------------------------------------------
+// Common purchase items — a tappable shortlist so buying chicken, onions,
+// packaging etc. daily doesn't mean retyping the description every time.
+// Purely a UI convenience; the resulting Entry rows are ordinary expenses.
+// ---------------------------------------------------------------------------
+
+model PurchaseItem {
+  id        String        @id @default(cuid())
+  name      String
+  category  EntryCategory
+  unit      String?
+  isActive  Boolean       @default(true)
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([isActive])
+}
+
+// ---------------------------------------------------------------------------
 // Audit log — a permanent, append-only record of every financial action.
 // Rows are never updated or deleted, including when the record they describe
 // (e.g. an Entry) is later deleted, so the trail survives the data.

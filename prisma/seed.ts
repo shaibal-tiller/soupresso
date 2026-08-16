@@ -2,7 +2,7 @@ import "dotenv/config";
 import { neonConfig } from "@neondatabase/serverless";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import ws from "ws";
-import { PrismaClient, AccountType, MenuCategory } from "../src/generated/prisma/client";
+import { PrismaClient, AccountType, MenuCategory, EntryCategory } from "../src/generated/prisma/client";
 
 neonConfig.webSocketConstructor = ws;
 
@@ -78,6 +78,35 @@ const MENU_ITEMS: {
   { name: "Nachos", price: 100, category: "SNACK", sortOrder: 8 },
 ];
 
+// Common purchase items — tap-to-add shortlist for the Entries page, built
+// from what the shop actually buys day to day.
+const PURCHASE_ITEMS: { name: string; category: EntryCategory; unit: string; sortOrder: number }[] = [
+  // Raw material / ingredients
+  { name: "Chicken", category: "RAW_MATERIAL", unit: "kg", sortOrder: 1 },
+  { name: "Onion", category: "RAW_MATERIAL", unit: "kg", sortOrder: 2 },
+  { name: "Garlic-Ginger Paste", category: "RAW_MATERIAL", unit: "kg", sortOrder: 3 },
+  { name: "Cooking Oil", category: "RAW_MATERIAL", unit: "litre", sortOrder: 4 },
+  { name: "Egg", category: "RAW_MATERIAL", unit: "pc", sortOrder: 5 },
+  { name: "Mushroom", category: "RAW_MATERIAL", unit: "kg", sortOrder: 6 },
+  { name: "Green Chili", category: "RAW_MATERIAL", unit: "kg", sortOrder: 7 },
+  { name: "Chili Powder", category: "RAW_MATERIAL", unit: "kg", sortOrder: 8 },
+  { name: "Spices / Masala", category: "RAW_MATERIAL", unit: "kg", sortOrder: 9 },
+  { name: "Salt", category: "RAW_MATERIAL", unit: "kg", sortOrder: 10 },
+  { name: "Lemon", category: "RAW_MATERIAL", unit: "pc", sortOrder: 11 },
+  { name: "Spring Onion", category: "RAW_MATERIAL", unit: "kg", sortOrder: 12 },
+  { name: "Cheese", category: "RAW_MATERIAL", unit: "kg", sortOrder: 13 },
+  { name: "Tortilla Chips", category: "RAW_MATERIAL", unit: "kg", sortOrder: 14 },
+  { name: "Momo / Wonton Wrapper", category: "RAW_MATERIAL", unit: "pack", sortOrder: 15 },
+  // Packaging & supplies
+  { name: "Soup Bowl", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 16 },
+  { name: "Parcel Box", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 17 },
+  { name: "Nachos Tray", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 18 },
+  { name: "Poly Bag", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 19 },
+  { name: "Foil Paper", category: "PACKAGING_SUPPLIES", unit: "roll", sortOrder: 20 },
+  { name: "Plate & Spoon", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 21 },
+  { name: "Napkin / Tissue", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 22 },
+];
+
 const PARTNER_COUNT = 15;
 
 async function main() {
@@ -111,6 +140,14 @@ async function main() {
     const existing = await prisma.menuItem.findFirst({ where: { name: item.name } });
     if (!existing) {
       await prisma.menuItem.create({ data: item });
+    }
+  }
+
+  console.log("Seeding purchase items...");
+  for (const item of PURCHASE_ITEMS) {
+    const existing = await prisma.purchaseItem.findFirst({ where: { name: item.name } });
+    if (!existing) {
+      await prisma.purchaseItem.create({ data: item });
     }
   }
 
