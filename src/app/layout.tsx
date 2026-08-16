@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { MobileNav } from "@/components/mobile-nav";
+import { ActorBadge } from "@/components/actor-badge";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -40,18 +41,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full">
         <div className="flex min-h-screen">
-          <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:block">
+          <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:flex md:flex-col">
             <div className="flex h-16 items-center gap-2 border-b px-4">
               <span className="text-lg font-semibold tracking-tight">🍜 Soupresso</span>
             </div>
             <Nav />
+            <div className="mt-auto border-t p-3">
+              <ActorBadge />
+            </div>
           </aside>
           <div className="flex min-w-0 flex-1 flex-col">
             <header
-              className="sticky top-0 z-30 flex h-14 items-center border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
+              className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
             >
               <span className="text-base font-semibold tracking-tight">🍜 Soupresso</span>
+              <ActorBadge />
             </header>
             <main className="flex-1 p-4 pb-24 md:p-8 md:pb-8">{children}</main>
           </div>

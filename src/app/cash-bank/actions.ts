@@ -9,6 +9,7 @@ import {
   setAccountBalance,
   transferBetweenFundSources,
 } from "@/lib/ledger";
+import { getActorName } from "@/lib/actor";
 import type { ActionState } from "@/app/entries/actions";
 
 function revalidateAll() {
@@ -36,12 +37,16 @@ export async function createFundSourceAction(_prevState: ActionState, formData: 
   const data = parsed.data;
 
   try {
-    await createFundSource({
-      name: data.name,
-      description: data.description || null,
-      openingBalance: data.openingBalance ? Number(data.openingBalance) : 0,
-      date: new Date(`${data.date}T00:00:00.000Z`),
-    });
+    const actor = await getActorName();
+    await createFundSource(
+      {
+        name: data.name,
+        description: data.description || null,
+        openingBalance: data.openingBalance ? Number(data.openingBalance) : 0,
+        date: new Date(`${data.date}T00:00:00.000Z`),
+      },
+      actor,
+    );
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to add account" };
   }
@@ -65,7 +70,8 @@ export async function renameFundSourceAction(_prevState: ActionState, formData: 
   const data = parsed.data;
 
   try {
-    await renameFundSource(data.accountId, data.name, data.description || null);
+    const actor = await getActorName();
+    await renameFundSource(data.accountId, data.name, data.description || null, actor);
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to update account" };
   }
@@ -75,7 +81,8 @@ export async function renameFundSourceAction(_prevState: ActionState, formData: 
 }
 
 export async function toggleFundSourceActiveAction(accountId: string, isActive: boolean): Promise<void> {
-  await setFundSourceActive(accountId, isActive);
+  const actor = await getActorName();
+  await setFundSourceActive(accountId, isActive, actor);
   revalidateAll();
 }
 
@@ -95,12 +102,16 @@ export async function setBalanceAction(_prevState: ActionState, formData: FormDa
   const data = parsed.data;
 
   try {
-    await setAccountBalance({
-      accountId: data.accountId,
-      targetBalance: data.targetBalance,
-      date: new Date(`${data.date}T00:00:00.000Z`),
-      description: data.description || null,
-    });
+    const actor = await getActorName();
+    await setAccountBalance(
+      {
+        accountId: data.accountId,
+        targetBalance: data.targetBalance,
+        date: new Date(`${data.date}T00:00:00.000Z`),
+        description: data.description || null,
+      },
+      actor,
+    );
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to adjust balance" };
   }
@@ -126,13 +137,17 @@ export async function transferAction(_prevState: ActionState, formData: FormData
   const data = parsed.data;
 
   try {
-    await transferBetweenFundSources({
-      fromAccountId: data.fromAccountId,
-      toAccountId: data.toAccountId,
-      amount: data.amount,
-      date: new Date(`${data.date}T00:00:00.000Z`),
-      description: data.description || null,
-    });
+    const actor = await getActorName();
+    await transferBetweenFundSources(
+      {
+        fromAccountId: data.fromAccountId,
+        toAccountId: data.toAccountId,
+        amount: data.amount,
+        date: new Date(`${data.date}T00:00:00.000Z`),
+        description: data.description || null,
+      },
+      actor,
+    );
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to transfer" };
   }

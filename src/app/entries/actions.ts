@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createEntry, deleteEntry } from "@/lib/ledger";
+import { getActorName } from "@/lib/actor";
 import type { EntryCategory, PaymentMethod } from "@/generated/prisma/client";
 
 export interface ActionState {
@@ -42,20 +43,24 @@ export async function createEntryAction(_prevState: ActionState, formData: FormD
   const data = parsed.data;
 
   try {
-    await createEntry({
-      date: new Date(`${data.date}T00:00:00.000Z`),
-      category: data.category as EntryCategory,
-      description: data.description,
-      vendor: data.vendor || null,
-      quantity: data.quantity ? Number(data.quantity) : null,
-      unit: data.unit || null,
-      amount: data.amount,
-      paymentMethod: data.paymentMethod as PaymentMethod,
-      fundSourceAccountId: data.fundSourceAccountId || null,
-      partnerId: data.partnerId || null,
-      manualDebitAccountId: data.manualDebitAccountId || null,
-      manualCreditAccountId: data.manualCreditAccountId || null,
-    });
+    const actor = await getActorName();
+    await createEntry(
+      {
+        date: new Date(`${data.date}T00:00:00.000Z`),
+        category: data.category as EntryCategory,
+        description: data.description,
+        vendor: data.vendor || null,
+        quantity: data.quantity ? Number(data.quantity) : null,
+        unit: data.unit || null,
+        amount: data.amount,
+        paymentMethod: data.paymentMethod as PaymentMethod,
+        fundSourceAccountId: data.fundSourceAccountId || null,
+        partnerId: data.partnerId || null,
+        manualDebitAccountId: data.manualDebitAccountId || null,
+        manualCreditAccountId: data.manualCreditAccountId || null,
+      },
+      actor,
+    );
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to create entry" };
   }
@@ -65,6 +70,7 @@ export async function createEntryAction(_prevState: ActionState, formData: FormD
 }
 
 export async function deleteEntryAction(id: string): Promise<void> {
-  await deleteEntry(id);
+  const actor = await getActorName();
+  await deleteEntry(id, actor);
   revalidateAll();
 }

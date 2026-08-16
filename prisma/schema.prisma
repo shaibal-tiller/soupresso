@@ -222,3 +222,31 @@ model DailySaleItem {
   @@index([dailySaleId])
   @@index([menuItemId])
 }
+
+// ---------------------------------------------------------------------------
+// Audit log — a permanent, append-only record of every financial action.
+// Rows are never updated or deleted, including when the record they describe
+// (e.g. an Entry) is later deleted, so the trail survives the data.
+// ---------------------------------------------------------------------------
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  occurredAt DateTime    @default(now())
+  actor      String // self-reported name of whoever performed the action
+  action     AuditAction
+  entityType String // "Entry", "DailySale", "Account", "Partner", "MenuItem"
+  entityId   String
+  summary    String // human-readable one-liner, e.g. "Raw Material ৳1,500 from Cash in Hand"
+  amount     Decimal?    @db.Decimal(12, 2)
+  detail     Json? // full snapshot of the record at the time of the action
+
+  @@index([occurredAt])
+  @@index([entityType, entityId])
+  @@index([action])
+}

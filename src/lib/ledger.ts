@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/db";
 import { ACCOUNT_CODES } from "@/lib/accounts";
-import { isPaymentMethodAllowed } from "@/lib/entry-meta";
-import type { AccountType, EntryCategory, PaymentMethod } from "@/generated/prisma/client";
+import { isPaymentMethodAllowed, CATEGORY_LABELS } from "@/lib/entry-meta";
+import { formatTaka } from "@/lib/format";
+import type { AccountType, EntryCategory, PaymentMethod, Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
 
 const accountIdCache = new Map<string, string>();
 
@@ -25,6 +28,54 @@ function normalBalance(type: AccountType, debit: number, credit: number): number
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Audit log — every mutating function below writes one of these, in the same
+// transaction as the change it describes, so the trail can never drift from
+// the data (and survives even if the underlying record is later deleted).
+// ---------------------------------------------------------------------------
+
+interface AuditInput {
+  actor: string;
+  action: "CREATE" | "UPDATE" | "DELETE";
+  entityType: string;
+  entityId: string;
+  summary: string;
+  amount?: number | null;
+  detail?: unknown;
+}
+
+async function logAudit(tx: Tx, input: AuditInput) {
+  await tx.auditLog.create({
+    data: {
+      actor: input.actor || "Unknown",
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      summary: input.summary,
+      amount: input.amount ?? null,
+      detail: input.detail === undefined ? undefined : (JSON.parse(JSON.stringify(input.detail)) as Prisma.InputJsonValue),
+    },
+  });
+}
+
+function entrySnapshot(entry: {
+  date: Date;
+  category: string;
+  description: string;
+  vendor: string | null;
+  amount: Prisma.Decimal | number;
+  paymentMethod: string;
+}) {
+  return {
+    date: entry.date.toISOString().slice(0, 10),
+    category: entry.category,
+    description: entry.description,
+    vendor: entry.vendor,
+    amount: toNumber(entry.amount),
+    paymentMethod: entry.paymentMethod,
+  };
 }
 
 /** Resolves the "other side" of an entry: either the chosen fund source account, or Payable/Receivable when paid on credit. */
@@ -62,7 +113,7 @@ export interface CreateEntryInput {
   manualCreditAccountId?: string | null;
 }
 
-export async function createEntry(input: CreateEntryInput) {
+export async function createEntry(input: CreateEntryInput, actor: string) {
   const amount = input.amount;
   if (!(amount > 0)) throw new Error("Amount must be greater than zero");
   if (!isPaymentMethodAllowed(input.category, input.paymentMethod)) {
@@ -156,32 +207,72 @@ export async function createEntry(input: CreateEntryInput) {
       throw new Error(`Unhandled category: ${input.category satisfies never}`);
   }
 
-  return prisma.entry.create({
-    data: {
-      date: input.date,
-      category: input.category,
-      description: input.description,
-      vendor: input.vendor ?? null,
-      quantity: input.quantity ?? null,
-      unit: input.unit ?? null,
-      amount,
-      paymentMethod: input.paymentMethod,
-      fundSourceAccountId: input.paymentMethod === "FUND_SOURCE" ? input.fundSourceAccountId : null,
-      partnerId: input.partnerId ?? null,
-      journalLines: {
-        create: [
-          { accountId: debitAccountId, debit: amount, credit: 0 },
-          { accountId: creditAccountId, debit: 0, credit: amount },
-        ],
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.entry.create({
+      data: {
+        date: input.date,
+        category: input.category,
+        description: input.description,
+        vendor: input.vendor ?? null,
+        quantity: input.quantity ?? null,
+        unit: input.unit ?? null,
+        amount,
+        paymentMethod: input.paymentMethod,
+        fundSourceAccountId: input.paymentMethod === "FUND_SOURCE" ? input.fundSourceAccountId : null,
+        partnerId: input.partnerId ?? null,
+        journalLines: {
+          create: [
+            { accountId: debitAccountId, debit: amount, credit: 0 },
+            { accountId: creditAccountId, debit: 0, credit: amount },
+          ],
+        },
       },
-    },
-    include: { journalLines: { include: { account: true } } },
+      include: { journalLines: { include: { account: true } } },
+    });
+
+    await logAudit(tx, {
+      actor,
+      action: "CREATE",
+      entityType: "Entry",
+      entityId: entry.id,
+      summary: `${CATEGORY_LABELS[entry.category] ?? entry.category} ${formatTaka(amount)} — ${entry.description}`,
+      amount,
+      detail: entrySnapshot(entry),
+    });
+
+    return entry;
   });
 }
 
-export async function deleteEntry(entryId: string) {
-  // JournalLine and DailySale rows cascade on delete via the FK.
-  return prisma.entry.delete({ where: { id: entryId } });
+export async function deleteEntry(entryId: string, actor: string) {
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.entry.findUniqueOrThrow({
+      where: { id: entryId },
+      include: { journalLines: { include: { account: true } }, partner: true },
+    });
+
+    await logAudit(tx, {
+      actor,
+      action: "DELETE",
+      entityType: "Entry",
+      entityId: entry.id,
+      summary: `Deleted: ${CATEGORY_LABELS[entry.category] ?? entry.category} ${formatTaka(toNumber(entry.amount))} — ${entry.description}`,
+      amount: toNumber(entry.amount),
+      detail: {
+        ...entrySnapshot(entry),
+        partnerName: entry.partner?.name ?? null,
+        lines: entry.journalLines.map((l) => ({
+          account: l.account.name,
+          debit: toNumber(l.debit),
+          credit: toNumber(l.credit),
+        })),
+      },
+    });
+
+    // JournalLine and DailySale rows cascade on delete via the FK.
+    await tx.entry.delete({ where: { id: entryId } });
+    return entry;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +286,7 @@ export interface CreateFundSourceInput {
   date: Date;
 }
 
-export async function createFundSource(input: CreateFundSourceInput) {
+export async function createFundSource(input: CreateFundSourceInput, actor: string) {
   const name = input.name.trim();
   if (!name) throw new Error("Name is required");
 
@@ -205,38 +296,76 @@ export async function createFundSource(input: CreateFundSourceInput) {
   });
   const nextNumber = lastAccount ? Number(lastAccount.code) + 1 : 1020;
 
-  const account = await prisma.account.create({
-    data: {
-      code: String(nextNumber),
-      name,
-      type: "ASSET",
-      isSystem: false,
-      isFundSource: true,
-      description: input.description || null,
-    },
+  const account = await prisma.$transaction(async (tx) => {
+    const created = await tx.account.create({
+      data: {
+        code: String(nextNumber),
+        name,
+        type: "ASSET",
+        isSystem: false,
+        isFundSource: true,
+        description: input.description || null,
+      },
+    });
+    await logAudit(tx, {
+      actor,
+      action: "CREATE",
+      entityType: "Account",
+      entityId: created.id,
+      summary: `Added cash/bank account: ${created.name}`,
+      detail: { code: created.code, name: created.name },
+    });
+    return created;
   });
 
   const openingBalance = input.openingBalance ?? 0;
   if (openingBalance !== 0) {
-    await setAccountBalance({
-      accountId: account.id,
-      targetBalance: openingBalance,
-      date: input.date,
-      description: `Opening balance - ${name}`,
-    });
+    await setAccountBalance(
+      {
+        accountId: account.id,
+        targetBalance: openingBalance,
+        date: input.date,
+        description: `Opening balance - ${name}`,
+      },
+      actor,
+    );
   }
 
   return account;
 }
 
-export async function renameFundSource(accountId: string, name: string, description?: string | null) {
+export async function renameFundSource(accountId: string, name: string, description: string | null, actor: string) {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Name is required");
-  return prisma.account.update({ where: { id: accountId }, data: { name: trimmed, description: description ?? null } });
+
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.account.findUniqueOrThrow({ where: { id: accountId } });
+    const updated = await tx.account.update({ where: { id: accountId }, data: { name: trimmed, description } });
+    await logAudit(tx, {
+      actor,
+      action: "UPDATE",
+      entityType: "Account",
+      entityId: accountId,
+      summary: before.name === trimmed ? `Updated account: ${trimmed}` : `Renamed account: ${before.name} → ${trimmed}`,
+      detail: { before: { name: before.name, description: before.description }, after: { name: trimmed, description } },
+    });
+    return updated;
+  });
 }
 
-export async function setFundSourceActive(accountId: string, isActive: boolean) {
-  return prisma.account.update({ where: { id: accountId }, data: { isActive } });
+export async function setFundSourceActive(accountId: string, isActive: boolean, actor: string) {
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.account.update({ where: { id: accountId }, data: { isActive } });
+    await logAudit(tx, {
+      actor,
+      action: "UPDATE",
+      entityType: "Account",
+      entityId: accountId,
+      summary: `${isActive ? "Activated" : "Deactivated"} account: ${updated.name}`,
+      detail: { isActive },
+    });
+    return updated;
+  });
 }
 
 export interface SetAccountBalanceInput {
@@ -247,7 +376,7 @@ export interface SetAccountBalanceInput {
 }
 
 /** Posts a correction so the account's ledger balance matches `targetBalance` (used for opening balances and cash-count corrections). */
-export async function setAccountBalance(input: SetAccountBalanceInput) {
+export async function setAccountBalance(input: SetAccountBalanceInput, actor: string) {
   const account = await prisma.account.findUniqueOrThrow({ where: { id: input.accountId } });
 
   const sum = await prisma.journalLine.aggregate({
@@ -273,22 +402,36 @@ export async function setAccountBalance(input: SetAccountBalanceInput) {
     creditAccountId = account.id;
   }
 
-  return prisma.entry.create({
-    data: {
-      date: input.date,
-      category: "BALANCE_ADJUSTMENT",
-      description: input.description || `Balance adjustment - ${account.name}`,
-      amount,
-      paymentMethod: "FUND_SOURCE",
-      fundSourceAccountId: account.id,
-      journalLines: {
-        create: [
-          { accountId: debitAccountId, debit: amount, credit: 0 },
-          { accountId: creditAccountId, debit: 0, credit: amount },
-        ],
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.entry.create({
+      data: {
+        date: input.date,
+        category: "BALANCE_ADJUSTMENT",
+        description: input.description || `Balance adjustment - ${account.name}`,
+        amount,
+        paymentMethod: "FUND_SOURCE",
+        fundSourceAccountId: account.id,
+        journalLines: {
+          create: [
+            { accountId: debitAccountId, debit: amount, credit: 0 },
+            { accountId: creditAccountId, debit: 0, credit: amount },
+          ],
+        },
       },
-    },
-    include: { journalLines: { include: { account: true } } },
+      include: { journalLines: { include: { account: true } } },
+    });
+
+    await logAudit(tx, {
+      actor,
+      action: "CREATE",
+      entityType: "Entry",
+      entityId: entry.id,
+      summary: `Balance adjustment: ${account.name} ${increasing ? "+" : "-"}${formatTaka(amount)} (now ${formatTaka(input.targetBalance)})`,
+      amount,
+      detail: { ...entrySnapshot(entry), accountName: account.name, newBalance: input.targetBalance },
+    });
+
+    return entry;
   });
 }
 
@@ -300,7 +443,7 @@ export interface TransferInput {
   description?: string | null;
 }
 
-export async function transferBetweenFundSources(input: TransferInput) {
+export async function transferBetweenFundSources(input: TransferInput, actor: string) {
   if (!(input.amount > 0)) throw new Error("Amount must be greater than zero");
   if (input.fromAccountId === input.toAccountId) throw new Error("Choose two different accounts to transfer between");
 
@@ -312,28 +455,42 @@ export async function transferBetweenFundSources(input: TransferInput) {
     throw new Error("Both accounts must be cash/bank accounts");
   }
 
-  return prisma.entry.create({
-    data: {
-      date: input.date,
-      category: "TRANSFER",
-      description: input.description || `Transfer: ${fromAccount.name} → ${toAccount.name}`,
-      amount: input.amount,
-      paymentMethod: "FUND_SOURCE",
-      fundSourceAccountId: fromAccount.id,
-      transferToAccountId: toAccount.id,
-      journalLines: {
-        create: [
-          { accountId: toAccount.id, debit: input.amount, credit: 0 },
-          { accountId: fromAccount.id, debit: 0, credit: input.amount },
-        ],
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.entry.create({
+      data: {
+        date: input.date,
+        category: "TRANSFER",
+        description: input.description || `Transfer: ${fromAccount.name} → ${toAccount.name}`,
+        amount: input.amount,
+        paymentMethod: "FUND_SOURCE",
+        fundSourceAccountId: fromAccount.id,
+        transferToAccountId: toAccount.id,
+        journalLines: {
+          create: [
+            { accountId: toAccount.id, debit: input.amount, credit: 0 },
+            { accountId: fromAccount.id, debit: 0, credit: input.amount },
+          ],
+        },
       },
-    },
-    include: { journalLines: { include: { account: true } } },
+      include: { journalLines: { include: { account: true } } },
+    });
+
+    await logAudit(tx, {
+      actor,
+      action: "CREATE",
+      entityType: "Entry",
+      entityId: entry.id,
+      summary: `Transfer ${formatTaka(input.amount)}: ${fromAccount.name} → ${toAccount.name}`,
+      amount: input.amount,
+      detail: { ...entrySnapshot(entry), from: fromAccount.name, to: toAccount.name },
+    });
+
+    return entry;
   });
 }
 
 // ---------------------------------------------------------------------------
-// Daily sales (end-of-day close-out)
+// Daily sales (end-of-day close-out, plus live per-order entry)
 // ---------------------------------------------------------------------------
 
 export interface DailySaleItemInput {
@@ -355,7 +512,7 @@ export interface CreateDailySaleInput {
   items: DailySaleItemInput[];
 }
 
-export async function createDailySale(input: CreateDailySaleInput) {
+export async function createDailySale(input: CreateDailySaleInput, actor: string) {
   const fundings = input.fundings.filter((f) => f.amount > 0);
   const total = round2(fundings.reduce((sum, f) => sum + f.amount, 0));
   if (!(total > 0)) throw new Error("Enter at least one cash/bank amount greater than zero");
@@ -407,12 +564,151 @@ export async function createDailySale(input: CreateDailySaleInput) {
       include: { items: { include: { menuItem: true } }, fundings: { include: { fundSourceAccount: true } } },
     });
 
+    await logAudit(tx, {
+      actor,
+      action: "CREATE",
+      entityType: "DailySale",
+      entityId: dailySale.id,
+      summary: `Daily sales recorded for ${dateLabel}: ${formatTaka(total)} (${input.items.length} item lines)`,
+      amount: total,
+      detail: { date: dateLabel, total, items: input.items.length, fundings: fundings.length },
+    });
+
     return { entry, dailySale };
   });
 }
 
-export async function deleteDailySale(dailySaleId: string) {
-  const dailySale = await prisma.dailySale.findUniqueOrThrow({ where: { id: dailySaleId } });
-  // Deleting the Entry cascades to the DailySale, DailySaleFunding and DailySaleItem rows.
-  return prisma.entry.delete({ where: { id: dailySale.entryId } });
+export async function deleteDailySale(dailySaleId: string, actor: string) {
+  return prisma.$transaction(async (tx) => {
+    const dailySale = await tx.dailySale.findUniqueOrThrow({ where: { id: dailySaleId } });
+    const dateLabel = dailySale.date.toISOString().slice(0, 10);
+
+    await logAudit(tx, {
+      actor,
+      action: "DELETE",
+      entityType: "DailySale",
+      entityId: dailySale.id,
+      summary: `Deleted daily sales record for ${dateLabel}: ${formatTaka(toNumber(dailySale.totalAmount))}`,
+      amount: toNumber(dailySale.totalAmount),
+      detail: { date: dateLabel, total: toNumber(dailySale.totalAmount) },
+    });
+
+    // Deleting the Entry cascades to the DailySale, DailySaleFunding and DailySaleItem rows.
+    await tx.entry.delete({ where: { id: dailySale.entryId } });
+    return dailySale;
+  });
+}
+
+/**
+ * Records a single customer order as it happens, appending to (or creating)
+ * that day's DailySale so the till stays live throughout the day instead of
+ * only being closed out once at the end.
+ */
+export interface QuickSaleInput {
+  date: Date;
+  fundSourceAccountId: string;
+  items: DailySaleItemInput[];
+}
+
+export async function addQuickSale(input: QuickSaleInput, actor: string) {
+  if (input.items.length === 0) throw new Error("Add at least one item");
+  const amount = round2(input.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+  if (!(amount > 0)) throw new Error("Order total must be greater than zero");
+
+  const fundSource = await prisma.account.findUnique({ where: { id: input.fundSourceAccountId } });
+  if (!fundSource || !fundSource.isFundSource || !fundSource.isActive) {
+    throw new Error("Choose a valid, active cash/bank account");
+  }
+  const salesAccountId = await getAccountId(ACCOUNT_CODES.SALES_INCOME);
+  const dateLabel = input.date.toISOString().slice(0, 10);
+
+  return prisma.$transaction(async (tx) => {
+    let dailySale = await tx.dailySale.findUnique({ where: { date: input.date } });
+    let isNewDay = false;
+
+    if (!dailySale) {
+      isNewDay = true;
+      const entry = await tx.entry.create({
+        data: {
+          date: input.date,
+          category: "SALES",
+          description: `Daily sales close-out - ${dateLabel}`,
+          amount,
+          paymentMethod: "FUND_SOURCE",
+          fundSourceAccountId: fundSource.id,
+          journalLines: {
+            create: [
+              { accountId: fundSource.id, debit: amount, credit: 0 },
+              { accountId: salesAccountId, debit: 0, credit: amount },
+            ],
+          },
+        },
+      });
+      dailySale = await tx.dailySale.create({
+        data: {
+          date: input.date,
+          totalAmount: amount,
+          entryId: entry.id,
+          fundings: { create: [{ fundSourceAccountId: fundSource.id, amount }] },
+          items: {
+            create: input.items.map((item) => ({
+              menuItemId: item.menuItemId,
+              quantity: item.quantity,
+              isParcel: item.isParcel,
+              unitPrice: item.unitPrice,
+              lineTotal: item.quantity * item.unitPrice,
+            })),
+          },
+        },
+      });
+    } else {
+      await tx.journalLine.createMany({
+        data: [
+          { entryId: dailySale.entryId, accountId: fundSource.id, debit: amount, credit: 0 },
+          { entryId: dailySale.entryId, accountId: salesAccountId, debit: 0, credit: amount },
+        ],
+      });
+      await tx.entry.update({ where: { id: dailySale.entryId }, data: { amount: { increment: amount } } });
+
+      const existingFunding = await tx.dailySaleFunding.findFirst({
+        where: { dailySaleId: dailySale.id, fundSourceAccountId: fundSource.id },
+      });
+      if (existingFunding) {
+        await tx.dailySaleFunding.update({ where: { id: existingFunding.id }, data: { amount: { increment: amount } } });
+      } else {
+        await tx.dailySaleFunding.create({ data: { dailySaleId: dailySale.id, fundSourceAccountId: fundSource.id, amount } });
+      }
+
+      await tx.dailySaleItem.createMany({
+        data: input.items.map((item) => ({
+          dailySaleId: dailySale!.id,
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          isParcel: item.isParcel,
+          unitPrice: item.unitPrice,
+          lineTotal: item.quantity * item.unitPrice,
+        })),
+      });
+
+      dailySale = await tx.dailySale.update({ where: { id: dailySale.id }, data: { totalAmount: { increment: amount } } });
+    }
+
+    await logAudit(tx, {
+      actor,
+      action: isNewDay ? "CREATE" : "UPDATE",
+      entityType: "DailySale",
+      entityId: dailySale.id,
+      summary: `Order recorded: ${formatTaka(amount)} via ${fundSource.name} (${input.items.length} item${input.items.length === 1 ? "" : "s"})`,
+      amount,
+      detail: {
+        date: dateLabel,
+        fundSource: fundSource.name,
+        items: input.items.length,
+        orderTotal: amount,
+        dayTotal: toNumber(dailySale.totalAmount),
+      },
+    });
+
+    return dailySale;
+  });
 }

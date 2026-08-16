@@ -8,6 +8,7 @@ import {
   BookOpen,
   Users,
   FileBarChart,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface NavLink {
@@ -31,6 +32,7 @@ export const SECONDARY_LINKS: NavLink[] = [
   { href: "/accounts", label: "Chart of Accounts", icon: BookOpen },
   { href: "/partners", label: "Partners & Equity", icon: Users },
   { href: "/reports", label: "Reports", icon: FileBarChart },
+  { href: "/audit-log", label: "Audit Log", icon: ShieldCheck },
 ];
 
 export const ALL_LINKS: NavLink[] = [...PRIMARY_LINKS, ...SECONDARY_LINKS];
