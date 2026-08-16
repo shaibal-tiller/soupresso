@@ -37,13 +37,14 @@ export default async function DailySalesPage() {
     name: m.name,
     price: Number(m.price),
     parcelPrice: m.parcelPrice != null ? Number(m.parcelPrice) : null,
+    category: m.category,
   }));
   const fundSourceOptions = fundSources.map((f) => ({ id: f.id, name: f.name }));
 
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Daily Sales</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">Daily Sales</h1>
         <p className="text-sm text-muted-foreground">
           Record a sale the moment a customer orders, or close out the whole day in one go.
         </p>

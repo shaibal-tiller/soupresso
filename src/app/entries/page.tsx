@@ -42,7 +42,7 @@ export default async function EntriesPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Entries</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">Entries</h1>
         <p className="text-sm text-muted-foreground">
           Record every purchase, expense, investment, loan, or settlement as a single entry. Daily food sales are recorded on the
           Daily Sales page.

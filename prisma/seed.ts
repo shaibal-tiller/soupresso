@@ -68,11 +68,13 @@ const MENU_ITEMS: {
   sortOrder: number;
 }[] = [
   { name: "Soup", price: 60, parcelPrice: 70, category: "SOUP", sortOrder: 1 },
-  { name: "Meat Box", price: 80, category: "MAIN", sortOrder: 2 },
-  { name: "Wonton", price: 10, category: "SNACK", sortOrder: 3 },
-  { name: "Taquitos Roll", price: 15, category: "SNACK", sortOrder: 4 },
-  { name: "Spring Roll", price: 15, category: "SNACK", sortOrder: 5 },
-  { name: "French Fries", price: 60, category: "SNACK", sortOrder: 6 },
+  { name: "Chicken Meat Box", price: 80, category: "MAIN", sortOrder: 2 },
+  { name: "Momo", price: 15, category: "SNACK", sortOrder: 3 },
+  { name: "Chicken Wonton", price: 10, category: "SNACK", sortOrder: 4 },
+  { name: "Taquitos", price: 15, category: "SNACK", sortOrder: 5 },
+  { name: "Spring Roll", price: 15, category: "SNACK", sortOrder: 6 },
+  { name: "French Fries", price: 60, category: "SNACK", sortOrder: 7 },
+  { name: "Nachos", price: 100, category: "SNACK", sortOrder: 8 },
 ];
 
 const PARTNER_COUNT = 15;

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { MenuTable, type MenuItemRow } from "@/components/menu/menu-table";
+import { MenuCardGrid, type MenuItemRow } from "@/components/menu/menu-card-grid";
 import { MenuItemDialog } from "@/components/menu/menu-item-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
@@ -22,7 +22,7 @@ export default async function MenuPage() {
     <div className="grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Menu</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Menu</h1>
           <p className="text-sm text-muted-foreground">Customize prices and items used on the Daily Sales page.</p>
         </div>
         <MenuItemDialog />
@@ -34,7 +34,7 @@ export default async function MenuPage() {
           <CardDescription>Toggle items off instead of deleting to keep them out of the Daily Sales picker.</CardDescription>
         </CardHeader>
         <CardContent>
-          <MenuTable items={rows} />
+          <MenuCardGrid items={rows} />
         </CardContent>
       </Card>
     </div>

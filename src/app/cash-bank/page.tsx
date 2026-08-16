@@ -56,7 +56,7 @@ export default async function CashBankPage() {
     <div className="grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Cash & Bank</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Cash & Bank</h1>
           <p className="text-sm text-muted-foreground">
             Every place money physically sits — cash box, bank accounts, mobile banking. Add as many as you use.
           </p>

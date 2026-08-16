@@ -15,7 +15,7 @@ import {
 } from "@/components/charts/dashboard-charts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
-import { Wallet, Scale, TrendingUp, HandCoins, Users, Boxes, Receipt } from "lucide-react";
+import { Wallet, Scale, TrendingUp, HandCoins, Users, Boxes, Receipt, AlertCircle, ArrowDownToLine, Banknote, Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Soupresso Ledger" };
@@ -32,30 +32,45 @@ export default async function DashboardPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Soupresso cart business — real-time ledger summary.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Liquid Funds" value={summary.totalLiquidFunds} icon={Wallet} hint="Across all cash/bank accounts" />
-        <StatCard label="Today's Sales" value={summary.todaySales} icon={TrendingUp} tone="good" />
-        <StatCard label="Month-to-Date Sales" value={summary.monthToDateSales} icon={Receipt} />
-        <StatCard label="Total Assets" value={summary.totalAssets} icon={Boxes} />
-        <StatCard label="Total Liabilities" value={summary.totalLiabilities} icon={Scale} />
-        <StatCard label="Total Equity" value={summary.totalEquity} icon={Users} />
+        <StatCard label="Total Liquid Funds" value={summary.totalLiquidFunds} icon={Wallet} hue="amber" hint="Across all cash/bank accounts" />
+        <StatCard label="Today's Sales" value={summary.todaySales} icon={TrendingUp} tone="good" hue="green" />
+        <StatCard label="Month-to-Date Sales" value={summary.monthToDateSales} icon={Receipt} hue="teal" />
+        <StatCard label="Total Assets" value={summary.totalAssets} icon={Boxes} hue="maroon" />
+        <StatCard label="Total Liabilities" value={summary.totalLiabilities} icon={Scale} hue="maroon" />
+        <StatCard label="Total Equity" value={summary.totalEquity} icon={Users} hue="green" />
         <StatCard
           label="Net Profit (all-time)"
           value={summary.netProfitAllTime}
           icon={HandCoins}
           tone={summary.netProfitAllTime >= 0 ? "good" : "critical"}
+          hue="green"
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Accounts Payable" value={summary.accountsPayable} tone={summary.accountsPayable > 0 ? "critical" : "default"} hint="What we owe" />
-        <StatCard label="Accounts Receivable" value={summary.accountsReceivable} tone="good" hint="What's owed to us" />
-        <StatCard label="Loans Payable" value={summary.loansPayable} />
-        <StatCard label="Fixed Assets" value={summary.fixedAssets} hint="Cart, equipment, furniture" />
+        <StatCard
+          label="Accounts Payable"
+          value={summary.accountsPayable}
+          tone={summary.accountsPayable > 0 ? "critical" : "default"}
+          icon={AlertCircle}
+          hue="maroon"
+          hint="What we owe"
+        />
+        <StatCard
+          label="Accounts Receivable"
+          value={summary.accountsReceivable}
+          tone="good"
+          icon={ArrowDownToLine}
+          hue="green"
+          hint="What's owed to us"
+        />
+        <StatCard label="Loans Payable" value={summary.loansPayable} icon={Banknote} hue="amber" />
+        <StatCard label="Fixed Assets" value={summary.fixedAssets} icon={Package} hue="teal" hint="Cart, equipment, furniture" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -10,12 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { formatTaka } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMenuVisual } from "@/lib/menu-icon";
 
 interface MenuItemOption {
   id: string;
   name: string;
   price: number;
   parcelPrice: number | null;
+  category: string;
 }
 
 interface FundSourceOption {
@@ -108,44 +110,51 @@ export function QuickSalePanel({
 
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
-        <span className="text-sm text-muted-foreground">Today&apos;s sales so far</span>
-        <span className="text-lg font-semibold tabular-nums">{formatTaka(todayTotal)}</span>
+      <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-brand-amber to-brand-amber-deep px-4 py-3 text-white shadow-sm">
+        <span className="text-sm font-medium opacity-90">Today&apos;s sales so far</span>
+        <span className="font-heading text-xl font-bold tabular-nums">{formatTaka(todayTotal)}</span>
       </div>
 
       <div>
         <Label className="mb-2 block text-sm text-muted-foreground">Tap an item to add it to the order</Label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => addItem(item, false)}
-              className="flex flex-col items-start gap-0.5 rounded-lg border bg-card p-3 text-left transition-colors active:bg-muted hover:bg-muted/60"
-            >
-              <span className="text-sm font-medium leading-tight">{item.name}</span>
-              <span className="text-xs text-muted-foreground">৳{item.price}</span>
-              {item.parcelPrice != null && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    addItem(item, true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {menuItems.map((item) => {
+            const visual = getMenuVisual(item.name, item.category);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => addItem(item, false)}
+                className="group relative flex flex-col items-start gap-1 overflow-hidden rounded-2xl border bg-card p-3 text-left shadow-sm transition-all active:scale-[0.97] active:bg-muted hover:shadow-md"
+              >
+                <div className={cn("absolute inset-x-0 top-0 h-1.5", visual.accentClass)} />
+                <div className={cn("mt-1 flex h-9 w-9 items-center justify-center rounded-full text-lg", visual.badgeClass)}>
+                  {visual.emoji}
+                </div>
+                <span className="font-heading mt-1 text-sm font-semibold leading-tight">{item.name}</span>
+                <span className="text-xs font-medium text-brand-maroon">৳{item.price}</span>
+                {item.parcelPrice != null && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
                       e.stopPropagation();
                       addItem(item, true);
-                    }
-                  }}
-                  className="mt-1 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                >
-                  Parcel ৳{item.parcelPrice}
-                </span>
-              )}
-            </button>
-          ))}
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        addItem(item, true);
+                      }
+                    }}
+                    className="mt-0.5 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    Parcel ৳{item.parcelPrice}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -164,11 +173,11 @@ export function QuickSalePanel({
           ) : (
             <div className="grid gap-2">
               {lines.map((line) => (
-                <div key={line.key} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+                <div key={line.key} className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">
+                    <div className="font-heading truncate text-sm font-semibold">
                       {line.name}
-                      {line.isParcel && <span className="text-muted-foreground"> (parcel)</span>}
+                      {line.isParcel && <span className="font-sans font-normal text-muted-foreground"> (parcel)</span>}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       ৳{line.unitPrice} × {line.quantity} = {formatTaka(line.unitPrice * line.quantity)}
