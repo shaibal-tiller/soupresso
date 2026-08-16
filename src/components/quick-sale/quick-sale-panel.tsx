@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { formatTaka } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getMenuVisual } from "@/lib/menu-icon";
+import { useLang } from "@/components/language-provider";
 
 interface MenuItemOption {
   id: string;
@@ -45,6 +46,7 @@ export function QuickSalePanel({
   fundSources: FundSourceOption[];
   initialTodayTotal: number;
 }) {
+  const { t } = useLang();
   const [state, formAction, pending] = useActionState(quickSaleAction, initialState);
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [fundSourceId, setFundSourceId] = useState(fundSources[0]?.id ?? "");
@@ -95,11 +97,11 @@ export function QuickSalePanel({
 
   function handleSubmit(formData: FormData) {
     if (lines.length === 0) {
-      toast.error("Add at least one item");
+      toast.error(t("Add at least one item"));
       return;
     }
     if (!fundSourceId) {
-      toast.error("Choose how the customer paid");
+      toast.error(t("Choose how the customer paid"));
       return;
     }
     const cartPayload = lines.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity, isParcel: l.isParcel }));
@@ -111,12 +113,12 @@ export function QuickSalePanel({
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-brand-amber to-brand-amber-deep px-4 py-3 text-white shadow-sm">
-        <span className="text-sm font-medium opacity-90">Today&apos;s sales so far</span>
+        <span className="text-sm font-medium opacity-90">{t("Today's sales so far")}</span>
         <span className="font-heading text-xl font-bold tabular-nums">{formatTaka(todayTotal)}</span>
       </div>
 
       <div>
-        <Label className="mb-2 block text-sm text-muted-foreground">Tap an item to add it to the order</Label>
+        <Label className="mb-2 block text-sm text-muted-foreground">{t("Tap an item to add it to the order")}</Label>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {menuItems.map((item) => {
             const visual = getMenuVisual(item.name, item.category);
@@ -149,7 +151,7 @@ export function QuickSalePanel({
                     }}
                     className="mt-0.5 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
-                    Parcel ৳{item.parcelPrice}
+                    {t("Parcel")} ৳{item.parcelPrice}
                   </span>
                 )}
               </button>
@@ -163,13 +165,13 @@ export function QuickSalePanel({
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-1.5 text-sm">
               <ShoppingCart className="h-4 w-4" />
-              Current Order
+              {t("Current Order")}
             </Label>
             <span className="text-sm font-medium tabular-nums">{formatTaka(cartTotal)}</span>
           </div>
 
           {lines.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No items yet — tap something above.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">{t("No items yet — tap something above.")}</p>
           ) : (
             <div className="grid gap-2">
               {lines.map((line) => (
@@ -177,7 +179,7 @@ export function QuickSalePanel({
                   <div className="min-w-0">
                     <div className="font-heading truncate text-sm font-semibold">
                       {line.name}
-                      {line.isParcel && <span className="font-sans font-normal text-muted-foreground"> (parcel)</span>}
+                      {line.isParcel && <span className="font-sans font-normal text-muted-foreground"> {t("(parcel)")}</span>}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       ৳{line.unitPrice} × {line.quantity} = {formatTaka(line.unitPrice * line.quantity)}
@@ -209,13 +211,13 @@ export function QuickSalePanel({
           )}
 
           <div className="grid gap-1.5">
-            <Label htmlFor="quickSaleFundSource">Customer paid with</Label>
+            <Label htmlFor="quickSaleFundSource">{t("Customer paid with")}</Label>
             {fundSources.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No cash/bank accounts yet — add one on the Cash &amp; Bank page.</p>
+              <p className="text-xs text-muted-foreground">{t("No cash/bank accounts yet — add one on the Cash & Bank page.")}</p>
             ) : (
               <Select value={fundSourceId} onValueChange={(v) => v && setFundSourceId(v)}>
                 <SelectTrigger id="quickSaleFundSource" className="w-full">
-                  <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : "Select account")}</SelectValue>
+                  <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : t("Select account"))}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {fundSources.map((f) => (
@@ -234,7 +236,7 @@ export function QuickSalePanel({
               disabled={pending || lines.length === 0 || !fundSourceId}
               className={cn("w-full", lines.length > 0 && "sticky bottom-20 md:static")}
             >
-              {pending ? "Recording..." : `Record Order — ${formatTaka(cartTotal)}`}
+              {pending ? t("Recording...") : `${t("Record Order")} — ${formatTaka(cartTotal)}`}
             </Button>
           </form>
         </CardContent>

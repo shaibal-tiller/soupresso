@@ -20,6 +20,7 @@ import { isPaymentMethodAllowed, CATEGORY_LABELS, type PaymentMethodValue } from
 import { getPurchaseVisual } from "@/lib/purchase-icon";
 import { cn } from "@/lib/utils";
 import { ManageItemsSheet } from "@/components/quick-purchase/manage-items-sheet";
+import { useLang } from "@/components/language-provider";
 
 export interface PurchaseItemOption {
   id: string;
@@ -54,6 +55,7 @@ export function QuickPurchasePanel({
   items: PurchaseItemOption[];
   fundSources: FundSourceOption[];
 }) {
+  const { t } = useLang();
   const [state, formAction, pending] = useActionState(quickPurchaseAction, initialState);
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [vendor, setVendor] = useState("");
@@ -148,11 +150,11 @@ export function QuickPurchasePanel({
         amount: Number(l.amount),
       }));
     if (cartPayload.length === 0) {
-      toast.error("Add an amount for at least one item");
+      toast.error(t("Add an amount for at least one item"));
       return;
     }
     if (needsFundSource && !fundSourceId) {
-      toast.error("Choose which cash/bank account this uses");
+      toast.error(t("Choose which cash/bank account this uses"));
       return;
     }
     formData.set("cart", JSON.stringify(cartPayload));
@@ -164,7 +166,7 @@ export function QuickPurchasePanel({
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <Label className="text-sm text-muted-foreground">Tap what you bought today</Label>
+        <Label className="text-sm text-muted-foreground">{t("Tap what you bought today")}</Label>
         <ManageItemsSheet items={items} />
       </div>
 
@@ -173,7 +175,7 @@ export function QuickPurchasePanel({
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search items..."
+          placeholder={t("Search items...")}
           className="pl-9"
         />
         {search && (
@@ -181,7 +183,7 @@ export function QuickPurchasePanel({
             type="button"
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label="Clear search"
+            aria-label={t("Clear search")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -197,7 +199,7 @@ export function QuickPurchasePanel({
             categoryFilter === "ALL" ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
           )}
         >
-          All ({activeItems.length})
+          {t("All")} ({activeItems.length})
         </button>
         {categories.map((category) => {
           const count = activeItems.filter((i) => i.category === category).length;
@@ -211,7 +213,7 @@ export function QuickPurchasePanel({
                 categoryFilter === category ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
               )}
             >
-              {CATEGORY_LABELS[category] ?? category} ({count})
+              {t(CATEGORY_LABELS[category] ?? category)} ({count})
             </button>
           );
         })}
@@ -219,7 +221,7 @@ export function QuickPurchasePanel({
 
       {groupedItems.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          {activeItems.length === 0 ? 'No purchase items yet — add some from "Manage items".' : "No items match your search."}
+          {activeItems.length === 0 ? t('No purchase items yet — add some from "Manage items".') : t("No items match your search.")}
         </p>
       ) : (
         <div className="grid gap-4">
@@ -227,7 +229,7 @@ export function QuickPurchasePanel({
             <div key={group.category}>
               {categoryFilter === "ALL" && (
                 <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  {CATEGORY_LABELS[group.category] ?? group.category}
+                  {t(CATEGORY_LABELS[group.category] ?? group.category)}
                 </Label>
               )}
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
@@ -264,13 +266,13 @@ export function QuickPurchasePanel({
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-1.5 text-sm">
               <ShoppingBasket className="h-4 w-4" />
-              Today&apos;s Basket
+              {t("Today's Basket")}
             </Label>
             <span className="text-sm font-medium tabular-nums">{formatTaka(cartTotal)}</span>
           </div>
 
           {lines.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No items yet — tap something above.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">{t("No items yet — tap something above.")}</p>
           ) : (
             <div className="grid gap-2">
               {lines.map((line) => (
@@ -306,28 +308,28 @@ export function QuickPurchasePanel({
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="qp-date">Date</Label>
+              <Label htmlFor="qp-date">{t("Date")}</Label>
               <Input id="qp-date" name="date" type="date" defaultValue={today} required form="quick-purchase-form" />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="qp-vendor">Vendor (optional)</Label>
+              <Label htmlFor="qp-vendor">{t("Vendor (optional)")}</Label>
               <Input
                 id="qp-vendor"
                 value={vendor}
                 onChange={(e) => setVendor(e.target.value)}
-                placeholder="e.g. Karwan Bazar"
+                placeholder={t("e.g. Karwan Bazar")}
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="qp-payment">Payment Method</Label>
+              <Label htmlFor="qp-payment">{t("Payment Method")}</Label>
               <Select value={paymentMethod} onValueChange={(v) => v && setPaymentMethod(v as PaymentMethodValue)}>
                 <SelectTrigger id="qp-payment" className="w-full">
-                  <SelectValue>{(value: string | null) => (value ? PAYMENT_METHOD_LABELS[value] : "Select")}</SelectValue>
+                  <SelectValue>{(value: string | null) => (value ? t(PAYMENT_METHOD_LABELS[value]) : t("Select"))}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.filter((pm) => isPaymentMethodAllowed("RAW_MATERIAL", pm)).map((pm) => (
                     <SelectItem key={pm} value={pm}>
-                      {PAYMENT_METHOD_LABELS[pm]}
+                      {t(PAYMENT_METHOD_LABELS[pm])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -337,10 +339,10 @@ export function QuickPurchasePanel({
 
           {needsFundSource && (
             <div className="grid gap-1.5">
-              <Label htmlFor="qp-fund">Cash / Bank Account</Label>
+              <Label htmlFor="qp-fund">{t("Cash / Bank Account")}</Label>
               <Select value={fundSourceId} onValueChange={(v) => v && setFundSourceId(v)}>
                 <SelectTrigger id="qp-fund" className="w-full">
-                  <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : "Select account")}</SelectValue>
+                  <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : t("Select account"))}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {fundSources.map((f) => (
@@ -356,7 +358,9 @@ export function QuickPurchasePanel({
           <form id="quick-purchase-form" action={handleSubmit}>
             <input type="hidden" name="vendor" value={vendor} />
             <Button type="submit" disabled={pending || lines.length === 0} className="w-full sm:w-auto">
-              {pending ? "Saving..." : `Save ${lines.length || ""} Purchase${lines.length === 1 ? "" : "s"} — ${formatTaka(cartTotal)}`}
+              {pending
+                ? t("Saving...")
+                : `${t("Save")} ${lines.length || ""} ${lines.length === 1 ? t("Purchase") : t("Purchases")} — ${formatTaka(cartTotal)}`}
             </Button>
           </form>
         </CardContent>

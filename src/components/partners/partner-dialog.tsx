@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { ActionState } from "@/app/entries/actions";
+import { useLang } from "@/components/language-provider";
 
 const initialState: ActionState = { success: false, message: "" };
 
@@ -28,6 +29,7 @@ interface PartnerData {
 }
 
 export function PartnerDialog({ partner }: { partner?: PartnerData }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(savePartnerAction, initialState);
 
@@ -44,37 +46,37 @@ export function PartnerDialog({ partner }: { partner?: PartnerData }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={partner ? <Button variant="ghost" size="icon" aria-label="Edit partner" /> : <Button />}>
+      <DialogTrigger render={partner ? <Button variant="ghost" size="icon" aria-label={t("Edit partner")} /> : <Button />}>
         {partner ? (
           <Pencil className="h-4 w-4" />
         ) : (
           <>
             <Plus className="h-4 w-4" />
-            Add Partner
+            {t("Add Partner")}
           </>
         )}
       </DialogTrigger>
       <DialogContent>
         <form action={formAction}>
           <DialogHeader>
-            <DialogTitle>{partner ? "Edit Partner" : "Add Partner"}</DialogTitle>
-            <DialogDescription>A dedicated equity account is created automatically for each partner.</DialogDescription>
+            <DialogTitle>{partner ? t("Edit Partner") : t("Add Partner")}</DialogTitle>
+            <DialogDescription>{t("A dedicated equity account is created automatically for each partner.")}</DialogDescription>
           </DialogHeader>
 
           {partner && <input type="hidden" name="id" value={partner.id} />}
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t("Name")}</Label>
               <Input id="name" name="name" defaultValue={partner?.name} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="phone">Phone (optional)</Label>
+                <Label htmlFor="phone">{t("Phone (optional)")}</Label>
                 <Input id="phone" name="phone" defaultValue={partner?.phone ?? undefined} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="sharePercent">Share % (optional)</Label>
+                <Label htmlFor="sharePercent">{t("Share % (optional)")}</Label>
                 <Input
                   id="sharePercent"
                   name="sharePercent"
@@ -90,7 +92,7 @@ export function PartnerDialog({ partner }: { partner?: PartnerData }) {
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Save"}
+              {pending ? t("Saving...") : t("Save")}
             </Button>
           </DialogFooter>
         </form>

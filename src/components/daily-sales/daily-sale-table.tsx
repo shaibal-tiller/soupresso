@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatTaka, formatDate } from "@/lib/format";
+import { useLang } from "@/components/language-provider";
 
 export interface DailySaleRow {
   id: string;
@@ -25,18 +26,19 @@ export interface DailySaleRow {
 }
 
 export function DailySaleTable({ rows }: { rows: DailySaleRow[] }) {
+  const { t } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleDelete(id: string) {
-    if (!confirm("Delete this daily sales record? This cannot be undone.")) return;
+    if (!confirm(t("Delete this daily sales record? This cannot be undone."))) return;
     startTransition(async () => {
       await deleteDailySaleAction(id);
-      toast.success("Daily sales record deleted");
+      toast.success(t("Daily sales record deleted"));
     });
   }
 
   if (rows.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">No daily sales recorded yet.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">{t("No daily sales recorded yet.")}</p>;
   }
 
   return (
@@ -44,10 +46,10 @@ export function DailySaleTable({ rows }: { rows: DailySaleRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Sources</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead>Items</TableHead>
+            <TableHead>{t("Date")}</TableHead>
+            <TableHead>{t("Sources")}</TableHead>
+            <TableHead className="text-right">{t("Total")}</TableHead>
+            <TableHead>{t("Items")}</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -61,7 +63,7 @@ export function DailySaleTable({ rows }: { rows: DailySaleRow[] }) {
               <TableCell className="text-right font-medium">{formatTaka(row.totalAmount)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{row.itemCount} line{row.itemCount === 1 ? "" : "s"}</TableCell>
               <TableCell>
-                <Button variant="ghost" size="icon" disabled={isPending} onClick={() => handleDelete(row.id)} aria-label="Delete">
+                <Button variant="ghost" size="icon" disabled={isPending} onClick={() => handleDelete(row.id)} aria-label={t("Delete")}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </TableCell>

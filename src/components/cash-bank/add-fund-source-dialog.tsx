@@ -17,10 +17,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { ActionState } from "@/app/entries/actions";
+import { useLang } from "@/components/language-provider";
 
 const initialState: ActionState = { success: false, message: "" };
 
 export function AddFundSourceDialog() {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createFundSourceAction, initialState);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -40,41 +42,42 @@ export function AddFundSourceDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
         <Plus className="h-4 w-4" />
-        Add Account
+        {t("Add Account")}
       </DialogTrigger>
       <DialogContent>
         <form action={formAction}>
           <DialogHeader>
-            <DialogTitle>Add Cash / Bank Account</DialogTitle>
+            <DialogTitle>{t("Add Cash / Bank Account")}</DialogTitle>
             <DialogDescription>
-              For a physical cash box, a bank account, or a mobile banking wallet (bKash, Nagad, Rocket...).
+              {t("For a physical cash box, a bank account, or a mobile banking wallet (bKash, Nagad, Rocket...).")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" placeholder="e.g. bKash, City Bank - 4521" required />
+              <Label htmlFor="name">{t("Name")}</Label>
+              <Input id="name" name="name" placeholder={t("e.g. bKash, City Bank - 4521")} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="openingBalance">Starting Balance (৳)</Label>
+                <Label htmlFor="openingBalance">{t("Starting Balance (৳)")}</Label>
                 <Input id="openingBalance" name="openingBalance" type="number" step="0.01" placeholder="0.00" defaultValue="0" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="date">As Of</Label>
+                <Label htmlFor="date">{t("As Of")}</Label>
                 <Input id="date" name="date" type="date" defaultValue={today} required />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              If this account already has money in it, enter the current balance — it&apos;s posted against a Balance
-              Adjustments account so your books stay correct without touching profit.
+              {t(
+                "If this account already has money in it, enter the current balance — it's posted against a Balance Adjustments account so your books stay correct without touching profit.",
+              )}
             </p>
           </div>
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Add Account"}
+              {pending ? t("Saving...") : t("Add Account")}
             </Button>
           </DialogFooter>
         </form>

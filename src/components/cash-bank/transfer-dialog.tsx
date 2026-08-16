@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ActionState } from "@/app/entries/actions";
+import { useLang } from "@/components/language-provider";
 
 const initialState: ActionState = { success: false, message: "" };
 
@@ -27,6 +28,7 @@ interface FundSourceOption {
 }
 
 export function TransferDialog({ fundSources }: { fundSources: FundSourceOption[] }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(transferAction, initialState);
   const [fromId, setFromId] = useState("");
@@ -51,22 +53,24 @@ export function TransferDialog({ fundSources }: { fundSources: FundSourceOption[
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" />}>
         <ArrowLeftRight className="h-4 w-4" />
-        Transfer
+        {t("Transfer")}
       </DialogTrigger>
       <DialogContent>
         <form action={formAction}>
           <DialogHeader>
-            <DialogTitle>Transfer Between Accounts</DialogTitle>
-            <DialogDescription>e.g. depositing today&apos;s cash into the bank, or moving bKash to the bank.</DialogDescription>
+            <DialogTitle>{t("Transfer Between Accounts")}</DialogTitle>
+            <DialogDescription>
+              {t("e.g. depositing today's cash into the bank, or moving bKash to the bank.")}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="fromAccountId">From</Label>
+                <Label htmlFor="fromAccountId">{t("From")}</Label>
                 <Select name="fromAccountId" value={fromId} onValueChange={(v) => v && setFromId(v)}>
                   <SelectTrigger id="fromAccountId" className="w-full">
-                    <SelectValue>{(value: string | null) => (value ? labels[value] : "Select account")}</SelectValue>
+                    <SelectValue>{(value: string | null) => (value ? labels[value] : t("Select account"))}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {fundSources.map((f) => (
@@ -78,10 +82,10 @@ export function TransferDialog({ fundSources }: { fundSources: FundSourceOption[
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="toAccountId">To</Label>
+                <Label htmlFor="toAccountId">{t("To")}</Label>
                 <Select name="toAccountId" value={toId} onValueChange={(v) => v && setToId(v)}>
                   <SelectTrigger id="toAccountId" className="w-full">
-                    <SelectValue>{(value: string | null) => (value ? labels[value] : "Select account")}</SelectValue>
+                    <SelectValue>{(value: string | null) => (value ? labels[value] : t("Select account"))}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {fundSources.map((f) => (
@@ -95,23 +99,23 @@ export function TransferDialog({ fundSources }: { fundSources: FundSourceOption[
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="amount">Amount (৳)</Label>
+                <Label htmlFor="amount">{t("Amount (৳)")}</Label>
                 <Input id="amount" name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" required />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">{t("Date")}</Label>
                 <Input id="date" name="date" type="date" defaultValue={today} required />
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="description">Note (optional)</Label>
-              <Input id="description" name="description" placeholder="e.g. Bank deposit" />
+              <Label htmlFor="description">{t("Note (optional)")}</Label>
+              <Input id="description" name="description" placeholder={t("e.g. Bank deposit")} />
             </div>
           </div>
 
           <DialogFooter>
             <Button type="submit" disabled={pending || !fromId || !toId}>
-              {pending ? "Saving..." : "Transfer"}
+              {pending ? t("Saving...") : t("Transfer")}
             </Button>
           </DialogFooter>
         </form>

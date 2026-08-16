@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ACTOR_COOKIE } from "@/lib/actor-shared";
+import { useLang } from "@/components/language-provider";
 
 function readActorCookie(): string | null {
   if (typeof document === "undefined") return null;
@@ -27,6 +28,7 @@ function writeActorCookie(name: string) {
 }
 
 export function ActorBadge({ className }: { className?: string }) {
+  const { t } = useLang();
   const [name, setName] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -63,31 +65,31 @@ export function ActorBadge({ className }: { className?: string }) {
         className={className ?? "flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"}
       >
         <UserCircle className="h-4 w-4" />
-        {name ?? "Set your name"}
+        {name ?? t("Set your name")}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <form onSubmit={handleSave}>
             <DialogHeader>
-              <DialogTitle>Who&apos;s using this device?</DialogTitle>
+              <DialogTitle>{t("Who's using this device?")}</DialogTitle>
               <DialogDescription>
-                Your name is attached to every entry, edit, and deletion you make, so the audit log stays accountable.
+                {t("Your name is attached to every entry, edit, and deletion you make, so the audit log stays accountable.")}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-1.5 py-4">
-              <Label htmlFor="actorName">Your Name</Label>
+              <Label htmlFor="actorName">{t("Your Name")}</Label>
               <Input
                 id="actorName"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="e.g. Rahim"
+                placeholder={t("e.g. Rahim")}
                 autoFocus
                 required
               />
             </div>
             <DialogFooter>
-              <Button type="submit">Save</Button>
+              <Button type="submit">{t("Save")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

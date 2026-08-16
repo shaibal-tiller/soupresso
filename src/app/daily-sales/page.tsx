@@ -4,6 +4,7 @@ import { DailySaleTable, type DailySaleRow } from "@/components/daily-sales/dail
 import { QuickSalePanel } from "@/components/quick-sale/quick-sale-panel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getLang, t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Daily Sales — Soupresso Ledger" };
@@ -12,7 +13,7 @@ export default async function DailySalesPage() {
   const now = new Date();
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-  const [menuItems, dailySales, fundSources, todaySale] = await Promise.all([
+  const [menuItems, dailySales, fundSources, todaySale, lang] = await Promise.all([
     prisma.menuItem.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     prisma.dailySale.findMany({
       orderBy: { date: "desc" },
@@ -21,6 +22,7 @@ export default async function DailySalesPage() {
     }),
     prisma.account.findMany({ where: { isActive: true, isFundSource: true }, orderBy: { code: "asc" } }),
     prisma.dailySale.findUnique({ where: { date: today } }),
+    getLang(),
   ]);
 
   const rows: DailySaleRow[] = dailySales.map((d) => ({
@@ -44,9 +46,9 @@ export default async function DailySalesPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Daily Sales</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Daily Sales")}</h1>
         <p className="text-sm text-muted-foreground">
-          Record a sale the moment a customer orders, or close out the whole day in one go.
+          {t(lang, "Record a sale the moment a customer orders, or close out the whole day in one go.")}
         </p>
       </div>
 
@@ -54,8 +56,8 @@ export default async function DailySalesPage() {
         <CardContent className="pt-6">
           <Tabs defaultValue="quick">
             <TabsList className="w-full sm:w-auto">
-              <TabsTrigger value="quick">Quick Sale</TabsTrigger>
-              <TabsTrigger value="full">Full Day Entry</TabsTrigger>
+              <TabsTrigger value="quick">{t(lang, "Quick Sale")}</TabsTrigger>
+              <TabsTrigger value="full">{t(lang, "Full Day Entry")}</TabsTrigger>
             </TabsList>
             <TabsContent value="quick" className="pt-4">
               <QuickSalePanel
@@ -66,8 +68,10 @@ export default async function DailySalesPage() {
             </TabsContent>
             <TabsContent value="full" className="grid gap-1.5 pt-4">
               <p className="mb-2 text-sm text-muted-foreground">
-                Enter the whole day&apos;s total at once — useful for a quiet day, or backfilling a day you didn&apos;t log
-                live. This creates the day&apos;s record; if it already exists (e.g. from Quick Sale), delete it first.
+                {t(
+                  lang,
+                  "Enter the whole day's total at once — useful for a quiet day, or backfilling a day you didn't log live. This creates the day's record; if it already exists (e.g. from Quick Sale), delete it first.",
+                )}
               </p>
               <DailySaleForm menuItems={menuItemOptions} fundSources={fundSourceOptions} />
             </TabsContent>
@@ -77,8 +81,8 @@ export default async function DailySalesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Sales History</CardTitle>
-          <CardDescription>Last 90 days.</CardDescription>
+          <CardTitle>{t(lang, "Sales History")}</CardTitle>
+          <CardDescription>{t(lang, "Last 90 days.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <DailySaleTable rows={rows} />

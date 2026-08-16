@@ -4,6 +4,7 @@ import { AccountTable, type AccountRow } from "@/components/accounts/account-tab
 import { AccountDialog } from "@/components/accounts/account-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
+import { getLang, t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Chart of Accounts — Soupresso Ledger" };
@@ -19,9 +20,10 @@ const TYPE_LABELS: Record<string, string> = {
 const TYPE_ORDER = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"];
 
 export default async function AccountsPage() {
-  const [accounts, balances] = await Promise.all([
+  const [accounts, balances, lang] = await Promise.all([
     prisma.account.findMany({ orderBy: { code: "asc" } }),
     getAccountBalances(),
+    getLang(),
   ]);
 
   const balanceMap = new Map(balances.map((b) => [b.id, b.balance]));
@@ -41,10 +43,12 @@ export default async function AccountsPage() {
     <div className="grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Chart of Accounts</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Chart of Accounts")}</h1>
           <p className="text-sm text-muted-foreground">
-            Every entry posts to two accounts here automatically. Core accounts are protected; add custom ones for manual
-            adjustments.
+            {t(
+              lang,
+              "Every entry posts to two accounts here automatically. Core accounts are protected; add custom ones for manual adjustments.",
+            )}
           </p>
         </div>
         <AccountDialog />
@@ -58,7 +62,7 @@ export default async function AccountsPage() {
           <Card key={type}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle>{TYPE_LABELS[type]}</CardTitle>
+                <CardTitle>{t(lang, TYPE_LABELS[type])}</CardTitle>
                 <CardDescription>{group.length} account{group.length === 1 ? "" : "s"}</CardDescription>
               </div>
               <span className="text-lg font-semibold">{formatTaka(total)}</span>

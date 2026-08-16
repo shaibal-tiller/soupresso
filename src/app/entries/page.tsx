@@ -4,12 +4,13 @@ import { EntryTable, type EntryRow } from "@/components/entries/entry-table";
 import { QuickPurchasePanel } from "@/components/quick-purchase/quick-purchase-panel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getLang, t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Entries — Soupresso Ledger" };
 
 export default async function EntriesPage() {
-  const [entries, partners, accounts, fundSources, purchaseItems] = await Promise.all([
+  const [entries, partners, accounts, fundSources, purchaseItems, lang] = await Promise.all([
     prisma.entry.findMany({
       where: { category: { not: "SALES" } },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -23,6 +24,7 @@ export default async function EntriesPage() {
     prisma.account.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
     prisma.account.findMany({ where: { isActive: true, isFundSource: true }, orderBy: { code: "asc" } }),
     prisma.purchaseItem.findMany({ orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }] }),
+    getLang(),
   ]);
 
   const rows: EntryRow[] = entries.map((e) => {
@@ -47,9 +49,9 @@ export default async function EntriesPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Entries</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Entries")}</h1>
         <p className="text-sm text-muted-foreground">
-          Tap what you bought today, or use manual entry for investments, loans, and other one-offs.
+          {t(lang, "Tap what you bought today, or use manual entry for investments, loans, and other one-offs.")}
         </p>
       </div>
 
@@ -57,8 +59,8 @@ export default async function EntriesPage() {
         <CardContent className="pt-6">
           <Tabs defaultValue="quick">
             <TabsList className="w-full sm:w-auto">
-              <TabsTrigger value="quick">Quick Purchase</TabsTrigger>
-              <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+              <TabsTrigger value="quick">{t(lang, "Quick Purchase")}</TabsTrigger>
+              <TabsTrigger value="manual">{t(lang, "Manual Entry")}</TabsTrigger>
             </TabsList>
             <TabsContent value="quick" className="pt-4">
               <QuickPurchasePanel
@@ -68,7 +70,7 @@ export default async function EntriesPage() {
             </TabsContent>
             <TabsContent value="manual" className="pt-4">
               <p className="mb-4 text-sm text-muted-foreground">
-                For investments, loans, settlements, asset purchases, or anything not on the quick-purchase list.
+                {t(lang, "For investments, loans, settlements, asset purchases, or anything not on the quick-purchase list.")}
               </p>
               <EntryForm
                 partners={partners.map((p) => ({ id: p.id, name: p.name }))}
@@ -82,8 +84,8 @@ export default async function EntriesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Entries</CardTitle>
-          <CardDescription>Latest 200 entries, newest first.</CardDescription>
+          <CardTitle>{t(lang, "Recent Entries")}</CardTitle>
+          <CardDescription>{t(lang, "Latest 200 entries, newest first.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <EntryTable entries={rows} />

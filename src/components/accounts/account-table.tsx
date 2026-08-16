@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AccountDialog } from "@/components/accounts/account-dialog";
 import { formatTaka } from "@/lib/format";
+import { useLang } from "@/components/language-provider";
 
 export interface AccountRow {
   id: string;
@@ -21,6 +22,7 @@ export interface AccountRow {
 }
 
 export function AccountTable({ accounts }: { accounts: AccountRow[] }) {
+  const { t } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string, next: boolean) {
@@ -35,10 +37,10 @@ export function AccountTable({ accounts }: { accounts: AccountRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
-            <TableHead>Active</TableHead>
+            <TableHead>{t("Code")}</TableHead>
+            <TableHead>{t("Name")}</TableHead>
+            <TableHead className="text-right">{t("Balance")}</TableHead>
+            <TableHead>{t("Active")}</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -51,7 +53,7 @@ export function AccountTable({ accounts }: { accounts: AccountRow[] }) {
                 {account.description && <div className="text-xs text-muted-foreground">{account.description}</div>}
                 {account.isSystem && (
                   <Badge variant="outline" className="mt-1 text-[10px]">
-                    Core
+                    {t("Core")}
                   </Badge>
                 )}
               </TableCell>

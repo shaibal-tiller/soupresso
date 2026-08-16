@@ -6,12 +6,13 @@ import { TransferDialog } from "@/components/cash-bank/transfer-dialog";
 import { EntryTable, type EntryRow } from "@/components/entries/entry-table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
+import { getLang, t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cash & Bank — Soupresso Ledger" };
 
 export default async function CashBankPage() {
-  const [balances, activity] = await Promise.all([
+  const [balances, activity, lang] = await Promise.all([
     getAccountBalances(true),
     prisma.entry.findMany({
       where: { category: { in: ["TRANSFER", "BALANCE_ADJUSTMENT"] } },
@@ -19,6 +20,7 @@ export default async function CashBankPage() {
       take: 50,
       include: { partner: true, journalLines: { include: { account: true } } },
     }),
+    getLang(),
   ]);
 
   const fundSources: FundSourceRow[] = balances
@@ -56,9 +58,9 @@ export default async function CashBankPage() {
     <div className="grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Cash & Bank</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Cash & Bank")}</h1>
           <p className="text-sm text-muted-foreground">
-            Every place money physically sits — cash box, bank accounts, mobile banking. Add as many as you use.
+            {t(lang, "Every place money physically sits — cash box, bank accounts, mobile banking. Add as many as you use.")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -70,8 +72,8 @@ export default async function CashBankPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle>Total Liquid Funds</CardTitle>
-            <CardDescription>Sum of all active cash/bank accounts</CardDescription>
+            <CardTitle>{t(lang, "Total Liquid Funds")}</CardTitle>
+            <CardDescription>{t(lang, "Sum of all active cash/bank accounts")}</CardDescription>
           </div>
           <span className="text-2xl font-semibold tabular-nums">{formatTaka(totalLiquid)}</span>
         </CardHeader>
@@ -81,8 +83,8 @@ export default async function CashBankPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transfers & Balance Adjustments</CardTitle>
-          <CardDescription>Money moved between accounts, and manual balance corrections.</CardDescription>
+          <CardTitle>{t(lang, "Transfers & Balance Adjustments")}</CardTitle>
+          <CardDescription>{t(lang, "Money moved between accounts, and manual balance corrections.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <EntryTable entries={activityRows} />

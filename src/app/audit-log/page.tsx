@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatTaka } from "@/lib/format";
+import { getLang, t } from "@/lib/i18n";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -42,24 +43,27 @@ export default async function AuditLogPage({ searchParams }: AuditLogPageProps) 
     where.occurredAt = { gte: since };
   }
 
-  const logs = await prisma.auditLog.findMany({
-    where,
-    orderBy: { occurredAt: "desc" },
-    take: 300,
-  });
+  const [logs, lang] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { occurredAt: "desc" },
+      take: 300,
+    }),
+    getLang(),
+  ]);
 
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Audit Log</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Audit Log")}</h1>
         <p className="text-sm text-muted-foreground">
-          A permanent record of every financial action — who did what, and when. Nothing here can be edited or deleted.
+          {t(lang, "A permanent record of every financial action — who did what, and when. Nothing here can be edited or deleted.")}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle>{t(lang, "Filters")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="flex flex-wrap gap-3" method="get">
@@ -70,7 +74,7 @@ export default async function AuditLogPage({ searchParams }: AuditLogPageProps) 
             >
               {RANGE_OPTIONS.map((r) => (
                 <option key={r.value} value={r.value}>
-                  {r.label}
+                  {t(lang, r.label)}
                 </option>
               ))}
             </select>
@@ -79,7 +83,7 @@ export default async function AuditLogPage({ searchParams }: AuditLogPageProps) 
               defaultValue={action ?? ""}
               className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
             >
-              <option value="">All actions</option>
+              <option value="">{t(lang, "All actions")}</option>
               {ACTIONS.map((a) => (
                 <option key={a} value={a}>
                   {a.charAt(0) + a.slice(1).toLowerCase()}
@@ -91,15 +95,15 @@ export default async function AuditLogPage({ searchParams }: AuditLogPageProps) 
               defaultValue={entityType ?? ""}
               className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
             >
-              <option value="">All record types</option>
-              {ENTITY_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              <option value="">{t(lang, "All record types")}</option>
+              {ENTITY_TYPES.map((et) => (
+                <option key={et} value={et}>
+                  {et}
                 </option>
               ))}
             </select>
             <button type="submit" className="h-9 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground">
-              Apply
+              {t(lang, "Apply")}
             </button>
           </form>
         </CardContent>
@@ -107,23 +111,23 @@ export default async function AuditLogPage({ searchParams }: AuditLogPageProps) 
 
       <Card>
         <CardHeader>
-          <CardTitle>Activity</CardTitle>
+          <CardTitle>{t(lang, "Activity")}</CardTitle>
           <CardDescription>{logs.length} record{logs.length === 1 ? "" : "s"}</CardDescription>
         </CardHeader>
         <CardContent>
           {logs.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No activity in this range.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t(lang, "No activity in this range.")}</p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Who</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Summary</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>{t(lang, "When")}</TableHead>
+                    <TableHead>{t(lang, "Who")}</TableHead>
+                    <TableHead>{t(lang, "Action")}</TableHead>
+                    <TableHead>{t(lang, "Type")}</TableHead>
+                    <TableHead>{t(lang, "Summary")}</TableHead>
+                    <TableHead className="text-right">{t(lang, "Amount ")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

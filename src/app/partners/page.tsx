@@ -4,14 +4,16 @@ import { PartnerTable, type PartnerRow } from "@/components/partners/partner-tab
 import { PartnerDialog } from "@/components/partners/partner-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
+import { getLang, t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Partners & Equity — Soupresso Ledger" };
 
 export default async function PartnersPage() {
-  const [partners, balances] = await Promise.all([
+  const [partners, balances, lang] = await Promise.all([
     prisma.partner.findMany({ orderBy: { name: "asc" } }),
     getAccountBalances(),
+    getLang(),
   ]);
 
   const balanceMap = new Map(balances.map((b) => [b.id, b.balance]));
@@ -31,9 +33,9 @@ export default async function PartnersPage() {
     <div className="grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Partners & Equity</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Partners & Equity")}</h1>
           <p className="text-sm text-muted-foreground">
-            Each partner's capital account tracks investments in and withdrawals out, recorded from the Entries page.
+            {t(lang, "Each partner's capital account tracks investments in and withdrawals out, recorded from the Entries page.")}
           </p>
         </div>
         <PartnerDialog />
@@ -42,7 +44,7 @@ export default async function PartnersPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle>All Partners</CardTitle>
+            <CardTitle>{t(lang, "All Partners")}</CardTitle>
             <CardDescription>{rows.length} partners</CardDescription>
           </div>
           <span className="text-lg font-semibold">{formatTaka(totalEquity)}</span>

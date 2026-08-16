@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { MenuItemDialog } from "@/components/menu/menu-item-dialog";
 import { getMenuVisual } from "@/lib/menu-icon";
 import { cn } from "@/lib/utils";
+import { useLang } from "@/components/language-provider";
 
 export interface MenuItemRow {
   id: string;
@@ -21,6 +22,7 @@ export interface MenuItemRow {
 }
 
 export function MenuCardGrid({ items }: { items: MenuItemRow[] }) {
+  const { t } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string, next: boolean) {
@@ -30,7 +32,7 @@ export function MenuCardGrid({ items }: { items: MenuItemRow[] }) {
   }
 
   function handleDelete(id: string) {
-    if (!confirm("Remove this menu item?")) return;
+    if (!confirm(t("Remove this menu item?"))) return;
     startTransition(async () => {
       const result = await deleteMenuItemAction(id);
       if (result.success) toast.success(result.message);
@@ -39,7 +41,7 @@ export function MenuCardGrid({ items }: { items: MenuItemRow[] }) {
   }
 
   if (items.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">No menu items yet. Add your first one above.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">{t("No menu items yet. Add your first one above.")}</p>;
   }
 
   return (
@@ -66,18 +68,20 @@ export function MenuCardGrid({ items }: { items: MenuItemRow[] }) {
               <div className="mt-3">
                 <div className="font-heading truncate text-[15px] font-semibold leading-tight">{item.name}</div>
                 <Badge variant="outline" className="mt-1 text-[10px] font-normal text-muted-foreground">
-                  {item.category}
+                  {t(item.category.charAt(0) + item.category.slice(1).toLowerCase())}
                 </Badge>
               </div>
 
               <div className="mt-2.5 flex items-baseline gap-1.5">
                 <span className="font-heading text-lg font-bold text-brand-maroon">৳{item.price}</span>
-                {item.parcelPrice != null && <span className="text-xs text-muted-foreground">/ ৳{item.parcelPrice} parcel</span>}
+                {item.parcelPrice != null && (
+                  <span className="text-xs text-muted-foreground">/ ৳{item.parcelPrice} {t("parcel")}</span>
+                )}
               </div>
 
               <div className="mt-3 flex items-center justify-end gap-1 border-t pt-2.5">
                 <MenuItemDialog item={item} />
-                <Button variant="ghost" size="icon-sm" disabled={isPending} onClick={() => handleDelete(item.id)} aria-label="Delete">
+                <Button variant="ghost" size="icon-sm" disabled={isPending} onClick={() => handleDelete(item.id)} aria-label={t("Delete")}>
                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>
               </div>

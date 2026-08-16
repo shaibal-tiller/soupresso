@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { ActionState } from "@/app/entries/actions";
+import { useLang } from "@/components/language-provider";
 
 const initialState: ActionState = { success: false, message: "" };
 
@@ -25,6 +26,7 @@ export function EditFundSourceDialog({
 }: {
   account: { id: string; name: string; description: string | null };
 }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(renameFundSourceAction, initialState);
 
@@ -41,32 +43,32 @@ export function EditFundSourceDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="icon" aria-label="Edit account" />}>
+      <DialogTrigger render={<Button variant="ghost" size="icon" aria-label={t("Edit account")} />}>
         <Pencil className="h-4 w-4" />
       </DialogTrigger>
       <DialogContent>
         <form action={formAction}>
           <DialogHeader>
-            <DialogTitle>Edit Account</DialogTitle>
-            <DialogDescription>Renaming doesn&apos;t affect its balance or history.</DialogDescription>
+            <DialogTitle>{t("Edit Account")}</DialogTitle>
+            <DialogDescription>{t("Renaming doesn't affect its balance or history.")}</DialogDescription>
           </DialogHeader>
 
           <input type="hidden" name="accountId" value={account.id} />
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t("Name")}</Label>
               <Input id="name" name="name" defaultValue={account.name} required />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="description">Description (optional)</Label>
+              <Label htmlFor="description">{t("Description (optional)")}</Label>
               <Input id="description" name="description" defaultValue={account.description ?? undefined} />
             </div>
           </div>
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Save"}
+              {pending ? t("Saving...") : t("Save")}
             </Button>
           </DialogFooter>
         </form>

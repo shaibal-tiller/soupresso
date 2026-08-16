@@ -8,6 +8,7 @@ import { formatTaka } from "@/lib/format";
 import { EditFundSourceDialog } from "@/components/cash-bank/edit-fund-source-dialog";
 import { SetBalanceDialog } from "@/components/cash-bank/set-balance-dialog";
 import { Wallet } from "lucide-react";
+import { useLang } from "@/components/language-provider";
 
 export interface FundSourceRow {
   id: string;
@@ -19,6 +20,7 @@ export interface FundSourceRow {
 }
 
 export function FundSourceTable({ accounts }: { accounts: FundSourceRow[] }) {
+  const { t } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string, next: boolean) {
@@ -28,7 +30,7 @@ export function FundSourceTable({ accounts }: { accounts: FundSourceRow[] }) {
   }
 
   if (accounts.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">No cash/bank accounts yet. Add one above.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">{t("No cash/bank accounts yet. Add one above.")}</p>;
   }
 
   return (

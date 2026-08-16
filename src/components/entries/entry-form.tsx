@@ -26,6 +26,7 @@ import {
   type EntryCategoryValue,
   type PaymentMethodValue,
 } from "@/lib/entry-meta";
+import { useLang } from "@/components/language-provider";
 
 interface PartnerOption {
   id: string;
@@ -59,6 +60,7 @@ export function EntryForm({
   accounts: AccountOption[];
   fundSources: FundSourceOption[];
 }) {
+  const { t } = useLang();
   const [state, formAction, pending] = useActionState(createEntryAction, initialState);
   const [category, setCategory] = useState<EntryCategoryValue>("RAW_MATERIAL");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>("FUND_SOURCE");
@@ -98,23 +100,23 @@ export function EntryForm({
     <form key={formKey} action={formAction} className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">
-          <Label htmlFor="date">Date</Label>
+          <Label htmlFor="date">{t("Date")}</Label>
           <Input id="date" name="date" type="date" defaultValue={today} required />
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="category">Category</Label>
+          <Label htmlFor="category">{t("Category")}</Label>
           <Select name="category" value={category} onValueChange={(v) => v && setCategory(v as EntryCategoryValue)}>
             <SelectTrigger id="category" className="w-full">
-              <SelectValue>{(value: string | null) => (value ? CATEGORY_LABELS[value] : "Select category")}</SelectValue>
+              <SelectValue>{(value: string | null) => (value ? t(CATEGORY_LABELS[value]) : t("Select category"))}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {CATEGORY_GROUPS.map((group) => (
                 <SelectGroup key={group}>
-                  <SelectLabel>{group}</SelectLabel>
+                  <SelectLabel>{t(group)}</SelectLabel>
                   {ENTRY_FORM_CATEGORIES.filter((c) => c.group === group).map((c) => (
                     <SelectItem key={c.value} value={c.value}>
-                      {c.label}
+                      {t(c.label)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -125,40 +127,40 @@ export function EntryForm({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor="description">Description</Label>
-        <Textarea id="description" name="description" placeholder="e.g. Onions, chicken, spices from Karwan Bazar" required rows={2} />
+        <Label htmlFor="description">{t("Description")}</Label>
+        <Textarea id="description" name="description" placeholder={t("e.g. Onions, chicken, spices from Karwan Bazar")} required rows={2} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="amount">Amount (৳)</Label>
+          <Label htmlFor="amount">{t("Amount (৳)")}</Label>
           <Input id="amount" name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" required />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="quantity">Quantity (optional)</Label>
-          <Input id="quantity" name="quantity" type="number" step="0.01" placeholder="e.g. 5" />
+          <Label htmlFor="quantity">{t("Quantity (optional)")}</Label>
+          <Input id="quantity" name="quantity" type="number" step="0.01" placeholder={t("e.g. 5")} />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="unit">Unit (optional)</Label>
-          <Input id="unit" name="unit" placeholder="kg, pcs, litre..." />
+          <Label htmlFor="unit">{t("Unit (optional)")}</Label>
+          <Input id="unit" name="unit" placeholder={t("kg, pcs, litre...")} />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">
-          <Label htmlFor="vendor">Vendor / Payee (optional)</Label>
-          <Input id="vendor" name="vendor" placeholder="e.g. Karwan Bazar vendor" />
+          <Label htmlFor="vendor">{t("Vendor / Payee (optional)")}</Label>
+          <Input id="vendor" name="vendor" placeholder={t("e.g. Karwan Bazar vendor")} />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="paymentMethod">Payment Method</Label>
+          <Label htmlFor="paymentMethod">{t("Payment Method")}</Label>
           <Select name="paymentMethod" value={paymentMethod} onValueChange={(v) => v && setPaymentMethod(v as PaymentMethodValue)}>
             <SelectTrigger id="paymentMethod" className="w-full">
-              <SelectValue>{(value: string | null) => (value ? PAYMENT_METHOD_LABELS[value] : "Select payment method")}</SelectValue>
+              <SelectValue>{(value: string | null) => (value ? t(PAYMENT_METHOD_LABELS[value]) : t("Select payment method"))}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {PAYMENT_METHODS.filter((pm) => isPaymentMethodAllowed(category, pm)).map((pm) => (
                 <SelectItem key={pm} value={pm}>
-                  {PAYMENT_METHOD_LABELS[pm]}
+                  {t(PAYMENT_METHOD_LABELS[pm])}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -168,10 +170,10 @@ export function EntryForm({
 
       {needsFundSource && (
         <div className="grid gap-1.5">
-          <Label htmlFor="fundSourceAccountId">Cash / Bank Account</Label>
+          <Label htmlFor="fundSourceAccountId">{t("Cash / Bank Account")}</Label>
           <Select name="fundSourceAccountId" required>
             <SelectTrigger id="fundSourceAccountId" className="w-full">
-              <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : "Select account")}</SelectValue>
+              <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : t("Select account"))}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {fundSources.map((f) => (
@@ -183,7 +185,7 @@ export function EntryForm({
           </Select>
           {fundSources.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              No cash/bank accounts yet — add one on the Cash &amp; Bank page.
+              {t("No cash/bank accounts yet — add one on the Cash & Bank page.")}
             </p>
           )}
         </div>
@@ -191,10 +193,10 @@ export function EntryForm({
 
       {needsPartner && (
         <div className="grid gap-1.5">
-          <Label htmlFor="partnerId">Partner</Label>
+          <Label htmlFor="partnerId">{t("Partner")}</Label>
           <Select name="partnerId" required>
             <SelectTrigger id="partnerId" className="w-full">
-              <SelectValue>{(value: string | null) => (value ? partnerLabels[value] : "Select partner")}</SelectValue>
+              <SelectValue>{(value: string | null) => (value ? partnerLabels[value] : t("Select partner"))}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {partners.map((p) => (
@@ -210,10 +212,10 @@ export function EntryForm({
       {needsManualAccounts && (
         <div className="grid gap-4 rounded-md border border-dashed p-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="manualDebitAccountId">Debit Account</Label>
+            <Label htmlFor="manualDebitAccountId">{t("Debit Account")}</Label>
             <Select name="manualDebitAccountId" required>
               <SelectTrigger id="manualDebitAccountId" className="w-full">
-                <SelectValue>{(value: string | null) => (value ? accountLabels[value] : "Select account")}</SelectValue>
+                <SelectValue>{(value: string | null) => (value ? accountLabels[value] : t("Select account"))}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
@@ -225,10 +227,10 @@ export function EntryForm({
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="manualCreditAccountId">Credit Account</Label>
+            <Label htmlFor="manualCreditAccountId">{t("Credit Account")}</Label>
             <Select name="manualCreditAccountId" required>
               <SelectTrigger id="manualCreditAccountId" className="w-full">
-                <SelectValue>{(value: string | null) => (value ? accountLabels[value] : "Select account")}</SelectValue>
+                <SelectValue>{(value: string | null) => (value ? accountLabels[value] : t("Select account"))}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
@@ -243,7 +245,7 @@ export function EntryForm({
       )}
 
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-        {pending ? "Saving..." : "Add Entry"}
+        {pending ? t("Saving...") : t("Add Entry")}
       </Button>
     </form>
   );

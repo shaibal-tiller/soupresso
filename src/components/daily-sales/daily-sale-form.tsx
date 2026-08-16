@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
 import type { ActionState } from "@/app/entries/actions";
+import { useLang } from "@/components/language-provider";
 
 interface MenuItemOption {
   id: string;
@@ -25,6 +26,7 @@ interface FundSourceOption {
 const initialState: ActionState = { success: false, message: "" };
 
 export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemOption[]; fundSources: FundSourceOption[] }) {
+  const { t } = useLang();
   const [state, formAction, pending] = useActionState(createDailySaleAction, initialState);
   const [fundAmounts, setFundAmounts] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, { regular: string; parcel: string }>>({});
@@ -63,19 +65,19 @@ export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemO
     <form key={formKey} action={formAction} className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">
-          <Label htmlFor="date">Date</Label>
+          <Label htmlFor="date">{t("Date")}</Label>
           <Input id="date" name="date" type="date" defaultValue={today} required />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="notes">Notes (optional)</Label>
-          <Input id="notes" name="notes" placeholder="Anything worth noting about today's sales" />
+          <Label htmlFor="notes">{t("Notes (optional)")}</Label>
+          <Input id="notes" name="notes" placeholder={t("Anything worth noting about today's sales")} />
         </div>
       </div>
 
       <div>
-        <Label className="mb-2 block text-base">Amount collected, by account</Label>
+        <Label className="mb-2 block text-base">{t("Amount collected, by account")}</Label>
         {fundSources.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No cash/bank accounts yet — add one on the Cash &amp; Bank page.</p>
+          <p className="text-sm text-muted-foreground">{t("No cash/bank accounts yet — add one on the Cash & Bank page.")}</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {fundSources.map((f) => (
@@ -101,17 +103,17 @@ export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemO
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <Label className="text-base">Item breakdown (optional, approximate)</Label>
+          <Label className="text-base">{t("Item breakdown (optional, approximate)")}</Label>
           <span className="text-sm text-muted-foreground">
-            Items subtotal: <span className="font-medium text-foreground">{formatTaka(itemsTotal)}</span>
+            {t("Items subtotal:")} <span className="font-medium text-foreground">{formatTaka(itemsTotal)}</span>
           </span>
         </div>
         <Card>
           <CardContent className="grid gap-3 pt-4">
             <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs font-medium text-muted-foreground sm:grid-cols-[1fr_120px_120px]">
-              <span>Item</span>
-              <span className="text-right">Regular Qty</span>
-              <span className="text-right">Parcel Qty</span>
+              <span>{t("Item")}</span>
+              <span className="text-right">{t("Regular Qty")}</span>
+              <span className="text-right">{t("Parcel Qty")}</span>
             </div>
             {menuItems.map((item) => (
               <div key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 sm:grid-cols-[1fr_120px_120px]">
@@ -119,7 +121,7 @@ export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemO
                   <div className="text-sm font-medium">{item.name}</div>
                   <div className="text-xs text-muted-foreground">
                     ৳{item.price}
-                    {item.parcelPrice ? ` / ৳${item.parcelPrice} parcel` : ""}
+                    {item.parcelPrice ? ` / ৳${item.parcelPrice} ${t("parcel")}` : ""}
                   </div>
                 </div>
                 <Input
@@ -152,14 +154,14 @@ export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemO
         </Card>
         {fundsTotal > 0 && itemsTotal > 0 && Math.abs(diff) > 0.5 && (
           <p className="mt-2 text-xs text-amber-600">
-            Heads up: item subtotal differs from the amount collected by {formatTaka(Math.abs(diff))}. That&apos;s fine — item
-            breakdown is approximate.
+            {t("Heads up: item subtotal differs from the amount collected by")} {formatTaka(Math.abs(diff))}.{" "}
+            {t("That's fine — item breakdown is approximate.")}
           </p>
         )}
       </div>
 
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-        {pending ? "Saving..." : "Record Daily Sales"}
+        {pending ? t("Saving...") : t("Record Daily Sales")}
       </Button>
     </form>
   );

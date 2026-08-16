@@ -4,7 +4,10 @@ import "./globals.css";
 import { Nav } from "@/components/nav";
 import { MobileNav } from "@/components/mobile-nav";
 import { ActorBadge } from "@/components/actor-badge";
+import { LanguageBadge } from "@/components/language-badge";
+import { LanguageProvider } from "@/components/language-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { getLang } from "@/lib/i18n";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,36 +53,44 @@ function Wordmark({ className }: { className?: string }) {
   );
 }
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const lang = await getLang();
+
   return (
     <html
-      lang="en"
+      lang={lang}
       className={`${geistSans.variable} ${geistMono.variable} ${fredoka.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <div className="flex min-h-screen">
-          <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:flex md:flex-col">
-            <div className="flex h-16 items-center gap-2 border-b px-4">
-              <Wordmark className="text-lg" />
+        <LanguageProvider initialLang={lang}>
+          <div className="flex min-h-screen">
+            <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:flex md:flex-col">
+              <div className="flex h-16 items-center gap-2 border-b px-4">
+                <Wordmark className="text-lg" />
+              </div>
+              <Nav />
+              <div className="mt-auto flex items-center justify-between gap-2 border-t p-3">
+                <ActorBadge />
+                <LanguageBadge />
+              </div>
+            </aside>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <header
+                className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
+                style={{ paddingTop: "env(safe-area-inset-top)" }}
+              >
+                <Wordmark className="text-base" />
+                <div className="flex items-center gap-3">
+                  <LanguageBadge />
+                  <ActorBadge />
+                </div>
+              </header>
+              <main className="flex-1 p-4 pb-24 md:p-8 md:pb-8">{children}</main>
             </div>
-            <Nav />
-            <div className="mt-auto border-t p-3">
-              <ActorBadge />
-            </div>
-          </aside>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <header
-              className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
-              style={{ paddingTop: "env(safe-area-inset-top)" }}
-            >
-              <Wordmark className="text-base" />
-              <ActorBadge />
-            </header>
-            <main className="flex-1 p-4 pb-24 md:p-8 md:pb-8">{children}</main>
           </div>
-        </div>
-        <MobileNav />
-        <Toaster />
+          <MobileNav />
+          <Toaster />
+        </LanguageProvider>
       </body>
     </html>
   );

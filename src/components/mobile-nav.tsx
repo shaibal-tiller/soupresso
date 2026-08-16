@@ -7,9 +7,11 @@ import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PRIMARY_LINKS, SECONDARY_LINKS, isLinkActive } from "@/lib/nav-links";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useLang } from "@/components/language-provider";
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { t } = useLang();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = SECONDARY_LINKS.some((l) => isLinkActive(pathname, l.href));
 
@@ -32,7 +34,7 @@ export function MobileNav() {
                 )}
               >
                 <Icon className="h-5 w-5" />
-                {shortLabel ?? label}
+                {t(shortLabel ?? label)}
               </Link>
             );
           })}
@@ -45,7 +47,7 @@ export function MobileNav() {
             )}
           >
             <MoreHorizontal className="h-5 w-5" />
-            More
+            {t("More")}
           </button>
         </div>
       </nav>
@@ -53,7 +55,7 @@ export function MobileNav() {
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
         <SheetContent side="bottom" className="rounded-t-xl">
           <SheetHeader>
-            <SheetTitle>More</SheetTitle>
+            <SheetTitle>{t("More")}</SheetTitle>
             <SheetDescription className="sr-only">Additional sections</SheetDescription>
           </SheetHeader>
           <div className="grid gap-1 p-4 pt-0">
@@ -70,7 +72,7 @@ export function MobileNav() {
                   )}
                 >
                   <Icon className="h-5 w-5" />
-                  {label}
+                  {t(label)}
                 </Link>
               );
             })}

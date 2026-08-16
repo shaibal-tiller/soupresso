@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ActionState } from "@/app/entries/actions";
+import { useLang } from "@/components/language-provider";
 
 const TYPES = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"];
 
@@ -34,6 +35,7 @@ interface AccountData {
 }
 
 export function AccountDialog({ account }: { account?: AccountData }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(saveAccountAction, initialState);
   const [type, setType] = useState(account?.type ?? "EXPENSE");
@@ -51,24 +53,24 @@ export function AccountDialog({ account }: { account?: AccountData }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={account ? <Button variant="ghost" size="icon" aria-label="Edit account" /> : <Button />}>
+      <DialogTrigger render={account ? <Button variant="ghost" size="icon" aria-label={t("Edit account")} /> : <Button />}>
         {account ? (
           <Pencil className="h-4 w-4" />
         ) : (
           <>
             <Plus className="h-4 w-4" />
-            Add Account
+            {t("Add Account")}
           </>
         )}
       </DialogTrigger>
       <DialogContent>
         <form action={formAction}>
           <DialogHeader>
-            <DialogTitle>{account ? "Edit Account" : "Add Account"}</DialogTitle>
+            <DialogTitle>{account ? t("Edit Account") : t("Add Account")}</DialogTitle>
             <DialogDescription>
               {account?.isSystem
-                ? "This is a core account used by the posting engine — only its name and description can change."
-                : "Custom accounts can be used with the Manual Adjustment entry category."}
+                ? t("This is a core account used by the posting engine — only its name and description can change.")
+                : t("Custom accounts can be used with the Manual Adjustment entry category.")}
             </DialogDescription>
           </DialogHeader>
 
@@ -79,23 +81,25 @@ export function AccountDialog({ account }: { account?: AccountData }) {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="code">Code</Label>
+                <Label htmlFor="code">{t("Code")}</Label>
                 <Input id="code" name="code" defaultValue={account?.code} disabled={account?.isSystem} required />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="typeSelect">Type</Label>
+                <Label htmlFor="typeSelect">{t("Type")}</Label>
                 {account?.isSystem ? (
                   <Input value={account.type} disabled />
                 ) : (
                   <>
                     <Select value={type} onValueChange={(value) => value && setType(value)}>
                       <SelectTrigger id="typeSelect" className="w-full">
-                        <SelectValue>{(value: string | null) => (value ? value.charAt(0) + value.slice(1).toLowerCase() : "Select")}</SelectValue>
+                        <SelectValue>
+                          {(value: string | null) => (value ? t(value.charAt(0) + value.slice(1).toLowerCase()) : t("Select"))}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t.charAt(0) + t.slice(1).toLowerCase()}
+                        {TYPES.map((typeValue) => (
+                          <SelectItem key={typeValue} value={typeValue}>
+                            {t(typeValue.charAt(0) + typeValue.slice(1).toLowerCase())}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -106,18 +110,18 @@ export function AccountDialog({ account }: { account?: AccountData }) {
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t("Name")}</Label>
               <Input id="name" name="name" defaultValue={account?.name} required />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="description">Description (optional)</Label>
+              <Label htmlFor="description">{t("Description (optional)")}</Label>
               <Textarea id="description" name="description" defaultValue={account?.description ?? undefined} rows={2} />
             </div>
           </div>
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Save"}
+              {pending ? t("Saving...") : t("Save")}
             </Button>
           </DialogFooter>
         </form>

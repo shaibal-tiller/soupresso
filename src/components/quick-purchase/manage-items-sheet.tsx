@@ -12,6 +12,7 @@ import { PurchaseItemDialog } from "@/components/quick-purchase/purchase-item-di
 import { CATEGORY_LABELS } from "@/lib/entry-meta";
 import { getPurchaseVisual } from "@/lib/purchase-icon";
 import { cn } from "@/lib/utils";
+import { useLang } from "@/components/language-provider";
 
 export interface PurchaseItemRow {
   id: string;
@@ -22,6 +23,7 @@ export interface PurchaseItemRow {
 }
 
 export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -32,10 +34,10 @@ export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
   }
 
   function handleDelete(id: string) {
-    if (!confirm("Remove this item from the picker?")) return;
+    if (!confirm(t("Remove this item from the picker?"))) return;
     startTransition(async () => {
       await deletePurchaseItemAction(id);
-      toast.success("Item removed");
+      toast.success(t("Item removed"));
     });
   }
 
@@ -43,14 +45,16 @@ export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
     <>
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
         <Settings2 className="h-3.5 w-3.5" />
-        Manage items
+        {t("Manage items")}
       </Button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Purchase Items</SheetTitle>
-            <SheetDescription>The tap-to-add shortlist on the Entries page. Toggle off instead of deleting to keep history intact.</SheetDescription>
+            <SheetTitle>{t("Purchase Items")}</SheetTitle>
+            <SheetDescription>
+              {t("The tap-to-add shortlist on the Entries page. Toggle off instead of deleting to keep history intact.")}
+            </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-2 overflow-y-auto p-4 pt-0">
             <PurchaseItemDialog />
@@ -71,14 +75,14 @@ export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
                     <div className="truncate text-sm font-medium">{item.name}</div>
                     <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
-                        {CATEGORY_LABELS[item.category] ?? item.category}
+                        {t(CATEGORY_LABELS[item.category] ?? item.category)}
                       </Badge>
                       {item.unit && <span className="text-[10px] text-muted-foreground">per {item.unit}</span>}
                     </div>
                   </div>
                   <Switch checked={item.isActive} disabled={isPending} onCheckedChange={(v) => handleToggle(item.id, v)} />
                   <PurchaseItemDialog item={item} />
-                  <Button variant="ghost" size="icon-sm" disabled={isPending} onClick={() => handleDelete(item.id)} aria-label="Delete">
+                  <Button variant="ghost" size="icon-sm" disabled={isPending} onClick={() => handleDelete(item.id)} aria-label={t("Delete")}>
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>

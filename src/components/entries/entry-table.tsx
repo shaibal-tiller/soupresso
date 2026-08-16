@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatTaka, formatDate, CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/format";
+import { useLang } from "@/components/language-provider";
 
 export interface EntryRow {
   id: string;
@@ -30,18 +31,19 @@ export interface EntryRow {
 }
 
 export function EntryTable({ entries }: { entries: EntryRow[] }) {
+  const { t } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleDelete(id: string) {
-    if (!confirm("Delete this entry? This cannot be undone.")) return;
+    if (!confirm(t("Delete this entry? This cannot be undone."))) return;
     startTransition(async () => {
       await deleteEntryAction(id);
-      toast.success("Entry deleted");
+      toast.success(t("Entry deleted"));
     });
   }
 
   if (entries.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">No entries yet. Add your first entry above.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">{t("No entries yet. Add your first entry above.")}</p>;
   }
 
   return (
@@ -49,12 +51,12 @@ export function EntryTable({ entries }: { entries: EntryRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Flow</TableHead>
-            <TableHead>Payment</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>{t("Date")}</TableHead>
+            <TableHead>{t("Category")}</TableHead>
+            <TableHead>{t("Description")}</TableHead>
+            <TableHead>{t("Flow")}</TableHead>
+            <TableHead>{t("Payment")}</TableHead>
+            <TableHead className="text-right">{t("Amount")}</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -63,7 +65,7 @@ export function EntryTable({ entries }: { entries: EntryRow[] }) {
             <TableRow key={entry.id}>
               <TableCell className="whitespace-nowrap text-sm">{formatDate(entry.date)}</TableCell>
               <TableCell>
-                <Badge variant="secondary">{CATEGORY_LABELS[entry.category] ?? entry.category}</Badge>
+                <Badge variant="secondary">{t(CATEGORY_LABELS[entry.category] ?? entry.category)}</Badge>
               </TableCell>
               <TableCell className="max-w-64">
                 <div className="truncate">{entry.description}</div>
@@ -74,7 +76,7 @@ export function EntryTable({ entries }: { entries: EntryRow[] }) {
               <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                 {entry.debitAccountName} → {entry.creditAccountName}
               </TableCell>
-              <TableCell className="whitespace-nowrap text-sm">{PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod}</TableCell>
+              <TableCell className="whitespace-nowrap text-sm">{t(PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod)}</TableCell>
               <TableCell className="whitespace-nowrap text-right font-medium">{formatTaka(entry.amount)}</TableCell>
               <TableCell>
                 <Button
@@ -82,7 +84,7 @@ export function EntryTable({ entries }: { entries: EntryRow[] }) {
                   size="icon"
                   disabled={isPending}
                   onClick={() => handleDelete(entry.id)}
-                  aria-label="Delete entry"
+                  aria-label={t("Delete entry")}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>

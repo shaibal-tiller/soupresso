@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ALL_LINKS, isLinkActive } from "@/lib/nav-links";
+import { useLang } from "@/components/language-provider";
 
 export function Nav() {
   const pathname = usePathname();
+  const { t } = useLang();
 
   return (
     <nav className="flex flex-col gap-1 p-3">
@@ -24,7 +26,7 @@ export function Nav() {
             )}
           >
             <Icon className="h-4 w-4" />
-            {label}
+            {t(label)}
           </Link>
         );
       })}

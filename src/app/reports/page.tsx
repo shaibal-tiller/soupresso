@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { formatTaka, formatDate } from "@/lib/format";
+import { getLang, t } from "@/lib/i18n";
+import type { Lang } from "@/lib/i18n-shared";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reports — Soupresso Ledger" };
@@ -17,76 +19,80 @@ export default async function ReportsPage() {
   const now = new Date();
   const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
-  const [balanceSheet, allTimeIncome, monthIncome, payableStatement, receivableStatement, partnerEquity] = await Promise.all([
+  const [balanceSheet, allTimeIncome, monthIncome, payableStatement, receivableStatement, partnerEquity, lang] = await Promise.all([
     getBalanceSheet(),
     getIncomeStatement(),
     getIncomeStatement(startOfMonth),
     getAccountStatementByCode(ACCOUNT_CODES.PAYABLE, 50),
     getAccountStatementByCode(ACCOUNT_CODES.RECEIVABLE, 50),
     getPartnerEquity(),
+    getLang(),
   ]);
 
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Reports</h1>
-        <p className="text-sm text-muted-foreground">Balance sheet, profit & loss, and outstanding balances.</p>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{t(lang, "Reports")}</h1>
+        <p className="text-sm text-muted-foreground">{t(lang, "Balance sheet, profit & loss, and outstanding balances.")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Balance Sheet</CardTitle>
-          <CardDescription>As of {formatDate(now)}</CardDescription>
+          <CardTitle>{t(lang, "Balance Sheet")}</CardTitle>
+          <CardDescription>{t(lang, "As of")} {formatDate(now)}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 lg:grid-cols-2">
           <div>
-            <SectionTitle>Assets</SectionTitle>
+            <SectionTitle>{t(lang, "Assets")}</SectionTitle>
             {balanceSheet.assets.map((a) => (
               <LineRow key={a.id} label={a.name} value={a.balance} />
             ))}
-            <TotalRow label="Total Assets" value={balanceSheet.totalAssets} />
+            <TotalRow label={t(lang, "Total Assets")} value={balanceSheet.totalAssets} />
           </div>
           <div className="grid gap-4">
             <div>
-              <SectionTitle>Liabilities</SectionTitle>
+              <SectionTitle>{t(lang, "Liabilities")}</SectionTitle>
               {balanceSheet.liabilities.map((l) => (
                 <LineRow key={l.id} label={l.name} value={l.balance} />
               ))}
-              <TotalRow label="Total Liabilities" value={balanceSheet.totalLiabilities} />
+              <TotalRow label={t(lang, "Total Liabilities")} value={balanceSheet.totalLiabilities} />
             </div>
             <div>
-              <SectionTitle>Equity</SectionTitle>
+              <SectionTitle>{t(lang, "Equity")}</SectionTitle>
               {balanceSheet.equity.map((e) => (
                 <LineRow key={e.id} label={e.name} value={e.balance} />
               ))}
-              <LineRow label="Retained Earnings (cumulative profit)" value={balanceSheet.retainedEarnings} />
-              <TotalRow label="Total Equity" value={balanceSheet.totalEquityAndRetained} />
+              <LineRow label={t(lang, "Retained Earnings (cumulative profit)")} value={balanceSheet.retainedEarnings} />
+              <TotalRow label={t(lang, "Total Equity")} value={balanceSheet.totalEquityAndRetained} />
             </div>
             <Separator />
-            <TotalRow label="Total Liabilities + Equity" value={balanceSheet.totalLiabilities + balanceSheet.totalEquityAndRetained} />
+            <TotalRow
+              label={t(lang, "Total Liabilities + Equity")}
+              value={balanceSheet.totalLiabilities + balanceSheet.totalEquityAndRetained}
+            />
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Income Statement</CardTitle>
-          <CardDescription>This month vs. all-time.</CardDescription>
+          <CardTitle>{t(lang, "Income Statement")}</CardTitle>
+          <CardDescription>{t(lang, "This month vs. all-time.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Account</TableHead>
-                  <TableHead className="text-right">This Month</TableHead>
-                  <TableHead className="text-right">All-Time</TableHead>
+                  <TableHead>{t(lang, "Account")}</TableHead>
+                  <TableHead className="text-right">{t(lang, "This Month")}</TableHead>
+                  <TableHead className="text-right">{t(lang, "All-Time")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow className="bg-muted/30">
                   <TableCell className="font-medium" colSpan={3}>
-                    Income
+                    {t(lang, "Income")}
                   </TableCell>
                 </TableRow>
                 {allTimeIncome.income.map((acc) => {
@@ -101,7 +107,7 @@ export default async function ReportsPage() {
                 })}
                 <TableRow className="bg-muted/30">
                   <TableCell className="font-medium" colSpan={3}>
-                    Expenses
+                    {t(lang, "Expenses")}
                   </TableCell>
                 </TableRow>
                 {allTimeIncome.expenses.map((acc) => {
@@ -115,7 +121,7 @@ export default async function ReportsPage() {
                   );
                 })}
                 <TableRow className="border-t-2 font-semibold">
-                  <TableCell>Net Profit</TableCell>
+                  <TableCell>{t(lang, "Net Profit")}</TableCell>
                   <TableCell className="text-right">{formatTaka(monthIncome.netProfit)}</TableCell>
                   <TableCell className="text-right">{formatTaka(allTimeIncome.netProfit)}</TableCell>
                 </TableRow>
@@ -128,38 +134,44 @@ export default async function ReportsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Accounts Payable</CardTitle>
-            <CardDescription>What the business owes, itemized.</CardDescription>
+            <CardTitle>{t(lang, "Accounts Payable")}</CardTitle>
+            <CardDescription>{t(lang, "What the business owes, itemized.")}</CardDescription>
           </CardHeader>
           <CardContent>
             {/* Payable is a liability: it grows on credit (we owe more), shrinks on debit (we paid). */}
-            <StatementTable rows={payableStatement} increaseLabel="Owed" decreaseLabel="Paid" increaseSide="credit" />
+            <StatementTable rows={payableStatement} increaseLabel={t(lang, "Owed")} decreaseLabel={t(lang, "Paid")} increaseSide="credit" lang={lang} />
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Accounts Receivable</CardTitle>
-            <CardDescription>What's owed to the business, itemized.</CardDescription>
+            <CardTitle>{t(lang, "Accounts Receivable")}</CardTitle>
+            <CardDescription>{t(lang, "What's owed to the business, itemized.")}</CardDescription>
           </CardHeader>
           <CardContent>
             {/* Receivable is an asset: it grows on debit (owed to us), shrinks on credit (collected). */}
-            <StatementTable rows={receivableStatement} increaseLabel="Owed to us" decreaseLabel="Collected" increaseSide="debit" />
+            <StatementTable
+              rows={receivableStatement}
+              increaseLabel={t(lang, "Owed to us")}
+              decreaseLabel={t(lang, "Collected")}
+              increaseSide="debit"
+              lang={lang}
+            />
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Partner Equity Summary</CardTitle>
-          <CardDescription>Contributions minus withdrawals, per partner.</CardDescription>
+          <CardTitle>{t(lang, "Partner Equity Summary")}</CardTitle>
+          <CardDescription>{t(lang, "Contributions minus withdrawals, per partner.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead>{t(lang, "Partner")}</TableHead>
+                  <TableHead className="text-right">{t(lang, "Balance")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -205,25 +217,27 @@ function StatementTable({
   increaseLabel,
   decreaseLabel,
   increaseSide,
+  lang,
 }: {
   rows: { entryId: string; date: string; description: string; vendor: string | null; debit: number; credit: number; runningBalance: number }[];
   increaseLabel: string;
   decreaseLabel: string;
   increaseSide: "debit" | "credit";
+  lang: Lang;
 }) {
   if (rows.length === 0) {
-    return <p className="py-6 text-center text-sm text-muted-foreground">Nothing outstanding.</p>;
+    return <p className="py-6 text-center text-sm text-muted-foreground">{t(lang, "Nothing outstanding.")}</p>;
   }
   return (
     <div className="overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Description</TableHead>
+            <TableHead>{t(lang, "Date")}</TableHead>
+            <TableHead>{t(lang, "Description")}</TableHead>
             <TableHead className="text-right">{increaseLabel}</TableHead>
             <TableHead className="text-right">{decreaseLabel}</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
+            <TableHead className="text-right">{t(lang, "Balance")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

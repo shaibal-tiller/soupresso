@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PartnerDialog } from "@/components/partners/partner-dialog";
 import { formatTaka } from "@/lib/format";
+import { useLang } from "@/components/language-provider";
 
 export interface PartnerRow {
   id: string;
@@ -17,6 +18,7 @@ export interface PartnerRow {
 }
 
 export function PartnerTable({ partners }: { partners: PartnerRow[] }) {
+  const { t } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string, next: boolean) {
@@ -30,11 +32,11 @@ export function PartnerTable({ partners }: { partners: PartnerRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Phone</TableHead>
-            <TableHead className="text-right">Share %</TableHead>
-            <TableHead className="text-right">Equity Balance</TableHead>
-            <TableHead>Active</TableHead>
+            <TableHead>{t("Name")}</TableHead>
+            <TableHead>{t("Phone")}</TableHead>
+            <TableHead className="text-right">{t("Share %")}</TableHead>
+            <TableHead className="text-right">{t("Equity Balance")}</TableHead>
+            <TableHead>{t("Active")}</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
