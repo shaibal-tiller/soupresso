@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Trash2, ShoppingBasket } from "lucide-react";
+import { Trash2, ShoppingBasket, Search, X } from "lucide-react";
 import { quickPurchaseAction, type QuickPurchaseActionState } from "@/app/entries/purchase-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatTaka, PAYMENT_METHOD_LABELS } from "@/lib/format";
-import { isPaymentMethodAllowed, type PaymentMethodValue } from "@/lib/entry-meta";
+import { isPaymentMethodAllowed, CATEGORY_LABELS, type PaymentMethodValue } from "@/lib/entry-meta";
 import { getPurchaseVisual } from "@/lib/purchase-icon";
 import { cn } from "@/lib/utils";
 import { ManageItemsSheet } from "@/components/quick-purchase/manage-items-sheet";
@@ -59,8 +59,34 @@ export function QuickPurchasePanel({
   const [vendor, setVendor] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>("FUND_SOURCE");
   const [fundSourceId, setFundSourceId] = useState(fundSources[0]?.id ?? "");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const activeItems = useMemo(() => items.filter((i) => i.isActive), [items]);
+
+  const categories = useMemo(() => {
+    const seen: string[] = [];
+    for (const item of activeItems) if (!seen.includes(item.category)) seen.push(item.category);
+    return seen;
+  }, [activeItems]);
+
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return activeItems.filter((item) => {
+      if (categoryFilter !== "ALL" && item.category !== categoryFilter) return false;
+      if (term && !item.name.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [activeItems, search, categoryFilter]);
+
+  const groupedItems = useMemo(() => {
+    if (categoryFilter !== "ALL") {
+      return filteredItems.length > 0 ? [{ category: categoryFilter, items: filteredItems }] : [];
+    }
+    return categories
+      .map((category) => ({ category, items: filteredItems.filter((i) => i.category === category) }))
+      .filter((group) => group.items.length > 0);
+  }, [filteredItems, categories, categoryFilter]);
 
   const lines = useMemo(() => Object.values(cart), [cart]);
   const cartTotal = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
@@ -142,33 +168,95 @@ export function QuickPurchasePanel({
         <ManageItemsSheet items={items} />
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-        {activeItems.map((item) => {
-          const visual = getPurchaseVisual(item.name, item.category);
-          const selected = !!cart[item.id];
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search items..."
+          className="pl-9"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => setCategoryFilter("ALL")}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            categoryFilter === "ALL" ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
+          )}
+        >
+          All ({activeItems.length})
+        </button>
+        {categories.map((category) => {
+          const count = activeItems.filter((i) => i.category === category).length;
           return (
             <button
-              key={item.id}
+              key={category}
               type="button"
-              onClick={() => toggleItem(item)}
+              onClick={() => setCategoryFilter(category)}
               className={cn(
-                "group relative flex flex-col items-center gap-1 overflow-hidden rounded-xl border bg-card p-2.5 text-center shadow-sm transition-all active:scale-[0.97]",
-                selected ? "border-brand-amber ring-2 ring-brand-amber/40" : "hover:shadow-md",
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                categoryFilter === category ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
               )}
             >
-              <div className={cn("absolute inset-x-0 top-0 h-1", visual.accentClass)} />
-              <div className={cn("mt-1 flex h-9 w-9 items-center justify-center rounded-full text-base", visual.badgeClass)}>
-                {visual.emoji}
-              </div>
-              <span className="font-heading text-xs font-semibold leading-tight">{item.name}</span>
-              {item.unit && <span className="text-[10px] text-muted-foreground">per {item.unit}</span>}
+              {CATEGORY_LABELS[category] ?? category} ({count})
             </button>
           );
         })}
       </div>
 
-      {activeItems.length === 0 && (
-        <p className="text-sm text-muted-foreground">No purchase items yet — add some from &quot;Manage items&quot;.</p>
+      {groupedItems.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          {activeItems.length === 0 ? 'No purchase items yet — add some from "Manage items".' : "No items match your search."}
+        </p>
+      ) : (
+        <div className="grid gap-4">
+          {groupedItems.map((group) => (
+            <div key={group.category}>
+              {categoryFilter === "ALL" && (
+                <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                  {CATEGORY_LABELS[group.category] ?? group.category}
+                </Label>
+              )}
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                {group.items.map((item) => {
+                  const visual = getPurchaseVisual(item.name, item.category);
+                  const selected = !!cart[item.id];
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => toggleItem(item)}
+                      className={cn(
+                        "group relative flex flex-col items-center gap-1 overflow-hidden rounded-xl border bg-card p-2.5 text-center shadow-sm transition-all active:scale-[0.97]",
+                        selected ? "border-brand-amber ring-2 ring-brand-amber/40" : "hover:shadow-md",
+                      )}
+                    >
+                      <div className={cn("absolute inset-x-0 top-0 h-1", visual.accentClass)} />
+                      <div className={cn("mt-1 flex h-9 w-9 items-center justify-center rounded-full text-base", visual.badgeClass)}>
+                        {visual.emoji}
+                      </div>
+                      <span className="font-heading text-xs font-semibold leading-tight">{item.name}</span>
+                      {item.unit && <span className="text-[10px] text-muted-foreground">per {item.unit}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <Card>

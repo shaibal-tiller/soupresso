@@ -12,18 +12,25 @@ export interface PurchaseVisual {
 const AMBER: PurchaseVisual = { emoji: "🛒", badgeClass: "bg-brand-amber-soft text-brand-amber-deep", accentClass: "bg-brand-amber" };
 const MAROON: PurchaseVisual = { emoji: "📦", badgeClass: "bg-brand-maroon-soft text-brand-maroon", accentClass: "bg-brand-maroon" };
 const GREEN: PurchaseVisual = { emoji: "🥬", badgeClass: "bg-brand-green-soft text-brand-green", accentClass: "bg-brand-green" };
+const TEAL: PurchaseVisual = { emoji: "🥤", badgeClass: "bg-brand-teal-soft text-brand-teal", accentClass: "bg-brand-teal" };
 
 const NAME_MATCHES: { pattern: RegExp; visual: PurchaseVisual }[] = [
   { pattern: /chicken/i, visual: { ...AMBER, emoji: "🐔" } },
   { pattern: /onion/i, visual: { ...GREEN, emoji: "🧅" } },
-  { pattern: /garlic|ginger/i, visual: { ...GREEN, emoji: "🧄" } },
+  { pattern: /ginger/i, visual: { ...GREEN, emoji: "🫚" } },
+  { pattern: /garlic/i, visual: { ...GREEN, emoji: "🧄" } },
   { pattern: /oil/i, visual: { ...AMBER, emoji: "🛢️" } },
   { pattern: /egg/i, visual: { ...AMBER, emoji: "🥚" } },
   { pattern: /mushroom/i, visual: { ...GREEN, emoji: "🍄" } },
   { pattern: /chili|pepper/i, visual: { ...GREEN, emoji: "🌶️" } },
   { pattern: /(spice|masala)/i, visual: { ...MAROON, emoji: "🧂" } },
   { pattern: /salt/i, visual: { ...MAROON, emoji: "🧂" } },
+  { pattern: /sugar/i, visual: { ...AMBER, emoji: "🍬" } },
   { pattern: /lemon/i, visual: { ...GREEN, emoji: "🍋" } },
+  { pattern: /carrot/i, visual: { ...GREEN, emoji: "🥕" } },
+  { pattern: /potato/i, visual: { ...GREEN, emoji: "🥔" } },
+  { pattern: /eggplant|brinjal/i, visual: { ...GREEN, emoji: "🍆" } },
+  { pattern: /cold drink|cola|soda/i, visual: { ...TEAL, emoji: "🥤" } },
   { pattern: /cheese/i, visual: { ...AMBER, emoji: "🧀" } },
   { pattern: /tortilla|chips/i, visual: { ...AMBER, emoji: "🌽" } },
   { pattern: /(wrapper|sheet|dough)/i, visual: { ...MAROON, emoji: "🥟" } },
