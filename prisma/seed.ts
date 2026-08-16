@@ -14,16 +14,39 @@ const CHART_OF_ACCOUNTS: {
   name: string;
   type: AccountType;
   isSystem?: boolean;
+  isFundSource?: boolean;
   description?: string;
 }[] = [
   // Assets
-  { code: "1000", name: "Cash in Hand", type: "ASSET", isSystem: true, description: "Physical cash held by the shop" },
-  { code: "1010", name: "Bank / Mobile Banking", type: "ASSET", isSystem: true, description: "Bank account and mobile banking (bKash/Nagad) balance" },
+  {
+    code: "1000",
+    name: "Cash in Hand",
+    type: "ASSET",
+    isSystem: true,
+    isFundSource: true,
+    description: "Physical cash held by the shop",
+  },
+  {
+    code: "1010",
+    name: "Bank Account",
+    type: "ASSET",
+    isSystem: true,
+    isFundSource: true,
+    description: "Primary bank account",
+  },
   { code: "1200", name: "Accounts Receivable", type: "ASSET", isSystem: true, description: "Money owed to the business (credit sales)" },
   { code: "1500", name: "Fixed Assets (Cart, Equipment & Furniture)", type: "ASSET", isSystem: true, description: "Cart, fridge, blender, grinder, bench and other long-lived equipment" },
   // Liabilities
   { code: "2000", name: "Accounts Payable", type: "LIABILITY", isSystem: true, description: "Money the business owes (unpaid purchases/expenses)" },
   { code: "2100", name: "Loans Payable", type: "LIABILITY", isSystem: true, description: "Loans taken by the business" },
+  // Equity
+  {
+    code: "3999",
+    name: "Balance Adjustments",
+    type: "EQUITY",
+    isSystem: true,
+    description: "Opening balances and manual balance corrections for cash/bank accounts",
+  },
   // Income
   { code: "4000", name: "Sales Income", type: "INCOME", isSystem: true, description: "Daily food sales" },
   { code: "4900", name: "Other Income", type: "INCOME", isSystem: true, description: "Any income outside regular food sales" },
@@ -59,7 +82,7 @@ async function main() {
   for (const account of CHART_OF_ACCOUNTS) {
     await prisma.account.upsert({
       where: { code: account.code },
-      update: {},
+      update: { name: account.name, isFundSource: account.isFundSource ?? false, description: account.description },
       create: account,
     });
   }

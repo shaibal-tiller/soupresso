@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { createDailySale, deleteDailySale, type DailySaleItemInput } from "@/lib/ledger";
+import { createDailySale, deleteDailySale, type DailySaleItemInput, type DailySaleFundingInput } from "@/lib/ledger";
 import type { ActionState } from "@/app/entries/actions";
 
 function revalidateAll() {
@@ -13,15 +13,20 @@ function revalidateAll() {
 
 export async function createDailySaleAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const dateRaw = formData.get("date");
-  const cashAmount = Number(formData.get("cashAmount") || 0);
-  const bankAmount = Number(formData.get("bankAmount") || 0);
   const notes = (formData.get("notes") as string) || null;
 
   if (!dateRaw || typeof dateRaw !== "string") {
     return { success: false, message: "Date is required" };
   }
-  if (cashAmount <= 0 && bankAmount <= 0) {
-    return { success: false, message: "Enter at least a cash or bank amount" };
+
+  const fundSourceAccounts = await prisma.account.findMany({ where: { isActive: true, isFundSource: true } });
+  const fundings: DailySaleFundingInput[] = [];
+  for (const account of fundSourceAccounts) {
+    const amount = Number(formData.get(`fund_${account.id}`) || 0);
+    if (amount > 0) fundings.push({ fundSourceAccountId: account.id, amount });
+  }
+  if (fundings.length === 0) {
+    return { success: false, message: "Enter at least one cash/bank amount" };
   }
 
   const menuItems = await prisma.menuItem.findMany({ where: { isActive: true } });
@@ -45,8 +50,7 @@ export async function createDailySaleAction(_prevState: ActionState, formData: F
   try {
     await createDailySale({
       date: new Date(`${dateRaw}T00:00:00.000Z`),
-      cashAmount,
-      bankAmount,
+      fundings,
       notes,
       items,
     });

@@ -6,7 +6,6 @@ import { createDailySaleAction } from "@/app/daily-sales/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
 import type { ActionState } from "@/app/entries/actions";
@@ -18,12 +17,16 @@ interface MenuItemOption {
   parcelPrice: number | null;
 }
 
+interface FundSourceOption {
+  id: string;
+  name: string;
+}
+
 const initialState: ActionState = { success: false, message: "" };
 
-export function DailySaleForm({ menuItems }: { menuItems: MenuItemOption[] }) {
+export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemOption[]; fundSources: FundSourceOption[] }) {
   const [state, formAction, pending] = useActionState(createDailySaleAction, initialState);
-  const [cashAmount, setCashAmount] = useState("");
-  const [bankAmount, setBankAmount] = useState("");
+  const [fundAmounts, setFundAmounts] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, { regular: string; parcel: string }>>({});
   const [formKey, setFormKey] = useState(0);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -33,8 +36,7 @@ export function DailySaleForm({ menuItems }: { menuItems: MenuItemOption[] }) {
       if (state.success) {
         toast.success(state.message);
         setFormKey((k) => k + 1);
-        setCashAmount("");
-        setBankAmount("");
+        setFundAmounts({});
         setQuantities({});
       } else {
         toast.error(state.message);
@@ -50,8 +52,8 @@ export function DailySaleForm({ menuItems }: { menuItems: MenuItemOption[] }) {
     return sum + regular + parcel;
   }, 0);
 
-  const cashBankTotal = Number(cashAmount || 0) + Number(bankAmount || 0);
-  const diff = cashBankTotal - itemsTotal;
+  const fundsTotal = Object.values(fundAmounts).reduce((sum, v) => sum + Number(v || 0), 0);
+  const diff = fundsTotal - itemsTotal;
 
   function updateQty(id: string, field: "regular" | "parcel", value: string) {
     setQuantities((prev) => ({ ...prev, [id]: { regular: prev[id]?.regular ?? "", parcel: prev[id]?.parcel ?? "", [field]: value } }));
@@ -59,42 +61,42 @@ export function DailySaleForm({ menuItems }: { menuItems: MenuItemOption[] }) {
 
   return (
     <form key={formKey} action={formAction} className="grid gap-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">
           <Label htmlFor="date">Date</Label>
           <Input id="date" name="date" type="date" defaultValue={today} required />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="cashAmount">Cash Collected (৳)</Label>
-          <Input
-            id="cashAmount"
-            name="cashAmount"
-            type="number"
-            step="0.01"
-            min="0"
-            value={cashAmount}
-            onChange={(e) => setCashAmount(e.target.value)}
-            placeholder="0.00"
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="bankAmount">Bank / Mobile Banking (৳)</Label>
-          <Input
-            id="bankAmount"
-            name="bankAmount"
-            type="number"
-            step="0.01"
-            min="0"
-            value={bankAmount}
-            onChange={(e) => setBankAmount(e.target.value)}
-            placeholder="0.00"
-          />
+          <Label htmlFor="notes">Notes (optional)</Label>
+          <Input id="notes" name="notes" placeholder="Anything worth noting about today's sales" />
         </div>
       </div>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="notes">Notes (optional)</Label>
-        <Textarea id="notes" name="notes" rows={2} placeholder="Anything worth noting about today's sales" />
+      <div>
+        <Label className="mb-2 block text-base">Amount collected, by account</Label>
+        {fundSources.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No cash/bank accounts yet — add one on the Cash &amp; Bank page.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {fundSources.map((f) => (
+              <div key={f.id} className="grid gap-1.5">
+                <Label htmlFor={`fund_${f.id}`} className="text-sm font-normal text-muted-foreground">
+                  {f.name}
+                </Label>
+                <Input
+                  id={`fund_${f.id}`}
+                  name={`fund_${f.id}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={fundAmounts[f.id] ?? ""}
+                  onChange={(e) => setFundAmounts((prev) => ({ ...prev, [f.id]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
@@ -148,9 +150,9 @@ export function DailySaleForm({ menuItems }: { menuItems: MenuItemOption[] }) {
             ))}
           </CardContent>
         </Card>
-        {cashBankTotal > 0 && itemsTotal > 0 && Math.abs(diff) > 0.5 && (
+        {fundsTotal > 0 && itemsTotal > 0 && Math.abs(diff) > 0.5 && (
           <p className="mt-2 text-xs text-amber-600">
-            Heads up: item subtotal differs from cash+bank total by {formatTaka(Math.abs(diff))}. That&apos;s fine — item
+            Heads up: item subtotal differs from the amount collected by {formatTaka(Math.abs(diff))}. That&apos;s fine — item
             breakdown is approximate.
           </p>
         )}

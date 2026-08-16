@@ -3,33 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Receipt,
-  Soup,
-  UtensilsCrossed,
-  BookOpen,
-  Users,
-  FileBarChart,
-} from "lucide-react";
-
-const links = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/entries", label: "Entries", icon: Receipt },
-  { href: "/daily-sales", label: "Daily Sales", icon: Soup },
-  { href: "/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/accounts", label: "Chart of Accounts", icon: BookOpen },
-  { href: "/partners", label: "Partners & Equity", icon: Users },
-  { href: "/reports", label: "Reports", icon: FileBarChart },
-];
+import { ALL_LINKS, isLinkActive } from "@/lib/nav-links";
 
 export function Nav() {
   const pathname = usePathname();
 
   return (
     <nav className="flex flex-col gap-1 p-3">
-      {links.map(({ href, label, icon: Icon }) => {
-        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+      {ALL_LINKS.map(({ href, label, icon: Icon }) => {
+        const active = isLinkActive(pathname, href);
         return (
           <Link
             key={href}

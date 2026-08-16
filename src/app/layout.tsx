@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
+import { MobileNav } from "@/components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -17,6 +18,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Soupresso Ledger",
   description: "Accounting ledger for the Soupresso food cart business",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Soupresso",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#fcfcfb",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -34,9 +47,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Nav />
           </aside>
           <div className="flex min-w-0 flex-1 flex-col">
-            <main className="flex-1 p-4 md:p-8">{children}</main>
+            <header
+              className="sticky top-0 z-30 flex h-14 items-center border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
+              style={{ paddingTop: "env(safe-area-inset-top)" }}
+            >
+              <span className="text-base font-semibold tracking-tight">🍜 Soupresso</span>
+            </header>
+            <main className="flex-1 p-4 pb-24 md:p-8 md:pb-8">{children}</main>
           </div>
         </div>
+        <MobileNav />
         <Toaster />
       </body>
     </html>

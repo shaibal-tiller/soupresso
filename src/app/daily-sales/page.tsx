@@ -7,23 +7,23 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Daily Sales — Soupresso Ledger" };
 
 export default async function DailySalesPage() {
-  const [menuItems, dailySales] = await Promise.all([
+  const [menuItems, dailySales, fundSources] = await Promise.all([
     prisma.menuItem.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     prisma.dailySale.findMany({
       orderBy: { date: "desc" },
       take: 90,
-      include: { items: true },
+      include: { items: true, fundings: { include: { fundSourceAccount: true } } },
     }),
+    prisma.account.findMany({ where: { isActive: true, isFundSource: true }, orderBy: { code: "asc" } }),
   ]);
 
   const rows: DailySaleRow[] = dailySales.map((d) => ({
     id: d.id,
     date: d.date.toISOString(),
-    cashAmount: Number(d.cashAmount),
-    bankAmount: Number(d.bankAmount),
     totalAmount: Number(d.totalAmount),
     itemCount: d.items.length,
     notes: d.notes,
+    fundings: d.fundings.map((f) => ({ name: f.fundSourceAccount.name, amount: Number(f.amount) })),
   }));
 
   return (
@@ -49,6 +49,7 @@ export default async function DailySalesPage() {
               price: Number(m.price),
               parcelPrice: m.parcelPrice != null ? Number(m.parcelPrice) : null,
             }))}
+            fundSources={fundSources.map((f) => ({ id: f.id, name: f.name }))}
           />
         </CardContent>
       </Card>

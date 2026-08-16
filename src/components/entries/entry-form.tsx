@@ -39,30 +39,45 @@ interface AccountOption {
   type: string;
 }
 
+interface FundSourceOption {
+  id: string;
+  name: string;
+}
+
 const initialState: ActionState = { success: false, message: "" };
 
-const PAYMENT_METHODS: PaymentMethodValue[] = ["CASH", "BANK", "CREDIT"];
+const PAYMENT_METHODS: PaymentMethodValue[] = ["FUND_SOURCE", "CREDIT"];
 
 const CATEGORY_GROUPS = Array.from(new Set(ENTRY_FORM_CATEGORIES.map((c) => c.group)));
 
-export function EntryForm({ partners, accounts }: { partners: PartnerOption[]; accounts: AccountOption[] }) {
+export function EntryForm({
+  partners,
+  accounts,
+  fundSources,
+}: {
+  partners: PartnerOption[];
+  accounts: AccountOption[];
+  fundSources: FundSourceOption[];
+}) {
   const [state, formAction, pending] = useActionState(createEntryAction, initialState);
   const [category, setCategory] = useState<EntryCategoryValue>("RAW_MATERIAL");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>("FUND_SOURCE");
   const [formKey, setFormKey] = useState(0);
 
   const needsPartner = CATEGORIES_REQUIRING_PARTNER.includes(category);
   const needsManualAccounts = category === CATEGORY_REQUIRES_MANUAL_ACCOUNTS;
+  const needsFundSource = paymentMethod === "FUND_SOURCE";
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const partnerLabels = useMemo(() => Object.fromEntries(partners.map((p) => [p.id, p.name])), [partners]);
   const accountLabels = useMemo(
     () => Object.fromEntries(accounts.map((a) => [a.id, `${a.code} — ${a.name}`])),
     [accounts],
   );
+  const fundSourceLabels = useMemo(() => Object.fromEntries(fundSources.map((f) => [f.id, f.name])), [fundSources]);
 
   useEffect(() => {
     if (!isPaymentMethodAllowed(category, paymentMethod)) {
-      setPaymentMethod("CASH");
+      setPaymentMethod("FUND_SOURCE");
     }
   }, [category, paymentMethod]);
 
@@ -72,7 +87,7 @@ export function EntryForm({ partners, accounts }: { partners: PartnerOption[]; a
         toast.success(state.message);
         setFormKey((k) => k + 1);
         setCategory("RAW_MATERIAL");
-        setPaymentMethod("CASH");
+        setPaymentMethod("FUND_SOURCE");
       } else {
         toast.error(state.message);
       }
@@ -150,6 +165,29 @@ export function EntryForm({ partners, accounts }: { partners: PartnerOption[]; a
           </Select>
         </div>
       </div>
+
+      {needsFundSource && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="fundSourceAccountId">Cash / Bank Account</Label>
+          <Select name="fundSourceAccountId" required>
+            <SelectTrigger id="fundSourceAccountId" className="w-full">
+              <SelectValue>{(value: string | null) => (value ? fundSourceLabels[value] : "Select account")}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {fundSources.map((f) => (
+                <SelectItem key={f.id} value={f.id}>
+                  {f.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {fundSources.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No cash/bank accounts yet — add one on the Cash &amp; Bank page.
+            </p>
+          )}
+        </div>
+      )}
 
       {needsPartner && (
         <div className="grid gap-1.5">

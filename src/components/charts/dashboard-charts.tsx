@@ -4,8 +4,6 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,7 +24,7 @@ const tooltipStyle = {
 
 const tickStyle = { fill: axisColor, fontSize: 11 };
 
-export function DailySalesTrendChart({ data }: { data: { date: string; cashAmount: number; bankAmount: number }[] }) {
+export function DailySalesTrendChart({ data }: { data: { date: string; totalAmount: number }[] }) {
   const chartData = data.map((d) => ({ ...d, label: d.date.slice(5) }));
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -36,15 +34,24 @@ export function DailySalesTrendChart({ data }: { data: { date: string; cashAmoun
         <YAxis tick={tickStyle} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => `${v}`} />
         <Tooltip
           contentStyle={tooltipStyle}
-          formatter={(value, name) => [formatTaka(Number(value)), name === "cashAmount" ? "Cash" : "Bank"]}
+          formatter={(value) => [formatTaka(Number(value)), "Sales"]}
           labelFormatter={(label) => `Date: ${label}`}
         />
-        <Legend
-          formatter={(value) => (value === "cashAmount" ? "Cash" : "Bank")}
-          wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }}
-        />
-        <Bar dataKey="cashAmount" stackId="sales" fill="var(--chart-1)" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="bankAmount" stackId="sales" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="totalAmount" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function FundSourceBreakdownChart({ data }: { data: { name: string; balance: number }[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(140, data.length * 42)}>
+      <BarChart data={data} layout="vertical" margin={{ left: 24 }}>
+        <CartesianGrid horizontal={false} stroke={gridColor} strokeDasharray="3 3" />
+        <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} />
+        <YAxis type="category" dataKey="name" tick={tickStyle} axisLine={false} tickLine={false} width={110} />
+        <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatTaka(Number(value))} />
+        <Bar dataKey="balance" fill="var(--chart-3)" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -97,21 +104,6 @@ export function TopItemsChart({ data }: { data: { name: string; revenue: number 
         <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatTaka(Number(value))} />
         <Bar dataKey="revenue" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
       </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-export function CashTrendLine({ data }: { data: { date: string; totalAmount: number }[] }) {
-  const chartData = data.map((d) => ({ ...d, label: d.date.slice(5) }));
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={chartData}>
-        <CartesianGrid vertical={false} stroke={gridColor} strokeDasharray="3 3" />
-        <XAxis dataKey="label" tick={tickStyle} axisLine={{ stroke: axisColor }} tickLine={false} interval="preserveStartEnd" />
-        <YAxis tick={tickStyle} axisLine={false} tickLine={false} width={48} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatTaka(Number(value))} />
-        <Line type="monotone" dataKey="totalAmount" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-      </LineChart>
     </ResponsiveContainer>
   );
 }

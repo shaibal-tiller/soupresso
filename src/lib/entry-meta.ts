@@ -17,9 +17,11 @@ export type EntryCategoryValue =
   | "PAYABLE_SETTLEMENT"
   | "RECEIVABLE_COLLECTION"
   | "WITHDRAWAL"
-  | "ADJUSTMENT";
+  | "ADJUSTMENT"
+  | "BALANCE_ADJUSTMENT"
+  | "TRANSFER";
 
-export type PaymentMethodValue = "CASH" | "BANK" | "CREDIT" | "MIXED";
+export type PaymentMethodValue = "FUND_SOURCE" | "CREDIT" | "MIXED";
 
 // Categories entered through the general Entries form (Daily Sales has its own dedicated page).
 export const ENTRY_FORM_CATEGORIES: { value: EntryCategoryValue; label: string; group: string }[] = [
@@ -79,11 +81,12 @@ export const CATEGORY_LABELS: Record<string, string> = {
   RECEIVABLE_COLLECTION: "Receivable Collection",
   WITHDRAWAL: "Partner Withdrawal",
   ADJUSTMENT: "Manual Adjustment",
+  BALANCE_ADJUSTMENT: "Balance Adjustment",
+  TRANSFER: "Transfer",
 };
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "Cash",
-  BANK: "Bank / Mobile Banking",
+  FUND_SOURCE: "Pay from account",
   CREDIT: "On Credit (unpaid)",
-  MIXED: "Cash + Bank",
+  MIXED: "Multiple accounts",
 };

@@ -17,14 +17,17 @@ export interface AccountBalance {
   id: string;
   code: string;
   name: string;
+  description: string | null;
   type: AccountType;
   isSystem: boolean;
+  isFundSource: boolean;
+  isActive: boolean;
   balance: number;
 }
 
-export async function getAccountBalances(): Promise<AccountBalance[]> {
+export async function getAccountBalances(includeInactive = false): Promise<AccountBalance[]> {
   const accounts = await prisma.account.findMany({
-    where: { isActive: true },
+    where: includeInactive ? undefined : { isActive: true },
     orderBy: { code: "asc" },
   });
   const sums = await prisma.journalLine.groupBy({
@@ -41,8 +44,11 @@ export async function getAccountBalances(): Promise<AccountBalance[]> {
       id: account.id,
       code: account.code,
       name: account.name,
+      description: account.description,
       type: account.type,
       isSystem: account.isSystem,
+      isFundSource: account.isFundSource,
+      isActive: account.isActive,
       balance: normalBalance(account.type, debit, credit),
     };
   });
@@ -59,8 +65,8 @@ export async function getAccountBalanceByCode(code: string): Promise<number> {
 }
 
 export interface DashboardSummary {
-  cashInHand: number;
-  bankBalance: number;
+  totalLiquidFunds: number;
+  fundSources: { id: string; name: string; balance: number }[];
   totalAssets: number;
   totalLiabilities: number;
   contributedEquity: number;
@@ -85,6 +91,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     balances.filter((b) => b.type === type).reduce((acc, b) => acc + b.balance, 0);
 
   const findBalance = (code: string) => balances.find((b) => b.code === code)?.balance ?? 0;
+
+  const fundSources = balances.filter((b) => b.isFundSource).map((b) => ({ id: b.id, name: b.name, balance: b.balance }));
+  const totalLiquidFunds = fundSources.reduce((sum, f) => sum + f.balance, 0);
 
   const totalAssets = sumByType("ASSET");
   const totalLiabilities = sumByType("LIABILITY");
@@ -126,8 +135,8 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   ]);
 
   return {
-    cashInHand: findBalance(ACCOUNT_CODES.CASH),
-    bankBalance: findBalance(ACCOUNT_CODES.BANK),
+    totalLiquidFunds,
+    fundSources,
     totalAssets,
     totalLiabilities,
     contributedEquity,
@@ -214,8 +223,11 @@ export async function getIncomeStatement(startDate?: Date, endDate?: Date): Prom
       id: account.id,
       code: account.code,
       name: account.name,
+      description: account.description,
       type: account.type,
       isSystem: account.isSystem,
+      isFundSource: account.isFundSource,
+      isActive: account.isActive,
       balance: normalBalance(account.type, debit, credit),
     };
   });
@@ -231,8 +243,6 @@ export async function getIncomeStatement(startDate?: Date, endDate?: Date): Prom
 export interface DailyTrendPoint {
   date: string;
   totalAmount: number;
-  cashAmount: number;
-  bankAmount: number;
 }
 
 export async function getDailySalesTrend(days = 30): Promise<DailyTrendPoint[]> {
@@ -245,8 +255,6 @@ export async function getDailySalesTrend(days = 30): Promise<DailyTrendPoint[]> 
   return rows.map((r) => ({
     date: r.date.toISOString().slice(0, 10),
     totalAmount: toNumber(r.totalAmount),
-    cashAmount: toNumber(r.cashAmount),
-    bankAmount: toNumber(r.bankAmount),
   }));
 }
 

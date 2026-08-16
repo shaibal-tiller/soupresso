@@ -18,11 +18,10 @@ import { formatTaka, formatDate } from "@/lib/format";
 export interface DailySaleRow {
   id: string;
   date: string;
-  cashAmount: number;
-  bankAmount: number;
   totalAmount: number;
   itemCount: number;
   notes: string | null;
+  fundings: { name: string; amount: number }[];
 }
 
 export function DailySaleTable({ rows }: { rows: DailySaleRow[] }) {
@@ -46,8 +45,7 @@ export function DailySaleTable({ rows }: { rows: DailySaleRow[] }) {
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
-            <TableHead className="text-right">Cash</TableHead>
-            <TableHead className="text-right">Bank</TableHead>
+            <TableHead>Sources</TableHead>
             <TableHead className="text-right">Total</TableHead>
             <TableHead>Items</TableHead>
             <TableHead className="w-10" />
@@ -57,8 +55,9 @@ export function DailySaleTable({ rows }: { rows: DailySaleRow[] }) {
           {rows.map((row) => (
             <TableRow key={row.id}>
               <TableCell className="whitespace-nowrap text-sm">{formatDate(row.date)}</TableCell>
-              <TableCell className="text-right">{formatTaka(row.cashAmount)}</TableCell>
-              <TableCell className="text-right">{formatTaka(row.bankAmount)}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {row.fundings.map((f) => `${f.name} ${formatTaka(f.amount)}`).join(", ")}
+              </TableCell>
               <TableCell className="text-right font-medium">{formatTaka(row.totalAmount)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{row.itemCount} line{row.itemCount === 1 ? "" : "s"}</TableCell>
               <TableCell>

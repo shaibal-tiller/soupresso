@@ -25,22 +25,29 @@ enum AccountType {
 }
 
 model Account {
-  id          String      @id @default(cuid())
-  code        String      @unique
-  name        String
-  type        AccountType
+  id           String      @id @default(cuid())
+  code         String      @unique
+  name         String
+  type         AccountType
   // true for accounts the posting engine depends on (Cash, Bank, AP, AR, Sales Income...).
   // Prevents accidental deletion from the Chart of Accounts UI.
-  isSystem    Boolean     @default(false)
-  isActive    Boolean     @default(true)
-  description String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  isSystem     Boolean     @default(false)
+  // true for liquid cash/bank/mobile-banking accounts the user can pay from or deposit to.
+  // Drives the fund-source picker on Entries, Daily Sales, and the Cash & Bank page.
+  isFundSource Boolean     @default(false)
+  isActive     Boolean     @default(true)
+  description  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  journalLines JournalLine[]
-  partner      Partner?
+  journalLines      JournalLine[]
+  partner           Partner?
+  fundSourceEntries Entry[]            @relation("EntryFundSource")
+  transferToEntries Entry[]            @relation("EntryTransferTo")
+  dailySaleFundings DailySaleFunding[]
 
   @@index([type])
+  @@index([isFundSource])
 }
 
 // ---------------------------------------------------------------------------
@@ -112,13 +119,14 @@ enum EntryCategory {
   RECEIVABLE_COLLECTION
   WITHDRAWAL
   ADJUSTMENT
+  BALANCE_ADJUSTMENT // sets/corrects an account's balance (e.g. opening balance) against the Balance Adjustments equity account
+  TRANSFER // moves money between two fund source accounts (e.g. cash deposited to bank)
 }
 
 enum PaymentMethod {
-  CASH
-  BANK
+  FUND_SOURCE // paid from / deposited to a specific cash, bank, or mobile-banking account
   CREDIT // unpaid: Accounts Payable (expense/asset side) or Accounts Receivable (sales side)
-  MIXED // cash + bank split, used by daily sales close-out
+  MIXED // split across multiple fund source accounts, used by daily sales close-out
 }
 
 model Entry {
@@ -134,6 +142,14 @@ model Entry {
 
   partnerId String?
   partner   Partner? @relation(fields: [partnerId], references: [id])
+
+  // The account this entry primarily concerns: paid-from/deposited-to for FUND_SOURCE entries,
+  // the "from" side of a TRANSFER, or the account being corrected for BALANCE_ADJUSTMENT.
+  fundSourceAccountId String?
+  fundSourceAccount   Account? @relation("EntryFundSource", fields: [fundSourceAccountId], references: [id])
+  // Only set for TRANSFER entries: the "to" account receiving the funds.
+  transferToAccountId String?
+  transferToAccount   Account? @relation("EntryTransferTo", fields: [transferToAccountId], references: [id])
 
   dailySale DailySale?
 
@@ -166,18 +182,30 @@ model JournalLine {
 model DailySale {
   id          String   @id @default(cuid())
   date        DateTime @unique @db.Date
-  cashAmount  Decimal  @default(0) @db.Decimal(12, 2)
-  bankAmount  Decimal  @default(0) @db.Decimal(12, 2)
   totalAmount Decimal  @db.Decimal(12, 2)
   notes       String?
 
   entryId String @unique
   entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
-  items DailySaleItem[]
+  items    DailySaleItem[]
+  fundings DailySaleFunding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Per-fund-source split of a day's sales (cash, bank, bKash, Nagad, ...).
+model DailySaleFunding {
+  id                  String    @id @default(cuid())
+  dailySaleId         String
+  dailySale           DailySale @relation(fields: [dailySaleId], references: [id], onDelete: Cascade)
+  fundSourceAccountId String
+  fundSourceAccount   Account   @relation(fields: [fundSourceAccountId], references: [id])
+  amount              Decimal   @db.Decimal(12, 2)
+
+  @@index([dailySaleId])
+  @@index([fundSourceAccountId])
 }
 
 model DailySaleItem {

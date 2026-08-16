@@ -14,4 +14,5 @@ export const ACCOUNT_CODES = {
   UTILITY: "5400",
   CLEANING: "5500",
   OTHER_EXPENSE: "5900",
+  BALANCE_ADJUSTMENTS: "3999",
 } as const;

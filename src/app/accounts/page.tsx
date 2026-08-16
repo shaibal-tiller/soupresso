@@ -39,7 +39,7 @@ export default async function AccountsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Chart of Accounts</h1>
           <p className="text-sm text-muted-foreground">

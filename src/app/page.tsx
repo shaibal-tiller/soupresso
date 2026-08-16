@@ -11,10 +11,11 @@ import {
   MonthlyComparisonChart,
   ExpenseBreakdownChart,
   TopItemsChart,
+  FundSourceBreakdownChart,
 } from "@/components/charts/dashboard-charts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
-import { Wallet, Landmark, Scale, TrendingUp, HandCoins, Users, Boxes, Receipt } from "lucide-react";
+import { Wallet, Scale, TrendingUp, HandCoins, Users, Boxes, Receipt } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Soupresso Ledger" };
@@ -36,8 +37,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Cash in Hand" value={summary.cashInHand} icon={Wallet} />
-        <StatCard label="Bank Balance" value={summary.bankBalance} icon={Landmark} />
+        <StatCard label="Total Liquid Funds" value={summary.totalLiquidFunds} icon={Wallet} hint="Across all cash/bank accounts" />
         <StatCard label="Today's Sales" value={summary.todaySales} icon={TrendingUp} tone="good" />
         <StatCard label="Month-to-Date Sales" value={summary.monthToDateSales} icon={Receipt} />
         <StatCard label="Total Assets" value={summary.totalAssets} icon={Boxes} />
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Daily Sales — Last 30 Days</CardTitle>
-            <CardDescription>Cash vs. bank collections per day.</CardDescription>
+            <CardDescription>Total collected per day.</CardDescription>
           </CardHeader>
           <CardContent>
             {dailyTrend.length > 0 ? (
@@ -80,6 +80,20 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <MonthlyComparisonChart data={monthly} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Cash & Bank</CardTitle>
+            <CardDescription>Balance by account.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {summary.fundSources.length > 0 ? (
+              <FundSourceBreakdownChart data={summary.fundSources} />
+            ) : (
+              <EmptyChart message="No cash/bank accounts yet." />
+            )}
           </CardContent>
         </Card>
 
