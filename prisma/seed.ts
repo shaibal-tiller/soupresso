@@ -26,14 +26,6 @@ const CHART_OF_ACCOUNTS: {
     isFundSource: true,
     description: "Physical cash held by the shop",
   },
-  {
-    code: "1010",
-    name: "Bank Account",
-    type: "ASSET",
-    isSystem: true,
-    isFundSource: true,
-    description: "Primary bank account",
-  },
   { code: "1200", name: "Accounts Receivable", type: "ASSET", isSystem: true, description: "Money owed to the business (credit sales)" },
   { code: "1500", name: "Fixed Assets (Cart, Equipment & Furniture)", type: "ASSET", isSystem: true, description: "Cart, fridge, blender, grinder, bench and other long-lived equipment" },
   // Liabilities
@@ -58,6 +50,15 @@ const CHART_OF_ACCOUNTS: {
   { code: "5400", name: "Utilities", type: "EXPENSE", isSystem: true },
   { code: "5500", name: "Cleaning & Maintenance", type: "EXPENSE", isSystem: true },
   { code: "5900", name: "Other Expense", type: "EXPENSE", isSystem: true },
+];
+
+// Mobile banking wallets — not protected system accounts, so the user can freely
+// rename, deactivate, or add more of these (e.g. a second bKash number) via the
+// Cash & Bank page.
+const MOBILE_MONEY_ACCOUNTS: { code: string; name: string; description?: string }[] = [
+  { code: "1010", name: "bKash" },
+  { code: "1020", name: "Rocket" },
+  { code: "1030", name: "Nagad" },
 ];
 
 const MENU_ITEMS: {
@@ -86,6 +87,22 @@ async function main() {
       where: { code: account.code },
       update: { name: account.name, isFundSource: account.isFundSource ?? false, description: account.description },
       create: account,
+    });
+  }
+
+  console.log("Seeding mobile money accounts...");
+  for (const account of MOBILE_MONEY_ACCOUNTS) {
+    await prisma.account.upsert({
+      where: { code: account.code },
+      update: {},
+      create: {
+        code: account.code,
+        name: account.name,
+        type: "ASSET",
+        isSystem: false,
+        isFundSource: true,
+        description: account.description,
+      },
     });
   }
 
