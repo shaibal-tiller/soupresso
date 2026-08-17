@@ -10,6 +10,7 @@ import {
   type DailySaleFundingInput,
 } from "@/lib/ledger";
 import { getActorName } from "@/lib/actor";
+import { getLang, t } from "@/lib/i18n";
 import type { ActionState } from "@/app/entries/actions";
 
 function revalidateAll() {
@@ -19,11 +20,12 @@ function revalidateAll() {
 }
 
 export async function createDailySaleAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const dateRaw = formData.get("date");
   const notes = (formData.get("notes") as string) || null;
 
   if (!dateRaw || typeof dateRaw !== "string") {
-    return { success: false, message: "Date is required" };
+    return { success: false, message: t(lang, "Date is required") };
   }
 
   const fundSourceAccounts = await prisma.account.findMany({ where: { isActive: true, isFundSource: true } });
@@ -33,7 +35,7 @@ export async function createDailySaleAction(_prevState: ActionState, formData: F
     if (amount > 0) fundings.push({ fundSourceAccountId: account.id, amount });
   }
   if (fundings.length === 0) {
-    return { success: false, message: "Enter at least one cash/bank amount" };
+    return { success: false, message: t(lang, "Enter at least one cash/bank amount") };
   }
 
   const menuItems = await prisma.menuItem.findMany({ where: { isActive: true } });
@@ -70,16 +72,19 @@ export async function createDailySaleAction(_prevState: ActionState, formData: F
       typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002";
     return {
       success: false,
-      message: isDuplicateDate
-        ? "A daily sales entry already exists for this date. Use Quick Sale to add more, or delete it first to re-enter."
-        : error instanceof Error
-          ? error.message
-          : "Failed to save daily sales",
+      message: t(
+        lang,
+        isDuplicateDate
+          ? "A daily sales entry already exists for this date. Use Quick Sale to add more, or delete it first to re-enter."
+          : error instanceof Error
+            ? error.message
+            : "Failed to save daily sales",
+      ),
     };
   }
 
   revalidateAll();
-  return { success: true, message: "Daily sales recorded" };
+  return { success: true, message: t(lang, "Daily sales recorded") };
 }
 
 export async function deleteDailySaleAction(id: string): Promise<void> {
@@ -95,24 +100,25 @@ export interface QuickSaleActionState {
 }
 
 export async function quickSaleAction(_prevState: QuickSaleActionState, formData: FormData): Promise<QuickSaleActionState> {
+  const lang = await getLang();
   const fundSourceAccountId = formData.get("fundSourceAccountId");
   const cartRaw = formData.get("cart");
 
   if (!fundSourceAccountId || typeof fundSourceAccountId !== "string") {
-    return { success: false, message: "Choose how the customer paid" };
+    return { success: false, message: t(lang, "Choose how the customer paid") };
   }
   if (!cartRaw || typeof cartRaw !== "string") {
-    return { success: false, message: "Add at least one item" };
+    return { success: false, message: t(lang, "Add at least one item") };
   }
 
   let cart: { menuItemId: string; quantity: number; isParcel: boolean }[];
   try {
     cart = JSON.parse(cartRaw);
   } catch {
-    return { success: false, message: "Invalid order" };
+    return { success: false, message: t(lang, "Invalid order") };
   }
   if (!Array.isArray(cart) || cart.length === 0) {
-    return { success: false, message: "Add at least one item" };
+    return { success: false, message: t(lang, "Add at least one item") };
   }
 
   const menuItemIds = cart.map((c) => c.menuItemId);
@@ -131,7 +137,7 @@ export async function quickSaleAction(_prevState: QuickSaleActionState, formData
     });
   }
   if (items.length === 0) {
-    return { success: false, message: "Add at least one item" };
+    return { success: false, message: t(lang, "Add at least one item") };
   }
 
   try {
@@ -140,8 +146,8 @@ export async function quickSaleAction(_prevState: QuickSaleActionState, formData
     const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
     const dailySale = await addQuickSale({ date, fundSourceAccountId, items }, actor);
     revalidateAll();
-    return { success: true, message: "Order recorded", dayTotal: Number(dailySale.totalAmount) };
+    return { success: true, message: t(lang, "Order recorded"), dayTotal: Number(dailySale.totalAmount) };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to record order" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to record order") };
   }
 }

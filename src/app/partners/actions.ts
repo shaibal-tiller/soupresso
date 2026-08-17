@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getLang, t } from "@/lib/i18n";
 import type { ActionState } from "@/app/entries/actions";
 
 function revalidateAll() {
@@ -21,10 +22,11 @@ const partnerSchema = z.object({
 });
 
 export async function savePartnerAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = partnerSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
   const sharePercent = data.sharePercent ? Number(data.sharePercent) : null;
@@ -60,11 +62,11 @@ export async function savePartnerAction(_prevState: ActionState, formData: FormD
       });
     }
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to save partner" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to save partner") };
   }
 
   revalidateAll();
-  return { success: true, message: data.id ? "Partner updated" : "Partner added" };
+  return { success: true, message: t(lang, data.id ? "Partner updated" : "Partner added") };
 }
 
 export async function togglePartnerActiveAction(id: string, isActive: boolean): Promise<void> {

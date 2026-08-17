@@ -16,8 +16,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatTaka, PAYMENT_METHOD_LABELS } from "@/lib/format";
-import { isPaymentMethodAllowed, CATEGORY_LABELS, type PaymentMethodValue } from "@/lib/entry-meta";
+import { isPaymentMethodAllowed, type PaymentMethodValue } from "@/lib/entry-meta";
 import { getPurchaseVisual } from "@/lib/purchase-icon";
+import { getPurchaseGroupKey, PURCHASE_GROUP_LABELS, PURCHASE_GROUP_ORDER, type PurchaseGroupKey } from "@/lib/purchase-group";
 import { cn } from "@/lib/utils";
 import { ManageItemsSheet } from "@/components/quick-purchase/manage-items-sheet";
 import { useLang } from "@/components/language-provider";
@@ -66,29 +67,33 @@ export function QuickPurchasePanel({
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const activeItems = useMemo(() => items.filter((i) => i.isActive), [items]);
 
+  const itemGroups = useMemo(
+    () => new Map(activeItems.map((item) => [item.id, getPurchaseGroupKey(item.name, item.category)])),
+    [activeItems],
+  );
+
   const categories = useMemo(() => {
-    const seen: string[] = [];
-    for (const item of activeItems) if (!seen.includes(item.category)) seen.push(item.category);
-    return seen;
-  }, [activeItems]);
+    const seen = new Set(itemGroups.values());
+    return PURCHASE_GROUP_ORDER.filter((key) => seen.has(key));
+  }, [itemGroups]);
 
   const filteredItems = useMemo(() => {
     const term = search.trim().toLowerCase();
     return activeItems.filter((item) => {
-      if (categoryFilter !== "ALL" && item.category !== categoryFilter) return false;
+      if (categoryFilter !== "ALL" && itemGroups.get(item.id) !== categoryFilter) return false;
       if (term && !item.name.toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [activeItems, search, categoryFilter]);
+  }, [activeItems, search, categoryFilter, itemGroups]);
 
   const groupedItems = useMemo(() => {
     if (categoryFilter !== "ALL") {
-      return filteredItems.length > 0 ? [{ category: categoryFilter, items: filteredItems }] : [];
+      return filteredItems.length > 0 ? [{ category: categoryFilter as PurchaseGroupKey, items: filteredItems }] : [];
     }
     return categories
-      .map((category) => ({ category, items: filteredItems.filter((i) => i.category === category) }))
+      .map((category) => ({ category, items: filteredItems.filter((i) => itemGroups.get(i.id) === category) }))
       .filter((group) => group.items.length > 0);
-  }, [filteredItems, categories, categoryFilter]);
+  }, [filteredItems, categories, categoryFilter, itemGroups]);
 
   const lines = useMemo(() => Object.values(cart), [cart]);
   const cartTotal = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
@@ -202,7 +207,7 @@ export function QuickPurchasePanel({
           {t("All")} ({activeItems.length})
         </button>
         {categories.map((category) => {
-          const count = activeItems.filter((i) => i.category === category).length;
+          const count = activeItems.filter((i) => itemGroups.get(i.id) === category).length;
           return (
             <button
               key={category}
@@ -213,7 +218,7 @@ export function QuickPurchasePanel({
                 categoryFilter === category ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
               )}
             >
-              {t(CATEGORY_LABELS[category] ?? category)} ({count})
+              {t(PURCHASE_GROUP_LABELS[category])} ({count})
             </button>
           );
         })}
@@ -229,7 +234,7 @@ export function QuickPurchasePanel({
             <div key={group.category}>
               {categoryFilter === "ALL" && (
                 <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  {t(CATEGORY_LABELS[group.category] ?? group.category)}
+                  {t(PURCHASE_GROUP_LABELS[group.category])}
                 </Label>
               )}
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getLang, t } from "@/lib/i18n";
 import type { ActionState } from "@/app/entries/actions";
 import type { MenuCategory } from "@/generated/prisma/client";
 
@@ -20,10 +21,11 @@ const menuItemSchema = z.object({
 });
 
 export async function saveMenuItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = menuItemSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
   const parcelPrice = data.parcelPrice ? Number(data.parcelPrice) : null;
@@ -47,11 +49,11 @@ export async function saveMenuItemAction(_prevState: ActionState, formData: Form
       });
     }
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to save menu item" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to save menu item") };
   }
 
   revalidateAll();
-  return { success: true, message: data.id ? "Menu item updated" : "Menu item added" };
+  return { success: true, message: t(lang, data.id ? "Menu item updated" : "Menu item added") };
 }
 
 export async function toggleMenuItemActiveAction(id: string, isActive: boolean): Promise<void> {
@@ -60,13 +62,14 @@ export async function toggleMenuItemActiveAction(id: string, isActive: boolean):
 }
 
 export async function deleteMenuItemAction(id: string): Promise<{ success: boolean; message: string }> {
+  const lang = await getLang();
   const usageCount = await prisma.dailySaleItem.count({ where: { menuItemId: id } });
   if (usageCount > 0) {
     await prisma.menuItem.update({ where: { id }, data: { isActive: false } });
     revalidateAll();
-    return { success: true, message: "Item has sales history, so it was deactivated instead of deleted." };
+    return { success: true, message: t(lang, "Item has sales history, so it was deactivated instead of deleted.") };
   }
   await prisma.menuItem.delete({ where: { id } });
   revalidateAll();
-  return { success: true, message: "Menu item deleted" };
+  return { success: true, message: t(lang, "Menu item deleted") };
 }

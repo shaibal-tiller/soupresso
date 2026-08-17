@@ -108,6 +108,7 @@ enum EntryCategory {
   RAW_MATERIAL
   PACKAGING_SUPPLIES
   CHEF_SALARY
+  STAFF_WELFARE // staff meals, allowances — separate from base salary
   RENT
   UTILITY
   CLEANING_MAINTENANCE

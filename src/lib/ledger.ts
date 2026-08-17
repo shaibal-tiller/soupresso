@@ -154,6 +154,10 @@ export async function createEntry(input: CreateEntryInput, actor: string) {
       debitAccountId = await getAccountId(ACCOUNT_CODES.CHEF_SALARY);
       creditAccountId = await resolveFundOrCreditAccountId(input.paymentMethod, input.fundSourceAccountId, "out");
       break;
+    case "STAFF_WELFARE":
+      debitAccountId = await getAccountId(ACCOUNT_CODES.STAFF_WELFARE);
+      creditAccountId = await resolveFundOrCreditAccountId(input.paymentMethod, input.fundSourceAccountId, "out");
+      break;
     case "RENT":
       debitAccountId = await getAccountId(ACCOUNT_CODES.RENT);
       creditAccountId = await resolveFundOrCreditAccountId(input.paymentMethod, input.fundSourceAccountId, "out");

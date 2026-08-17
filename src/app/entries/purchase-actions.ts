@@ -10,6 +10,7 @@ import {
   type QuickPurchaseLineInput,
 } from "@/lib/ledger";
 import { getActorName } from "@/lib/actor";
+import { getLang, t } from "@/lib/i18n";
 import type { ActionState } from "@/app/entries/actions";
 import type { EntryCategory } from "@/generated/prisma/client";
 
@@ -37,6 +38,7 @@ export async function quickPurchaseAction(
   _prevState: QuickPurchaseActionState,
   formData: FormData,
 ): Promise<QuickPurchaseActionState> {
+  const lang = await getLang();
   const dateRaw = formData.get("date");
   const vendor = (formData.get("vendor") as string) || null;
   const paymentMethod = formData.get("paymentMethod");
@@ -44,24 +46,24 @@ export async function quickPurchaseAction(
   const cartRaw = formData.get("cart");
 
   if (!dateRaw || typeof dateRaw !== "string") {
-    return { success: false, message: "Date is required" };
+    return { success: false, message: t(lang, "Date is required") };
   }
   if (!paymentMethod || typeof paymentMethod !== "string") {
-    return { success: false, message: "Choose a payment method" };
+    return { success: false, message: t(lang, "Choose a payment method") };
   }
   if (!cartRaw || typeof cartRaw !== "string") {
-    return { success: false, message: "Add at least one item" };
+    return { success: false, message: t(lang, "Add at least one item") };
   }
 
   let cart: unknown;
   try {
     cart = JSON.parse(cartRaw);
   } catch {
-    return { success: false, message: "Invalid basket" };
+    return { success: false, message: t(lang, "Invalid basket") };
   }
   const parsed = z.array(cartLineSchema).safeParse(cart);
   if (!parsed.success || parsed.data.length === 0) {
-    return { success: false, message: "Add at least one item with an amount" };
+    return { success: false, message: t(lang, "Add at least one item with an amount") };
   }
 
   const items: QuickPurchaseLineInput[] = parsed.data.map((line) => ({
@@ -85,11 +87,12 @@ export async function quickPurchaseAction(
       actor,
     );
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to save purchases" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to save purchases") };
   }
 
   revalidateAll();
-  return { success: true, message: `Saved ${items.length} purchase${items.length === 1 ? "" : "s"}` };
+  const itemWord = items.length === 1 ? t(lang, "Purchase") : t(lang, "Purchases");
+  return { success: true, message: `${t(lang, "Saved")} ${items.length} ${itemWord}` };
 }
 
 const purchaseItemSchema = z.object({
@@ -100,10 +103,11 @@ const purchaseItemSchema = z.object({
 });
 
 export async function savePurchaseItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = purchaseItemSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -115,11 +119,11 @@ export async function savePurchaseItemAction(_prevState: ActionState, formData: 
       unit: data.unit || null,
     });
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to save item" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to save item") };
   }
 
   revalidateAll();
-  return { success: true, message: data.id ? "Item updated" : "Item added" };
+  return { success: true, message: t(lang, data.id ? "Item updated" : "Item added") };
 }
 
 export async function togglePurchaseItemActiveAction(id: string, isActive: boolean): Promise<void> {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getLang, t } from "@/lib/i18n";
 import type { ActionState } from "@/app/entries/actions";
 import type { AccountType } from "@/generated/prisma/client";
 
@@ -22,10 +23,11 @@ const accountSchema = z.object({
 });
 
 export async function saveAccountAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = accountSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -55,19 +57,20 @@ export async function saveAccountAction(_prevState: ActionState, formData: FormD
       });
     }
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to save account" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to save account") };
   }
 
   revalidateAll();
-  return { success: true, message: data.id ? "Account updated" : "Account created" };
+  return { success: true, message: t(lang, data.id ? "Account updated" : "Account created") };
 }
 
 export async function toggleAccountActiveAction(id: string, isActive: boolean): Promise<{ success: boolean; message: string }> {
+  const lang = await getLang();
   const account = await prisma.account.findUniqueOrThrow({ where: { id } });
   if (account.isSystem && !isActive) {
-    return { success: false, message: "Core accounts used by the posting engine can't be deactivated." };
+    return { success: false, message: t(lang, "Core accounts used by the posting engine can't be deactivated.") };
   }
   await prisma.account.update({ where: { id }, data: { isActive } });
   revalidateAll();
-  return { success: true, message: isActive ? "Account activated" : "Account deactivated" };
+  return { success: true, message: t(lang, isActive ? "Account activated" : "Account deactivated") };
 }

@@ -7,6 +7,7 @@ export type EntryCategoryValue =
   | "RAW_MATERIAL"
   | "PACKAGING_SUPPLIES"
   | "CHEF_SALARY"
+  | "STAFF_WELFARE"
   | "RENT"
   | "UTILITY"
   | "CLEANING_MAINTENANCE"
@@ -29,6 +30,7 @@ export const ENTRY_FORM_CATEGORIES: { value: EntryCategoryValue; label: string; 
   { value: "PACKAGING_SUPPLIES", label: "Packaging & Supplies", group: "Purchases" },
   { value: "ASSET_PURCHASE", label: "Asset Purchase (cart, fridge, blender...)", group: "Purchases" },
   { value: "CHEF_SALARY", label: "Chef Salary", group: "Recurring Expenses" },
+  { value: "STAFF_WELFARE", label: "Staff Food & Allowance", group: "Recurring Expenses" },
   { value: "RENT", label: "House Rent", group: "Recurring Expenses" },
   { value: "UTILITY", label: "Utility", group: "Recurring Expenses" },
   { value: "CLEANING_MAINTENANCE", label: "Cleaning & Maintenance", group: "Recurring Expenses" },
@@ -47,6 +49,7 @@ export const CREDIT_ELIGIBLE_CATEGORIES: EntryCategoryValue[] = [
   "RAW_MATERIAL",
   "PACKAGING_SUPPLIES",
   "CHEF_SALARY",
+  "STAFF_WELFARE",
   "RENT",
   "UTILITY",
   "CLEANING_MAINTENANCE",
@@ -79,6 +82,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   RAW_MATERIAL: "Raw Material / Ingredients",
   PACKAGING_SUPPLIES: "Packaging & Supplies",
   CHEF_SALARY: "Chef Salary",
+  STAFF_WELFARE: "Staff Food & Allowance",
   RENT: "House Rent",
   UTILITY: "Utility",
   CLEANING_MAINTENANCE: "Cleaning & Maintenance",

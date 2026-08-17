@@ -10,6 +10,7 @@ import {
   transferBetweenFundSources,
 } from "@/lib/ledger";
 import { getActorName } from "@/lib/actor";
+import { getLang, t } from "@/lib/i18n";
 import type { ActionState } from "@/app/entries/actions";
 
 function revalidateAll() {
@@ -29,10 +30,11 @@ const createSchema = z.object({
 });
 
 export async function createFundSourceAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = createSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -48,11 +50,11 @@ export async function createFundSourceAction(_prevState: ActionState, formData: 
       actor,
     );
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to add account" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to add account") };
   }
 
   revalidateAll();
-  return { success: true, message: "Account added" };
+  return { success: true, message: t(lang, "Account added") };
 }
 
 const renameSchema = z.object({
@@ -62,10 +64,11 @@ const renameSchema = z.object({
 });
 
 export async function renameFundSourceAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = renameSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -73,11 +76,11 @@ export async function renameFundSourceAction(_prevState: ActionState, formData: 
     const actor = await getActorName();
     await renameFundSource(data.accountId, data.name, data.description || null, actor);
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to update account" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to update account") };
   }
 
   revalidateAll();
-  return { success: true, message: "Account updated" };
+  return { success: true, message: t(lang, "Account updated") };
 }
 
 export async function toggleFundSourceActiveAction(accountId: string, isActive: boolean): Promise<void> {
@@ -94,10 +97,11 @@ const balanceSchema = z.object({
 });
 
 export async function setBalanceAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = balanceSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -113,11 +117,11 @@ export async function setBalanceAction(_prevState: ActionState, formData: FormDa
       actor,
     );
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to adjust balance" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to adjust balance") };
   }
 
   revalidateAll();
-  return { success: true, message: "Balance adjusted" };
+  return { success: true, message: t(lang, "Balance adjusted") };
 }
 
 const transferSchema = z.object({
@@ -129,10 +133,11 @@ const transferSchema = z.object({
 });
 
 export async function transferAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = transferSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -149,9 +154,9 @@ export async function transferAction(_prevState: ActionState, formData: FormData
       actor,
     );
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to transfer" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to transfer") };
   }
 
   revalidateAll();
-  return { success: true, message: "Transfer recorded" };
+  return { success: true, message: t(lang, "Transfer recorded") };
 }

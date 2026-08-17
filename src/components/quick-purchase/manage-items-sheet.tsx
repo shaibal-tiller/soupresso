@@ -9,8 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { PurchaseItemDialog } from "@/components/quick-purchase/purchase-item-dialog";
-import { CATEGORY_LABELS } from "@/lib/entry-meta";
 import { getPurchaseVisual } from "@/lib/purchase-icon";
+import { getPurchaseGroupKey, PURCHASE_GROUP_LABELS } from "@/lib/purchase-group";
 import { cn } from "@/lib/utils";
 import { useLang } from "@/components/language-provider";
 
@@ -75,7 +75,7 @@ export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
                     <div className="truncate text-sm font-medium">{item.name}</div>
                     <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
-                        {t(CATEGORY_LABELS[item.category] ?? item.category)}
+                        {t(PURCHASE_GROUP_LABELS[getPurchaseGroupKey(item.name, item.category)])}
                       </Badge>
                       {item.unit && <span className="text-[10px] text-muted-foreground">per {item.unit}</span>}
                     </div>

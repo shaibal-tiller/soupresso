@@ -46,6 +46,7 @@ const CHART_OF_ACCOUNTS: {
   { code: "5000", name: "Raw Material & Ingredients (COGS)", type: "EXPENSE", isSystem: true, description: "Vegetables, chicken, spices, sauces, mushroom cans, rolling sheets etc." },
   { code: "5100", name: "Packaging & Disposable Supplies", type: "EXPENSE", isSystem: true, description: "Parcel boxes, foil paper, polythene" },
   { code: "5200", name: "Chef Salary", type: "EXPENSE", isSystem: true },
+  { code: "5250", name: "Staff Food & Allowance", type: "EXPENSE", isSystem: true, description: "Meals and allowances for staff, separate from base salary" },
   { code: "5300", name: "House Rent", type: "EXPENSE", isSystem: true, description: "Chef's house rent" },
   { code: "5400", name: "Utilities", type: "EXPENSE", isSystem: true },
   { code: "5500", name: "Cleaning & Maintenance", type: "EXPENSE", isSystem: true },
@@ -81,7 +82,10 @@ const MENU_ITEMS: {
 // Common purchase items — tap-to-add shortlist for the Entries page, built
 // from what the shop actually buys day to day.
 const PURCHASE_ITEMS: { name: string; category: EntryCategory; unit: string; sortOrder: number }[] = [
-  // Raw material / ingredients
+  // Raw material / ingredients (raw spices, processed spices, vegetables, and
+  // cooking essentials all post to the same Raw Material account — the finer
+  // shopping groups shown in the Quick Purchase picker are inferred from the
+  // item name in src/lib/purchase-group.ts, not stored separately).
   { name: "Chicken", category: "RAW_MATERIAL", unit: "kg", sortOrder: 1 },
   { name: "Onion", category: "RAW_MATERIAL", unit: "kg", sortOrder: 2 },
   { name: "Ginger", category: "RAW_MATERIAL", unit: "kg", sortOrder: 3 },
@@ -104,14 +108,69 @@ const PURCHASE_ITEMS: { name: string; category: EntryCategory; unit: string; sor
   { name: "Tortilla Chips", category: "RAW_MATERIAL", unit: "kg", sortOrder: 20 },
   { name: "Momo / Wonton Wrapper", category: "RAW_MATERIAL", unit: "pack", sortOrder: 21 },
   { name: "Cold Drink", category: "RAW_MATERIAL", unit: "pc", sortOrder: 22 },
+  // Raw spices (new)
+  { name: "Turmeric", category: "RAW_MATERIAL", unit: "kg", sortOrder: 30 },
+  { name: "Cumin", category: "RAW_MATERIAL", unit: "kg", sortOrder: 31 },
+  { name: "Coriander Seed", category: "RAW_MATERIAL", unit: "kg", sortOrder: 32 },
+  { name: "Bay Leaf", category: "RAW_MATERIAL", unit: "pack", sortOrder: 33 },
+  { name: "Cardamom", category: "RAW_MATERIAL", unit: "kg", sortOrder: 34 },
+  { name: "Cinnamon", category: "RAW_MATERIAL", unit: "kg", sortOrder: 35 },
+  // Processed spices & sauces (new)
+  { name: "Ginger-Garlic Paste", category: "RAW_MATERIAL", unit: "kg", sortOrder: 36 },
+  { name: "Soy Sauce", category: "RAW_MATERIAL", unit: "litre", sortOrder: 37 },
+  { name: "Chili Sauce", category: "RAW_MATERIAL", unit: "litre", sortOrder: 38 },
+  { name: "Vinegar", category: "RAW_MATERIAL", unit: "litre", sortOrder: 39 },
+  { name: "Curry Powder", category: "RAW_MATERIAL", unit: "kg", sortOrder: 40 },
+  // Vegetables (new)
+  { name: "Cabbage", category: "RAW_MATERIAL", unit: "kg", sortOrder: 41 },
+  { name: "Capsicum", category: "RAW_MATERIAL", unit: "kg", sortOrder: 42 },
+  { name: "Tomato", category: "RAW_MATERIAL", unit: "kg", sortOrder: 43 },
+  { name: "Cucumber", category: "RAW_MATERIAL", unit: "kg", sortOrder: 44 },
+  // Cooking essentials (new)
+  { name: "Milk", category: "RAW_MATERIAL", unit: "litre", sortOrder: 45 },
+  { name: "Butter", category: "RAW_MATERIAL", unit: "kg", sortOrder: 46 },
+  { name: "Rice", category: "RAW_MATERIAL", unit: "kg", sortOrder: 47 },
+  { name: "Flour / Maida", category: "RAW_MATERIAL", unit: "kg", sortOrder: 48 },
   // Packaging & supplies
-  { name: "Soup Bowl", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 23 },
-  { name: "Parcel Box", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 24 },
-  { name: "Nachos Tray", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 25 },
-  { name: "Poly Bag", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 26 },
-  { name: "Foil Paper", category: "PACKAGING_SUPPLIES", unit: "roll", sortOrder: 27 },
-  { name: "Plate & Spoon", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 28 },
-  { name: "Napkin / Tissue", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 29 },
+  { name: "Soup Bowl", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 50 },
+  { name: "Parcel Box", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 51 },
+  { name: "Nachos Tray", category: "PACKAGING_SUPPLIES", unit: "pc", sortOrder: 52 },
+  { name: "Poly Bag", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 53 },
+  { name: "Foil Paper", category: "PACKAGING_SUPPLIES", unit: "roll", sortOrder: 54 },
+  { name: "Plate & Spoon", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 55 },
+  { name: "Napkin / Tissue", category: "PACKAGING_SUPPLIES", unit: "pack", sortOrder: 56 },
+  // Cooking wares & kitchen equipment (new — posts to Fixed Assets)
+  { name: "Karai / Wok", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 60 },
+  { name: "Frying Pan", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 61 },
+  { name: "Cooking Pot (Dekchi)", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 62 },
+  { name: "Gas Cylinder", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 63 },
+  { name: "Gas Stove / Burner", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 64 },
+  { name: "Knife", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 65 },
+  { name: "Cutting Board", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 66 },
+  { name: "Serving Plate", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 67 },
+  { name: "Ladle / Spatula", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 68 },
+  // Furniture (new — posts to Fixed Assets)
+  { name: "Chair", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 70 },
+  { name: "Table", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 71 },
+  { name: "Mora (Stool)", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 72 },
+  { name: "Moi (Ladder)", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 73 },
+  { name: "Shelf / Rack", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 74 },
+  // Electronics & appliances (new — posts to Fixed Assets)
+  { name: "Fridge", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 80 },
+  { name: "Light / Bulb", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 81 },
+  { name: "Camera (CCTV)", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 82 },
+  { name: "Router", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 83 },
+  { name: "Blender", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 84 },
+  { name: "Grinder", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 85 },
+  { name: "Beater", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 86 },
+  { name: "Mixer", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 87 },
+  { name: "Fan", category: "ASSET_PURCHASE", unit: "pc", sortOrder: 88 },
+  // Cleaning & maintenance (new)
+  { name: "Detergent", category: "CLEANING_MAINTENANCE", unit: "pack", sortOrder: 90 },
+  { name: "Dish Soap", category: "CLEANING_MAINTENANCE", unit: "litre", sortOrder: 91 },
+  { name: "Sponge / Scrubber", category: "CLEANING_MAINTENANCE", unit: "pack", sortOrder: 92 },
+  { name: "Broom", category: "CLEANING_MAINTENANCE", unit: "pc", sortOrder: 93 },
+  { name: "Trash Bags", category: "CLEANING_MAINTENANCE", unit: "pack", sortOrder: 94 },
 ];
 
 const PARTNER_COUNT = 15;

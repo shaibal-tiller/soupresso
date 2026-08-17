@@ -399,7 +399,86 @@ const BN: Record<string, string> = {
   Sources: "উৎস",
   Total: "মোট",
   Items: "আইটেম",
+
+  // Quick Purchase shopping groups
+  "Raw Spices": "কাঁচা মসলা",
+  "Processed Spices & Sauces": "প্রক্রিয়াজাত মসলা ও সস",
+  Vegetables: "সবজি",
+  "Cooking Items": "রান্নার উপকরণ",
+  "Cooking Wares": "রান্নার সরঞ্জাম",
+  Furniture: "আসবাবপত্র",
+  "Electronics & Appliances": "ইলেকট্রনিক্স ও যন্ত্রপাতি",
+
+  // Staff Food & Allowance
+  "Staff Food & Allowance": "স্টাফের খাবার ও ভাতা",
 };
+
+// Server action success/error messages (returned from "use server" files and
+// shown via toast) — translated at the point of return with getLang()+t()
+// since those files can't use the client useLang() hook.
+Object.assign(BN, {
+  "Invalid input": "অবৈধ তথ্য",
+  "Failed to create entry": "এন্ট্রি সংরক্ষণ ব্যর্থ হয়েছে",
+  "Entry saved": "এন্ট্রি সংরক্ষিত হয়েছে",
+  "Date is required": "তারিখ আবশ্যক",
+  "Code is required": "কোড আবশ্যক",
+  "Description is required": "বিবরণ আবশ্যক",
+  "Choose a source account": "একটি উৎস অ্যাকাউন্ট বেছে নিন",
+  "Choose a destination account": "একটি গন্তব্য অ্যাকাউন্ট বেছে নিন",
+  "Price must be greater than zero": "দাম শূন্যের চেয়ে বেশি হতে হবে",
+  "Choose a payment method": "একটি পেমেন্ট পদ্ধতি বেছে নিন",
+  "Invalid basket": "অবৈধ ঝুড়ি",
+  "Add at least one item with an amount": "পরিমাণসহ অন্তত একটি আইটেম যোগ করুন",
+  "Enter at least one cash/bank amount": "অন্তত একটি ক্যাশ/ব্যাংক পরিমাণ লিখুন",
+  "A daily sales entry already exists for this date. Use Quick Sale to add more, or delete it first to re-enter.":
+    "এই তারিখের জন্য ইতিমধ্যে একটি দৈনিক বিক্রয় এন্ট্রি আছে। আরও যোগ করতে দ্রুত বিক্রয় ব্যবহার করুন, অথবা আবার লিখতে আগে এটি মুছে ফেলুন।",
+  "Failed to save daily sales": "দৈনিক বিক্রয় সংরক্ষণ ব্যর্থ হয়েছে",
+  "Daily sales recorded": "দৈনিক বিক্রয় লেখা হয়েছে",
+  "Invalid order": "অবৈধ অর্ডার",
+  "Order recorded": "অর্ডার লেখা হয়েছে",
+  "Failed to record order": "অর্ডার লেখা ব্যর্থ হয়েছে",
+  "Failed to save account": "অ্যাকাউন্ট সংরক্ষণ ব্যর্থ হয়েছে",
+  "Account updated": "অ্যাকাউন্ট হালনাগাদ হয়েছে",
+  "Account created": "অ্যাকাউন্ট তৈরি হয়েছে",
+  "Core accounts used by the posting engine can't be deactivated.": "পোস্টিং ইঞ্জিন কর্তৃক ব্যবহৃত মূল অ্যাকাউন্ট নিষ্ক্রিয় করা যাবে না।",
+  "Account activated": "অ্যাকাউন্ট সক্রিয় হয়েছে",
+  "Account deactivated": "অ্যাকাউন্ট নিষ্ক্রিয় হয়েছে",
+  "Failed to add account": "অ্যাকাউন্ট যোগ ব্যর্থ হয়েছে",
+  "Account added": "অ্যাকাউন্ট যোগ হয়েছে",
+  "Failed to update account": "অ্যাকাউন্ট হালনাগাদ ব্যর্থ হয়েছে",
+  "Failed to adjust balance": "ব্যালেন্স সমন্বয় ব্যর্থ হয়েছে",
+  "Balance adjusted": "ব্যালেন্স সমন্বয় হয়েছে",
+  "Failed to transfer": "স্থানান্তর ব্যর্থ হয়েছে",
+  "Transfer recorded": "স্থানান্তর লেখা হয়েছে",
+  "Failed to save menu item": "মেনু আইটেম সংরক্ষণ ব্যর্থ হয়েছে",
+  "Menu item updated": "মেনু আইটেম হালনাগাদ হয়েছে",
+  "Menu item added": "মেনু আইটেম যোগ হয়েছে",
+  "Item has sales history, so it was deactivated instead of deleted.": "আইটেমটির বিক্রয় ইতিহাস আছে, তাই এটি মুছে না ফেলে নিষ্ক্রিয় করা হয়েছে।",
+  "Menu item deleted": "মেনু আইটেম মুছে ফেলা হয়েছে",
+  "Failed to save purchases": "ক্রয় সংরক্ষণ ব্যর্থ হয়েছে",
+  Saved: "সংরক্ষিত হয়েছে",
+  "Failed to save item": "আইটেম সংরক্ষণ ব্যর্থ হয়েছে",
+  "Item updated": "আইটেম হালনাগাদ হয়েছে",
+  "Item added": "আইটেম যোগ হয়েছে",
+  "Failed to save partner": "অংশীদার সংরক্ষণ ব্যর্থ হয়েছে",
+  "Partner updated": "অংশীদার হালনাগাদ হয়েছে",
+  "Partner added": "অংশীদার যোগ হয়েছে",
+
+  // Ledger validation errors (thrown from src/lib/ledger.ts)
+  "Choose which cash/bank account this uses": "কোন ক্যাশ/ব্যাংক অ্যাকাউন্ট থেকে খরচ হবে বেছে নিন",
+  "Choose a valid, active cash/bank account": "একটি বৈধ, সক্রিয় ক্যাশ/ব্যাংক অ্যাকাউন্ট বেছে নিন",
+  "Amount must be greater than zero": "পরিমাণ শূন্যের চেয়ে বেশি হতে হবে",
+  "Partner is required for an investment entry": "বিনিয়োগ এন্ট্রির জন্য অংশীদার আবশ্যক",
+  "Partner is required for a withdrawal entry": "উত্তোলন এন্ট্রির জন্য অংশীদার আবশ্যক",
+  "Manual entries require both a debit and a credit account": "ম্যানুয়াল এন্ট্রির জন্য ডেবিট ও ক্রেডিট উভয় হিসাব আবশ্যক",
+  "Debit and credit accounts must be different": "ডেবিট ও ক্রেডিট হিসাব ভিন্ন হতে হবে",
+  "Name is required": "নাম আবশ্যক",
+  "That account's balance is already correct — no adjustment needed": "এই অ্যাকাউন্টের ব্যালেন্স ইতিমধ্যে সঠিক — কোনো সমন্বয়ের প্রয়োজন নেই",
+  "Choose two different accounts to transfer between": "স্থানান্তরের জন্য দুটি ভিন্ন অ্যাকাউন্ট বেছে নিন",
+  "Both accounts must be cash/bank accounts": "উভয় হিসাবই ক্যাশ/ব্যাংক অ্যাকাউন্ট হতে হবে",
+  "Enter at least one cash/bank amount greater than zero": "শূন্যের চেয়ে বেশি অন্তত একটি ক্যাশ/ব্যাংক পরিমাণ লিখুন",
+  "Order total must be greater than zero": "অর্ডারের মোট শূন্যের চেয়ে বেশি হতে হবে",
+});
 
 export function t(lang: Lang, en: string): string {
   if (lang !== "bn") return en;

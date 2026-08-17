@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createEntry, deleteEntry } from "@/lib/ledger";
 import { getActorName } from "@/lib/actor";
+import { getLang, t } from "@/lib/i18n";
 import type { EntryCategory, PaymentMethod } from "@/generated/prisma/client";
 
 export interface ActionState {
@@ -35,10 +36,11 @@ function revalidateAll() {
 }
 
 export async function createEntryAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const lang = await getLang();
   const raw = Object.fromEntries(formData.entries());
   const parsed = entrySchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid input" };
+    return { success: false, message: t(lang, parsed.error.issues[0]?.message ?? "Invalid input") };
   }
   const data = parsed.data;
 
@@ -62,11 +64,11 @@ export async function createEntryAction(_prevState: ActionState, formData: FormD
       actor,
     );
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Failed to create entry" };
+    return { success: false, message: t(lang, error instanceof Error ? error.message : "Failed to create entry") };
   }
 
   revalidateAll();
-  return { success: true, message: "Entry saved" };
+  return { success: true, message: t(lang, "Entry saved") };
 }
 
 export async function deleteEntryAction(id: string): Promise<void> {
