@@ -37,6 +37,7 @@ export default async function DailySalesPage() {
   const menuItemOptions = menuItems.map((m) => ({
     id: m.id,
     name: m.name,
+    nameBn: m.nameBn,
     price: Number(m.price),
     parcelPrice: m.parcelPrice != null ? Number(m.parcelPrice) : null,
     category: m.category,

@@ -86,6 +86,7 @@ enum MenuCategory {
 model MenuItem {
   id           String       @id @default(cuid())
   name         String
+  nameBn       String?
   price        Decimal      @db.Decimal(10, 2)
   parcelPrice  Decimal?     @db.Decimal(10, 2)
   category     MenuCategory @default(OTHER)
@@ -233,6 +234,7 @@ model DailySaleItem {
 model PurchaseItem {
   id        String        @id @default(cuid())
   name      String
+  nameBn    String?
   category  EntryCategory
   unit      String?
   isActive  Boolean       @default(true)

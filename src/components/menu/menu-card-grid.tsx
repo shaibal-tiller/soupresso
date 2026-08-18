@@ -10,11 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { MenuItemDialog } from "@/components/menu/menu-item-dialog";
 import { getMenuVisual } from "@/lib/menu-icon";
 import { cn } from "@/lib/utils";
+import { itemLabel } from "@/lib/i18n-shared";
 import { useLang } from "@/components/language-provider";
 
 export interface MenuItemRow {
   id: string;
   name: string;
+  nameBn?: string | null;
   price: number;
   parcelPrice: number | null;
   category: string;
@@ -22,7 +24,7 @@ export interface MenuItemRow {
 }
 
 export function MenuCardGrid({ items }: { items: MenuItemRow[] }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string, next: boolean) {
@@ -66,7 +68,7 @@ export function MenuCardGrid({ items }: { items: MenuItemRow[] }) {
               </div>
 
               <div className="mt-3">
-                <div className="font-heading truncate text-[15px] font-semibold leading-tight">{item.name}</div>
+                <div className="font-heading truncate text-[15px] font-semibold leading-tight">{itemLabel(lang, item.name, item.nameBn)}</div>
                 <Badge variant="outline" className="mt-1 text-[10px] font-normal text-muted-foreground">
                   {t(item.category.charAt(0) + item.category.slice(1).toLowerCase())}
                 </Badge>

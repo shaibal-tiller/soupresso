@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label";
 import { formatTaka } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getMenuVisual } from "@/lib/menu-icon";
+import { itemLabel } from "@/lib/i18n-shared";
 import { useLang } from "@/components/language-provider";
 
 interface MenuItemOption {
   id: string;
   name: string;
+  nameBn?: string | null;
   price: number;
   parcelPrice: number | null;
   category: string;
@@ -30,6 +32,7 @@ interface CartLine {
   key: string;
   menuItemId: string;
   name: string;
+  nameBn?: string | null;
   isParcel: boolean;
   unitPrice: number;
   quantity: number;
@@ -46,7 +49,7 @@ export function QuickSalePanel({
   fundSources: FundSourceOption[];
   initialTodayTotal: number;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [state, formAction, pending] = useActionState(quickSaleAction, initialState);
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [fundSourceId, setFundSourceId] = useState(fundSources[0]?.id ?? "");
@@ -77,7 +80,7 @@ export function QuickSalePanel({
         ...prev,
         [key]: existing
           ? { ...existing, quantity: existing.quantity + 1 }
-          : { key, menuItemId: item.id, name: item.name, isParcel, unitPrice, quantity: 1 },
+          : { key, menuItemId: item.id, name: item.name, nameBn: item.nameBn, isParcel, unitPrice, quantity: 1 },
       };
     });
   }
@@ -133,7 +136,7 @@ export function QuickSalePanel({
                 <div className={cn("mt-1 flex h-9 w-9 items-center justify-center rounded-full text-lg", visual.badgeClass)}>
                   {visual.emoji}
                 </div>
-                <span className="font-heading mt-1 text-sm font-semibold leading-tight">{item.name}</span>
+                <span className="font-heading mt-1 text-sm font-semibold leading-tight">{itemLabel(lang, item.name, item.nameBn)}</span>
                 <span className="text-xs font-medium text-brand-maroon">৳{item.price}</span>
                 {item.parcelPrice != null && (
                   <span
@@ -178,7 +181,7 @@ export function QuickSalePanel({
                 <div key={line.key} className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2">
                   <div className="min-w-0">
                     <div className="font-heading truncate text-sm font-semibold">
-                      {line.name}
+                      {itemLabel(lang, line.name, line.nameBn)}
                       {line.isParcel && <span className="font-sans font-normal text-muted-foreground"> {t("(parcel)")}</span>}
                     </div>
                     <div className="text-xs text-muted-foreground">

@@ -12,18 +12,20 @@ import { PurchaseItemDialog } from "@/components/quick-purchase/purchase-item-di
 import { getPurchaseVisual } from "@/lib/purchase-icon";
 import { getPurchaseGroupKey, PURCHASE_GROUP_LABELS } from "@/lib/purchase-group";
 import { cn } from "@/lib/utils";
+import { itemLabel } from "@/lib/i18n-shared";
 import { useLang } from "@/components/language-provider";
 
 export interface PurchaseItemRow {
   id: string;
   name: string;
+  nameBn?: string | null;
   category: string;
   unit: string | null;
   isActive: boolean;
 }
 
 export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -72,12 +74,12 @@ export function ManageItemsSheet({ items }: { items: PurchaseItemRow[] }) {
                     {visual.emoji}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{item.name}</div>
+                    <div className="truncate text-sm font-medium">{itemLabel(lang, item.name, item.nameBn)}</div>
                     <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
                         {t(PURCHASE_GROUP_LABELS[getPurchaseGroupKey(item.name, item.category)])}
                       </Badge>
-                      {item.unit && <span className="text-[10px] text-muted-foreground">per {item.unit}</span>}
+                      {item.unit && <span className="text-[10px] text-muted-foreground">{t("per")} {t(item.unit)}</span>}
                     </div>
                   </div>
                   <Switch checked={item.isActive} disabled={isPending} onCheckedChange={(v) => handleToggle(item.id, v)} />

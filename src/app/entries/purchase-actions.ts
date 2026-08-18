@@ -98,6 +98,7 @@ export async function quickPurchaseAction(
 const purchaseItemSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Name is required"),
+  nameBn: z.string().optional(),
   category: z.string().min(1),
   unit: z.string().optional(),
 });
@@ -115,6 +116,7 @@ export async function savePurchaseItemAction(_prevState: ActionState, formData: 
     await savePurchaseItem({
       id: data.id || null,
       name: data.name,
+      nameBn: data.nameBn || null,
       category: data.category as EntryCategory,
       unit: data.unit || null,
     });

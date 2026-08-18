@@ -370,6 +370,7 @@ export async function createQuickPurchaseBatch(input: CreateQuickPurchaseBatchIn
 export interface SavePurchaseItemInput {
   id?: string | null;
   name: string;
+  nameBn?: string | null;
   category: EntryCategory;
   unit?: string | null;
 }
@@ -377,16 +378,17 @@ export interface SavePurchaseItemInput {
 export async function savePurchaseItem(input: SavePurchaseItemInput) {
   const name = input.name.trim();
   if (!name) throw new Error("Name is required");
+  const nameBn = input.nameBn?.trim() || null;
 
   if (input.id) {
     return prisma.purchaseItem.update({
       where: { id: input.id },
-      data: { name, category: input.category, unit: input.unit || null },
+      data: { name, nameBn, category: input.category, unit: input.unit || null },
     });
   }
   const maxSort = await prisma.purchaseItem.aggregate({ _max: { sortOrder: true } });
   return prisma.purchaseItem.create({
-    data: { name, category: input.category, unit: input.unit || null, sortOrder: (maxSort._max.sortOrder ?? 0) + 1 },
+    data: { name, nameBn, category: input.category, unit: input.unit || null, sortOrder: (maxSort._max.sortOrder ?? 0) + 1 },
   });
 }
 

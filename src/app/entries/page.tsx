@@ -64,7 +64,7 @@ export default async function EntriesPage() {
             </TabsList>
             <TabsContent value="quick" className="pt-4">
               <QuickPurchasePanel
-                items={purchaseItems.map((p) => ({ id: p.id, name: p.name, category: p.category, unit: p.unit, isActive: p.isActive }))}
+                items={purchaseItems.map((p) => ({ id: p.id, name: p.name, nameBn: p.nameBn, category: p.category, unit: p.unit, isActive: p.isActive }))}
                 fundSources={fundSourceOptions}
               />
             </TabsContent>

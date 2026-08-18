@@ -16,6 +16,7 @@ export default async function MenuPage() {
   const rows: MenuItemRow[] = items.map((i) => ({
     id: i.id,
     name: i.name,
+    nameBn: i.nameBn,
     price: Number(i.price),
     parcelPrice: i.parcelPrice != null ? Number(i.parcelPrice) : null,
     category: i.category,

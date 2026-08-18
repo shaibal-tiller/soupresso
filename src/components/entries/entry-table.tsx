@@ -68,7 +68,7 @@ export function EntryTable({ entries }: { entries: EntryRow[] }) {
                 <Badge variant="secondary">{t(CATEGORY_LABELS[entry.category] ?? entry.category)}</Badge>
               </TableCell>
               <TableCell className="max-w-64">
-                <div className="truncate">{entry.description}</div>
+                <div className="truncate">{t(entry.description)}</div>
                 {(entry.vendor || entry.partnerName) && (
                   <div className="truncate text-xs text-muted-foreground">{entry.vendor ?? entry.partnerName}</div>
                 )}

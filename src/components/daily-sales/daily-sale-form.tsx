@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatTaka } from "@/lib/format";
+import { itemLabel } from "@/lib/i18n-shared";
 import type { ActionState } from "@/app/entries/actions";
 import { useLang } from "@/components/language-provider";
 
 interface MenuItemOption {
   id: string;
   name: string;
+  nameBn?: string | null;
   price: number;
   parcelPrice: number | null;
 }
@@ -26,7 +28,7 @@ interface FundSourceOption {
 const initialState: ActionState = { success: false, message: "" };
 
 export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemOption[]; fundSources: FundSourceOption[] }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [state, formAction, pending] = useActionState(createDailySaleAction, initialState);
   const [fundAmounts, setFundAmounts] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, { regular: string; parcel: string }>>({});
@@ -118,7 +120,7 @@ export function DailySaleForm({ menuItems, fundSources }: { menuItems: MenuItemO
             {menuItems.map((item) => (
               <div key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 sm:grid-cols-[1fr_120px_120px]">
                 <div>
-                  <div className="text-sm font-medium">{item.name}</div>
+                  <div className="text-sm font-medium">{itemLabel(lang, item.name, item.nameBn)}</div>
                   <div className="text-xs text-muted-foreground">
                     ৳{item.price}
                     {item.parcelPrice ? ` / ৳${item.parcelPrice} ${t("parcel")}` : ""}

@@ -258,6 +258,7 @@ const BN: Record<string, string> = {
   Hidden: "লুকানো",
   "Item Name": "আইটেমের নাম",
   "e.g. Chicken, Onion, Cooking Oil": "যেমন মুরগি, পেঁয়াজ, রান্নার তেল",
+  "Bangla Name (optional)": "বাংলা নাম (ঐচ্ছিক)",
 
   // Entry Table / form extras
   "No entries yet.": "এখনও কোনো এন্ট্রি নেই।",
@@ -411,6 +412,101 @@ const BN: Record<string, string> = {
 
   // Staff Food & Allowance
   "Staff Food & Allowance": "স্টাফের খাবার ও ভাতা",
+
+  // Purchase item names (Quick Purchase tiles / Manage Items)
+  Chicken: "মুরগি",
+  Onion: "পেঁয়াজ",
+  Ginger: "আদা",
+  Garlic: "রসুন",
+  "Cooking Oil": "রান্নার তেল",
+  Egg: "ডিম",
+  Mushroom: "মাশরুম",
+  "Green Chili": "কাঁচা মরিচ",
+  "Dried Chili": "শুকনা মরিচ",
+  "Chili Powder": "মরিচের গুঁড়া",
+  "Spices / Masala": "মসলা",
+  Salt: "লবণ",
+  Sugar: "চিনি",
+  Lemon: "লেবু",
+  "Spring Onion": "পেঁয়াজ পাতা",
+  Carrot: "গাজর",
+  Potato: "আলু",
+  Eggplant: "বেগুন",
+  Cheese: "পনির",
+  "Tortilla Chips": "টর্টিলা চিপস",
+  "Momo / Wonton Wrapper": "মোমো/ওয়ান্টন র‍্যাপার",
+  "Cold Drink": "কোল্ড ড্রিংক",
+  Turmeric: "হলুদ",
+  Cumin: "জিরা",
+  "Coriander Seed": "ধনে",
+  "Bay Leaf": "তেজপাতা",
+  Cardamom: "এলাচ",
+  Cinnamon: "দারুচিনি",
+  "Ginger-Garlic Paste": "আদা-রসুন পেস্ট",
+  "Soy Sauce": "সয়া সস",
+  "Chili Sauce": "চিলি সস",
+  Vinegar: "ভিনেগার",
+  "Curry Powder": "কারি পাউডার",
+  Cabbage: "বাঁধাকপি",
+  Capsicum: "ক্যাপসিকাম",
+  Tomato: "টমেটো",
+  Cucumber: "শসা",
+  Milk: "দুধ",
+  Butter: "মাখন",
+  Rice: "চাল",
+  "Flour / Maida": "ময়দা",
+  "Soup Bowl": "স্যুপ বাটি",
+  "Parcel Box": "পার্সেল বক্স",
+  "Nachos Tray": "নাচোস ট্রে",
+  "Poly Bag": "পলি ব্যাগ",
+  "Foil Paper": "ফয়েল পেপার",
+  "Plate & Spoon": "প্লেট ও চামচ",
+  "Napkin / Tissue": "ন্যাপকিন/টিস্যু",
+  "Karai / Wok": "কড়াই",
+  "Frying Pan": "ফ্রাইং প্যান",
+  "Cooking Pot (Dekchi)": "রান্নার পাতিল (ডেকচি)",
+  "Gas Cylinder": "গ্যাস সিলিন্ডার",
+  "Gas Stove / Burner": "গ্যাস চুলা/বার্নার",
+  Knife: "ছুরি",
+  "Cutting Board": "কাটিং বোর্ড",
+  "Serving Plate": "পরিবেশন প্লেট",
+  "Ladle / Spatula": "খুন্তি/চামচ",
+  Chair: "চেয়ার",
+  Table: "টেবিল",
+  "Mora (Stool)": "মোড়া (টুল)",
+  "Moi (Ladder)": "মই (সিঁড়ি)",
+  "Shelf / Rack": "তাক/র‍্যাক",
+  Fridge: "ফ্রিজ",
+  "Light / Bulb": "লাইট/বাল্ব",
+  "Camera (CCTV)": "ক্যামেরা (সিসিটিভি)",
+  Router: "রাউটার",
+  Blender: "ব্লেন্ডার",
+  Grinder: "গ্রাইন্ডার",
+  Beater: "বিটার",
+  Mixer: "মিক্সার",
+  Fan: "ফ্যান",
+  Detergent: "ডিটারজেন্ট",
+  "Dish Soap": "ডিশ সোপ",
+  "Sponge / Scrubber": "স্পঞ্জ/স্ক্রাবার",
+  Broom: "ঝাড়ু",
+  "Trash Bags": "ময়লার ব্যাগ",
+
+  // Menu item names (Menu page / Daily Sales)
+  "Chicken Meat Box": "চিকেন মিট বক্স",
+  Momo: "মোমো",
+  "Chicken Wonton": "চিকেন ওয়ান্টন",
+  Taquitos: "টাকিটোস",
+  "Spring Roll": "স্প্রিং রোল",
+  "French Fries": "ফ্রেঞ্চ ফ্রাই",
+  Nachos: "নাচোস",
+
+  // Units
+  kg: "কেজি",
+  litre: "লিটার",
+  pc: "পিস",
+  pack: "প্যাক",
+  roll: "রোল",
+  per: "প্রতি",
 };
 
 // Server action success/error messages (returned from "use server" files and
@@ -483,4 +579,12 @@ Object.assign(BN, {
 export function t(lang: Lang, en: string): string {
   if (lang !== "bn") return en;
   return BN[en] ?? en;
+}
+
+// For user-entered item names (purchase items, menu items): prefer the
+// item's own Bangla name if the user supplied one, otherwise fall back to
+// looking the English name up in the dictionary above.
+export function itemLabel(lang: Lang, name: string, nameBn?: string | null): string {
+  if (lang === "bn" && nameBn) return nameBn;
+  return t(lang, name);
 }

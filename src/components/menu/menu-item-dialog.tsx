@@ -27,6 +27,7 @@ const initialState: ActionState = { success: false, message: "" };
 interface MenuItemData {
   id: string;
   name: string;
+  nameBn?: string | null;
   price: number;
   parcelPrice: number | null;
   category: string;
@@ -75,6 +76,10 @@ export function MenuItemDialog({ item }: { item?: MenuItemData }) {
             <div className="grid gap-1.5">
               <Label htmlFor="name">{t("Name")}</Label>
               <Input id="name" name="name" defaultValue={item?.name} required />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="name-bn">{t("Bangla Name (optional)")}</Label>
+              <Input id="name-bn" name="nameBn" defaultValue={item?.nameBn ?? undefined} placeholder="যেমন মোমো" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">

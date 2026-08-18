@@ -26,6 +26,7 @@ const initialState: ActionState = { success: false, message: "" };
 interface PurchaseItemData {
   id: string;
   name: string;
+  nameBn?: string | null;
   category: string;
   unit: string | null;
 }
@@ -75,6 +76,10 @@ export function PurchaseItemDialog({ item }: { item?: PurchaseItemData }) {
             <div className="grid gap-1.5">
               <Label htmlFor="pi-name">{t("Name")}</Label>
               <Input id="pi-name" name="name" defaultValue={item?.name} placeholder={t("e.g. Chicken")} required />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pi-name-bn">{t("Bangla Name (optional)")}</Label>
+              <Input id="pi-name-bn" name="nameBn" defaultValue={item?.nameBn ?? undefined} placeholder="যেমন মুরগি" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">

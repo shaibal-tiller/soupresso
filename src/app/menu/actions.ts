@@ -15,6 +15,7 @@ function revalidateAll() {
 const menuItemSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Name is required"),
+  nameBn: z.string().optional(),
   price: z.coerce.number().positive("Price must be greater than zero"),
   parcelPrice: z.string().optional(),
   category: z.string().min(1),
@@ -29,18 +30,20 @@ export async function saveMenuItemAction(_prevState: ActionState, formData: Form
   }
   const data = parsed.data;
   const parcelPrice = data.parcelPrice ? Number(data.parcelPrice) : null;
+  const nameBn = data.nameBn?.trim() || null;
 
   try {
     if (data.id) {
       await prisma.menuItem.update({
         where: { id: data.id },
-        data: { name: data.name, price: data.price, parcelPrice, category: data.category as MenuCategory },
+        data: { name: data.name, nameBn, price: data.price, parcelPrice, category: data.category as MenuCategory },
       });
     } else {
       const maxSort = await prisma.menuItem.aggregate({ _max: { sortOrder: true } });
       await prisma.menuItem.create({
         data: {
           name: data.name,
+          nameBn,
           price: data.price,
           parcelPrice,
           category: data.category as MenuCategory,

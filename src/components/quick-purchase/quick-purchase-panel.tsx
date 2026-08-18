@@ -20,12 +20,14 @@ import { isPaymentMethodAllowed, type PaymentMethodValue } from "@/lib/entry-met
 import { getPurchaseVisual } from "@/lib/purchase-icon";
 import { getPurchaseGroupKey, PURCHASE_GROUP_LABELS, PURCHASE_GROUP_ORDER, type PurchaseGroupKey } from "@/lib/purchase-group";
 import { cn } from "@/lib/utils";
+import { itemLabel } from "@/lib/i18n-shared";
 import { ManageItemsSheet } from "@/components/quick-purchase/manage-items-sheet";
 import { useLang } from "@/components/language-provider";
 
 export interface PurchaseItemOption {
   id: string;
   name: string;
+  nameBn?: string | null;
   category: string;
   unit: string | null;
   isActive: boolean;
@@ -40,6 +42,7 @@ interface CartLine {
   key: string;
   purchaseItemId: string;
   name: string;
+  nameBn?: string | null;
   category: string;
   unit: string | null;
   quantity: string;
@@ -56,7 +59,7 @@ export function QuickPurchasePanel({
   items: PurchaseItemOption[];
   fundSources: FundSourceOption[];
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [state, formAction, pending] = useActionState(quickPurchaseAction, initialState);
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [vendor, setVendor] = useState("");
@@ -81,7 +84,7 @@ export function QuickPurchasePanel({
     const term = search.trim().toLowerCase();
     return activeItems.filter((item) => {
       if (categoryFilter !== "ALL" && itemGroups.get(item.id) !== categoryFilter) return false;
-      if (term && !item.name.toLowerCase().includes(term)) return false;
+      if (term && !item.name.toLowerCase().includes(term) && !item.nameBn?.toLowerCase().includes(term)) return false;
       return true;
     });
   }, [activeItems, search, categoryFilter, itemGroups]);
@@ -124,6 +127,7 @@ export function QuickPurchasePanel({
           key: item.id,
           purchaseItemId: item.id,
           name: item.name,
+          nameBn: item.nameBn,
           category: item.category,
           unit: item.unit,
           quantity: "",
@@ -195,12 +199,12 @@ export function QuickPurchasePanel({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => setCategoryFilter("ALL")}
           className={cn(
-            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            "shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors",
             categoryFilter === "ALL" ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
           )}
         >
@@ -214,7 +218,7 @@ export function QuickPurchasePanel({
               type="button"
               onClick={() => setCategoryFilter(category)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                "shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 categoryFilter === category ? "border-brand-amber bg-brand-amber-soft text-brand-amber-deep" : "text-muted-foreground hover:bg-muted",
               )}
             >
@@ -255,8 +259,8 @@ export function QuickPurchasePanel({
                       <div className={cn("mt-1 flex h-9 w-9 items-center justify-center rounded-full text-base", visual.badgeClass)}>
                         {visual.emoji}
                       </div>
-                      <span className="font-heading text-xs font-semibold leading-tight">{item.name}</span>
-                      {item.unit && <span className="text-[10px] text-muted-foreground">per {item.unit}</span>}
+                      <span className="font-heading text-xs font-semibold leading-tight">{itemLabel(lang, item.name, item.nameBn)}</span>
+                      {item.unit && <span className="text-[10px] text-muted-foreground">{t("per")} {t(item.unit)}</span>}
                     </button>
                   );
                 })}
@@ -283,13 +287,13 @@ export function QuickPurchasePanel({
               {lines.map((line) => (
                 <div key={line.key} className="grid grid-cols-[1fr_72px_100px_auto] items-center gap-2 rounded-lg border px-2.5 py-2 sm:grid-cols-[1fr_88px_120px_auto]">
                   <div className="min-w-0">
-                    <div className="font-heading truncate text-sm font-semibold">{line.name}</div>
+                    <div className="font-heading truncate text-sm font-semibold">{itemLabel(lang, line.name, line.nameBn)}</div>
                   </div>
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
-                    placeholder={line.unit ?? "qty"}
+                    placeholder={line.unit ? t(line.unit) : "qty"}
                     value={line.quantity}
                     onChange={(e) => updateLine(line.key, "quantity", e.target.value)}
                     className="h-8 text-sm"
