@@ -3,18 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../AppShell';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
-
-function todayStr() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
-}
-
-function formatDateNice(dateVal) {
-  const isoDatePart = String(dateVal).slice(0, 10);
-  const d = new Date(isoDatePart + 'T00:00:00');
-  if (isNaN(d)) return isoDatePart;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { todayStr, shiftDateStr, formatDateDisplay, formatDateNice } from '@/lib/dates';
 
 function emptyDenoms() {
   return Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, 0]));
@@ -34,6 +23,7 @@ export default function EntryPage() {
   const [nextBazarAdvance, setNextBazarAdvance] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
   const [notes, setNotes] = useState('');
+  const [isOffDay, setIsOffDay] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,12 +37,14 @@ export default function EntryPage() {
     setMsg(null);
     setCarryForwardNote(null);
     setStep(0);
+    setIsOffDay(false);
     try {
       const res = await fetch(`/api/entries?date=${d}`);
       const data = await res.json();
       if (data.entry) {
         const e = data.entry;
         setHadExistingEntry(true);
+        setIsOffDay(!!e.is_off_day);
         if (e.denominations) {
           setMode('denom');
           setDenoms({ ...emptyDenoms(), ...e.denominations });
@@ -78,9 +70,7 @@ export default function EntryPage() {
         if (data.carryForward) {
           setOpeningBhangti(data.carryForward.openingBhangti);
           setBazarAdvanceReceived(data.carryForward.bazarAdvanceReceived);
-          setCarryForwardNote(
-            `Carried forward from ${formatDateNice(data.carryForward.fromDate)}`
-          );
+          setCarryForwardNote(`Carried forward from ${formatDateNice(data.carryForward.fromDate)}`);
         } else {
           setOpeningBhangti(0);
           setBazarAdvanceReceived(0);
@@ -114,14 +104,15 @@ export default function EntryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           entryDate: date,
-          denominations: mode === 'denom' ? denoms : null,
-          totalCounted,
-          openingBhangti: Number(openingBhangti) || 0,
-          bazarAdvanceReceived: Number(bazarAdvanceReceived) || 0,
-          bazarActualCost: Number(bazarActualCost) || 0,
-          nextBazarAdvance: Number(nextBazarAdvance) || 0,
-          nextBhangti: Number(nextBhangti) || 0,
-          notes,
+          isOffDay,
+          denominations: isOffDay ? null : (mode === 'denom' ? denoms : null),
+          totalCounted: isOffDay ? 0 : totalCounted,
+          openingBhangti: isOffDay ? 0 : (Number(openingBhangti) || 0),
+          bazarAdvanceReceived: isOffDay ? 0 : (Number(bazarAdvanceReceived) || 0),
+          bazarActualCost: isOffDay ? 0 : (Number(bazarActualCost) || 0),
+          nextBazarAdvance: isOffDay ? 0 : (Number(nextBazarAdvance) || 0),
+          nextBhangti: isOffDay ? 0 : (Number(nextBhangti) || 0),
+          notes: isOffDay ? (notes || 'Shop closed') : notes,
         }),
       });
       const data = await res.json();
@@ -138,48 +129,72 @@ export default function EntryPage() {
     }
   }
 
-  function shiftDate(days) {
-    const d = new Date(date + 'T00:00:00');
-    d.setDate(d.getDate() + days);
-    setDate(d.toISOString().slice(0, 10));
-  }
-
   const stepLabels = ['Count box', 'Sales', 'Bazar', 'Tomorrow', 'Review'];
 
   return (
     <AppShell>
       <div className="wizard-shell">
 
-        {/* ---- Header: date nav + step indicator ---- */}
+        {/* Header: date nav with picker + off-day toggle */}
         <div className="wizard-header">
-          <div className="day-nav" style={{ marginBottom: 8 }}>
-            <button onClick={() => shiftDate(-1)}>‹</button>
-            <div className="date-display">
-              {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-            </div>
-            <button onClick={() => shiftDate(1)}>›</button>
+          <div className="day-nav" style={{ marginBottom: 6 }}>
+            <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
+            <label className="date-display" style={{ cursor: 'pointer', position: 'relative' }}>
+              {formatDateDisplay(date)}
+              <input
+                type="date" value={date}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+              />
+            </label>
+            <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
           </div>
 
-          {hadExistingEntry && <div className="wizard-badge edit">Editing saved entry</div>}
+          {hadExistingEntry && !isOffDay && <div className="wizard-badge edit">Editing saved entry</div>}
           {carryForwardNote && !hadExistingEntry && <div className="wizard-badge carry">{carryForwardNote}</div>}
 
-          <div className="step-dots">
-            {stepLabels.map((label, i) => (
-              <button key={i} className={`step-dot ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`} onClick={() => setStep(i)}>
-                <span className="dot-circle">{i < step ? '✓' : i + 1}</span>
-                <span className="dot-label">{label}</span>
-              </button>
-            ))}
+          {/* Off-day toggle */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+            <button
+              className={`btn ${isOffDay ? 'danger' : 'secondary'}`}
+              style={{ padding: '6px 16px', fontSize: 12.5 }}
+              onClick={() => setIsOffDay(!isOffDay)}
+            >
+              {isOffDay ? '🚫 Shop Off — tap to undo' : 'Mark as off day'}
+            </button>
           </div>
+
+          {!isOffDay && (
+            <div className="step-dots">
+              {stepLabels.map((label, i) => (
+                <button key={i} className={`step-dot ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`} onClick={() => setStep(i)}>
+                  <span className="dot-circle">{i < step ? '✓' : i + 1}</span>
+                  <span className="dot-label">{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* ---- Step content ---- */}
+        {/* Body */}
         {loading ? (
-          <div className="wizard-body"><div className="card">Loading…</div></div>
+          <div className="wizard-body"><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div></div>
+        ) : isOffDay ? (
+          <div className="wizard-body">
+            <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
+              <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>Shop closed</h3>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>This day will be marked as an off day — no sales recorded.</p>
+              <div className="field">
+                <label>Note (optional)</label>
+                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Holiday, rain, personal day" />
+              </div>
+              {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
+            </div>
+          </div>
         ) : (
           <div className="wizard-body">
 
-            {/* STEP 0: Count the box */}
             {step === 0 && (
               <div className="card">
                 <div className="card-title">Count today's box</div>
@@ -187,17 +202,13 @@ export default function EntryPage() {
                   <button className={mode === 'denom' ? 'on' : ''} onClick={() => setMode('denom')}>By denomination</button>
                   <button className={mode === 'total' ? 'on' : ''} onClick={() => setMode('total')}>Enter total</button>
                 </div>
-
                 {mode === 'denom' ? (
                   <div className="denom-grid">
                     {STANDARD_DENOMINATIONS.map((d) => (
                       <div key={d} className="denom-cell">
                         <span className="denom-note">৳{d}</span>
-                        <input
-                          type="number" min="0" inputMode="numeric"
-                          value={denoms[d] || 0}
-                          onChange={(e) => setDenoms({ ...denoms, [d]: Math.max(0, Number(e.target.value) || 0) })}
-                        />
+                        <input type="number" min="0" inputMode="numeric" value={denoms[d] || 0}
+                          onChange={(e) => setDenoms({ ...denoms, [d]: Math.max(0, Number(e.target.value) || 0) })} />
                         <span className="denom-sub">= ৳{(d * (denoms[d] || 0)).toLocaleString()}</span>
                       </div>
                     ))}
@@ -208,15 +219,10 @@ export default function EntryPage() {
                     <input type="number" min="0" inputMode="numeric" value={totalDirect} onChange={(e) => setTotalDirect(e.target.value)} placeholder="e.g. 10000" autoFocus />
                   </div>
                 )}
-
-                <div className="step-result">
-                  <span>Total counted</span>
-                  <strong>৳{totalCounted.toLocaleString()}</strong>
-                </div>
+                <div className="step-result"><span>Total counted</span><strong>৳{totalCounted.toLocaleString()}</strong></div>
               </div>
             )}
 
-            {/* STEP 1: Today's sales */}
             {step === 1 && (
               <div className="card">
                 <div className="card-title">Today's total sales</div>
@@ -233,7 +239,6 @@ export default function EntryPage() {
               </div>
             )}
 
-            {/* STEP 2: Bazar settlement */}
             {step === 2 && (
               <div className="card">
                 <div className="card-title">Settle yesterday's bazar</div>
@@ -251,7 +256,6 @@ export default function EntryPage() {
               </div>
             )}
 
-            {/* STEP 3: Set aside for tomorrow */}
             {step === 3 && (
               <div className="card">
                 <div className="card-title">Set aside for tomorrow</div>
@@ -266,7 +270,6 @@ export default function EntryPage() {
               </div>
             )}
 
-            {/* STEP 4: Review & save */}
             {step === 4 && (
               <div className="card">
                 <div className="card-title">Review & save</div>
@@ -281,42 +284,43 @@ export default function EntryPage() {
                     <span className={summary.cashTakenHome >= 0 ? 'g' : 'r'}>৳{summary.cashTakenHome.toLocaleString()}</span>
                   </div>
                 </div>
-
                 {summary.isShort && (
                   <div className="insight red" style={{ marginTop: 10 }}>
                     <b>Box is short.</b> Not enough to cover tomorrow's advance and bhangti. Go back and adjust.
                   </div>
                 )}
-
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>Notes (optional)</label>
                   <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything to remember" />
                 </div>
-
                 {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
               </div>
             )}
-
           </div>
         )}
 
-        {/* ---- Footer: back / next / save ---- */}
+        {/* Footer */}
         {!loading && (
           <div className="wizard-footer">
-            <button className="btn secondary" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
-              ← Back
-            </button>
-
-            <span className="step-counter">{step + 1} / {TOTAL_STEPS}</span>
-
-            {step < TOTAL_STEPS - 1 ? (
-              <button className="btn" onClick={() => setStep(step + 1)}>
-                Next →
-              </button>
+            {isOffDay ? (
+              <>
+                <div />
+                <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
+                  {saving ? 'Saving…' : hadExistingEntry ? '✓ Update' : '✓ Mark off day'}
+                </button>
+              </>
             ) : (
-              <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
-                {saving ? 'Saving…' : hadExistingEntry ? '✓ Update' : '✓ Save'}
-              </button>
+              <>
+                <button className="btn secondary" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>← Back</button>
+                <span className="step-counter">{step + 1} / {TOTAL_STEPS}</span>
+                {step < TOTAL_STEPS - 1 ? (
+                  <button className="btn" onClick={() => setStep(step + 1)}>Next →</button>
+                ) : (
+                  <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
+                    {saving ? 'Saving…' : hadExistingEntry ? '✓ Update' : '✓ Save'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -325,33 +329,36 @@ export default function EntryPage() {
         {showConfirm && (
           <div className="modal-overlay" onClick={() => setShowConfirm(false)}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-              <h3>{hadExistingEntry ? 'Update this entry?' : 'Save this entry?'}</h3>
+              <h3>{isOffDay ? 'Mark as off day?' : hadExistingEntry ? 'Update this entry?' : 'Save this entry?'}</h3>
               <p>
-                {hadExistingEntry
-                  ? `You're about to overwrite the saved data for ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. The previous version will be kept in the audit log.`
-                  : `Save the cash entry for ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}?`
+                {isOffDay
+                  ? `Mark ${formatDateDisplay(date)} as a shop off day.`
+                  : hadExistingEntry
+                  ? `You're about to overwrite the saved data for ${formatDateDisplay(date)}. The previous version will be kept in the audit log.`
+                  : `Save the cash entry for ${formatDateDisplay(date)}?`
                 }
               </p>
-              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, textAlign: 'left' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--text2)' }}>Total sales</span>
-                  <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>৳{summary.totalSales.toLocaleString()}</strong>
+              {!isOffDay && (
+                <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text2)' }}>Total sales</span>
+                    <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>৳{summary.totalSales.toLocaleString()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: 'var(--text2)' }}>Cash taken home</span>
+                    <strong style={{ color: summary.cashTakenHome >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>৳{summary.cashTakenHome.toLocaleString()}</strong>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: 'var(--text2)' }}>Cash taken home</span>
-                  <strong style={{ color: summary.cashTakenHome >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>৳{summary.cashTakenHome.toLocaleString()}</strong>
-                </div>
-              </div>
+              )}
               <div className="modal-actions">
                 <button className="btn secondary" onClick={() => setShowConfirm(false)}>Cancel</button>
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => { setShowConfirm(false); handleSave(); }} disabled={saving}>
-                  {hadExistingEntry ? 'Yes, update' : 'Yes, save'}
+                  {isOffDay ? 'Yes, mark off' : hadExistingEntry ? 'Yes, update' : 'Yes, save'}
                 </button>
               </div>
             </div>
           </div>
         )}
-
       </div>
     </AppShell>
   );

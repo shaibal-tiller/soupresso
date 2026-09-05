@@ -81,6 +81,7 @@ export async function POST(request) {
     nextBazarAdvance,
     nextBhangti,
     notes,
+    isOffDay,
   } = body || {};
 
   if (!entryDate || !/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
@@ -121,8 +122,8 @@ export async function POST(request) {
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
          bazar_advance_received, bazar_actual_cost, next_bazar_advance, next_bhangti,
-         total_sales, bazar_variance, cash_taken_home, notes, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
+         total_sales, bazar_variance, cash_taken_home, is_off_day, notes, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -134,6 +135,7 @@ export async function POST(request) {
          total_sales = EXCLUDED.total_sales,
          bazar_variance = EXCLUDED.bazar_variance,
          cash_taken_home = EXCLUDED.cash_taken_home,
+         is_off_day = EXCLUDED.is_off_day,
          notes = EXCLUDED.notes,
          updated_at = now()
        RETURNING *`,
@@ -149,6 +151,7 @@ export async function POST(request) {
         summary.totalSales,
         summary.bazarVariance,
         summary.cashTakenHome,
+        !!isOffDay,
         notes || null,
       ]
     );

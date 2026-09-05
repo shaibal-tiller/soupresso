@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../AppShell';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayStr, shiftDateStr, formatDateDisplay } from '@/lib/dates';
 
 export default function ProductsPage() {
   const [tab, setTab] = useState('sales'); // 'sales' | 'menu'
@@ -103,9 +100,9 @@ export default function ProductsPage() {
       {tab === 'sales' ? (
         <>
           <div className="day-nav">
-            <button onClick={() => { const d = new Date(date); d.setDate(d.getDate() - 1); setDate(d.toISOString().slice(0, 10)); }}>‹</button>
-            <div className="date-display">{new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-            <button onClick={() => { const d = new Date(date); d.setDate(d.getDate() + 1); setDate(d.toISOString().slice(0, 10)); }}>›</button>
+            <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
+            <div className="date-display">{formatDateDisplay(date)}</div>
+            <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
           </div>
 
           <div className="card">

@@ -1,0 +1,12 @@
+{
+  "name": "Soupresso Cash Register",
+  "short_name": "Soupresso",
+  "description": "Daily cash reconciliation & sales tracking",
+  "start_url": "/entry",
+  "display": "standalone",
+  "background_color": "#FBF6EC",
+  "theme_color": "#1F5C42",
+  "icons": [
+    { "src": "/logo.jpg", "sizes": "200x200", "type": "image/jpeg" }
+  ]
+}

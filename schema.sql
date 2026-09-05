@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS daily_entries (
   bazar_variance       NUMERIC(12,2) NOT NULL DEFAULT 0,   -- bazar_actual_cost - bazar_advance_received
   cash_taken_home      NUMERIC(12,2) NOT NULL DEFAULT 0,   -- total_counted - bazar_variance - next_bazar_advance - next_bhangti
 
+  is_off_day          BOOLEAN NOT NULL DEFAULT false,
   notes               TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -70,3 +71,6 @@ CREATE TABLE IF NOT EXISTS entry_edit_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_edit_log_date ON entry_edit_log (entry_date, edited_at DESC);
+
+-- If your database already has daily_entries without is_off_day, run this:
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS is_off_day BOOLEAN NOT NULL DEFAULT false;
