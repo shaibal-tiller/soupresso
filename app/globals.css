@@ -176,6 +176,20 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions .btn { flex: 1; justify-content: center; }
 
+/* ---- DATE PICKER BUTTON ---- */
+.date-picker-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: none; border: none; cursor: pointer; position: relative;
+  font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--text);
+  padding: 4px 8px;
+}
+.date-picker-btn:active { opacity: .7; }
+.cal-icon { font-size: 15px; }
+.date-hidden-input {
+  position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer;
+  /* On mobile, tapping the button triggers showPicker; this hidden input is the fallback */
+}
+
 /* ---- WIZARD (Daily Entry) ---- */
 .wizard-shell {
   display: flex; flex-direction: column;

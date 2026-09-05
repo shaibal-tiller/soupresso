@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
 import { todayStr, shiftDateStr, formatDateDisplay, formatDateLong } from '@/lib/dates';
 
@@ -9,6 +9,7 @@ export default function HistoryPage() {
   const [entry, setEntry] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const dateRef = useRef(null);
 
   const load = useCallback(async (d) => {
     setLoading(true); setNotFound(false);
@@ -27,14 +28,16 @@ export default function HistoryPage() {
     <AppShell>
       <div className="day-nav no-print">
         <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
-        <label className="date-display" style={{ cursor: 'pointer', position: 'relative' }}>
-          {formatDateDisplay(date)}
+        <button className="date-picker-btn" onClick={() => dateRef.current?.showPicker?.()}>
+          <span className="cal-icon">📅</span>
+          <span>{formatDateDisplay(date)}</span>
           <input
+            ref={dateRef}
             type="date" value={date}
             onChange={(e) => e.target.value && setDate(e.target.value)}
-            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+            className="date-hidden-input"
           />
-        </label>
+        </button>
         <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
       </div>
 

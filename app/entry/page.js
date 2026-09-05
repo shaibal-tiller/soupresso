@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
 import { todayStr, shiftDateStr, formatDateDisplay, formatDateNice } from '@/lib/dates';
@@ -13,6 +13,7 @@ const TOTAL_STEPS = 5;
 
 export default function EntryPage() {
   const [date, setDate] = useState(todayStr());
+  const [editing, setEditing] = useState(false); // locked until user explicitly starts
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState('denom');
   const [denoms, setDenoms] = useState(emptyDenoms());
@@ -30,7 +31,9 @@ export default function EntryPage() {
   const [msg, setMsg] = useState(null);
   const [carryForwardNote, setCarryForwardNote] = useState(null);
   const [hadExistingEntry, setHadExistingEntry] = useState(false);
+  const [existingEntry, setExistingEntry] = useState(null); // raw entry for the summary card
   const [showConfirm, setShowConfirm] = useState(false);
+  const dateRef = useRef(null);
 
   const load = useCallback(async (d) => {
     setLoading(true);
@@ -38,12 +41,15 @@ export default function EntryPage() {
     setCarryForwardNote(null);
     setStep(0);
     setIsOffDay(false);
+    setEditing(false);
+    setExistingEntry(null);
     try {
       const res = await fetch(`/api/entries?date=${d}`);
       const data = await res.json();
       if (data.entry) {
         const e = data.entry;
         setHadExistingEntry(true);
+        setExistingEntry(e);
         setIsOffDay(!!e.is_off_day);
         if (e.denominations) {
           setMode('denom');
@@ -121,6 +127,8 @@ export default function EntryPage() {
       } else {
         setMsg({ type: 'ok', text: 'Saved successfully!' });
         setHadExistingEntry(true);
+        setEditing(false);
+        load(date); // reload to show the updated summary
       }
     } catch {
       setMsg({ type: 'err', text: 'Could not reach the server.' });
@@ -130,42 +138,116 @@ export default function EntryPage() {
   }
 
   const stepLabels = ['Count box', 'Sales', 'Bazar', 'Tomorrow', 'Review'];
+  const fmt = (n) => `৳${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   return (
     <AppShell>
       <div className="wizard-shell">
 
-        {/* Header: date nav with picker + off-day toggle */}
+        {/* Header: date nav with calendar picker */}
         <div className="wizard-header">
           <div className="day-nav" style={{ marginBottom: 6 }}>
             <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
-            <label className="date-display" style={{ cursor: 'pointer', position: 'relative' }}>
-              {formatDateDisplay(date)}
+            <button className="date-picker-btn" onClick={() => dateRef.current?.showPicker?.()}>
+              <span className="cal-icon">📅</span>
+              <span>{formatDateDisplay(date)}</span>
               <input
+                ref={dateRef}
                 type="date" value={date}
                 onChange={(e) => e.target.value && setDate(e.target.value)}
-                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+                className="date-hidden-input"
               />
-            </label>
+            </button>
             <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
           </div>
+        </div>
 
-          {hadExistingEntry && !isOffDay && <div className="wizard-badge edit">Editing saved entry</div>}
-          {carryForwardNote && !hadExistingEntry && <div className="wizard-badge carry">{carryForwardNote}</div>}
+        {/* Body */}
+        {loading ? (
+          <div className="wizard-body"><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div></div>
 
-          {/* Off-day toggle */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-            <button
-              className={`btn ${isOffDay ? 'danger' : 'secondary'}`}
-              style={{ padding: '6px 16px', fontSize: 12.5 }}
-              onClick={() => setIsOffDay(!isOffDay)}
-            >
-              {isOffDay ? '🚫 Shop Off — tap to undo' : 'Mark as off day'}
-            </button>
+        ) : !editing ? (
+          /* ============ LOCKED STATE: summary or empty ============ */
+          <div className="wizard-body">
+            {hadExistingEntry && existingEntry ? (
+              existingEntry.is_off_day ? (
+                /* Off day summary */
+                <div className="card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>🚫</div>
+                  <h3 style={{ color: 'var(--text)', marginBottom: 4 }}>Shop was closed</h3>
+                  {existingEntry.notes && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{existingEntry.notes}</p>}
+                  <button className="btn secondary" onClick={() => { setEditing(true); }} style={{ marginTop: 8 }}>
+                    ✎ Edit this day
+                  </button>
+                </div>
+              ) : (
+                /* Existing entry summary */
+                <div className="card">
+                  <div className="card-title">Saved entry</div>
+                  <div className="step-calc">
+                    <div className="calc-row"><span>Total sales</span><span className="g">{fmt(existingEntry.total_sales)}</span></div>
+                    <div className="calc-row"><span>Expense (bazar)</span><span style={{ color: 'var(--red)' }}>{fmt(existingEntry.bazar_actual_cost)}</span></div>
+                    <div className="calc-row"><span>Bazar advance (tomorrow)</span><span>{fmt(existingEntry.next_bazar_advance)}</span></div>
+                    <div className="calc-row"><span>Bhangti in box</span><span>{fmt(existingEntry.next_bhangti)}</span></div>
+                    <div className={`calc-row result`}>
+                      <span>Cash taken home</span>
+                      <span className={Number(existingEntry.cash_taken_home) >= 0 ? 'g' : 'r'}>{fmt(existingEntry.cash_taken_home)}</span>
+                    </div>
+                  </div>
+                  {existingEntry.notes && (
+                    <div className="receipt-note" style={{ marginTop: 12 }}>
+                      <span className="note-icon">📝</span>
+                      <span>{existingEntry.notes}</span>
+                    </div>
+                  )}
+                  <button className="btn secondary block" onClick={() => setEditing(true)} style={{ marginTop: 16 }}>
+                    ✎ Edit this entry
+                  </button>
+                </div>
+              )
+            ) : (
+              /* No entry yet */
+              <div className="card" style={{ textAlign: 'center', padding: '36px 20px' }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>No entry yet</h3>
+                <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
+                  {formatDateDisplay(date)}
+                </p>
+                {carryForwardNote && <div className="wizard-badge carry" style={{ marginBottom: 16 }}>{carryForwardNote}</div>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
+                    ＋ Start entry
+                  </button>
+                  <button className="btn secondary" onClick={() => { setEditing(true); setIsOffDay(true); }}>
+                    🚫 Mark off day
+                  </button>
+                </div>
+              </div>
+            )}
+            {msg && <div className={`status-msg ${msg.type}`} style={{ marginTop: 10 }}>{msg.text}</div>}
           </div>
 
-          {!isOffDay && (
-            <div className="step-dots">
+        ) : isOffDay ? (
+          /* ============ EDITING: off day ============ */
+          <div className="wizard-body">
+            <div className="card" style={{ textAlign: 'center', padding: '30px 20px' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
+              <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>Shop closed</h3>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>This day will be marked as an off day — no sales recorded.</p>
+              <div className="field" style={{ textAlign: 'left' }}>
+                <label>Note (optional)</label>
+                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Holiday, rain, personal day" />
+              </div>
+              {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
+            </div>
+          </div>
+
+        ) : (
+          /* ============ EDITING: wizard steps ============ */
+          <div className="wizard-body">
+
+            {/* Step dots — only shown in editing mode */}
+            <div className="step-dots" style={{ marginBottom: 8 }}>
               {stepLabels.map((label, i) => (
                 <button key={i} className={`step-dot ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`} onClick={() => setStep(i)}>
                   <span className="dot-circle">{i < step ? '✓' : i + 1}</span>
@@ -173,27 +255,6 @@ export default function EntryPage() {
                 </button>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* Body */}
-        {loading ? (
-          <div className="wizard-body"><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div></div>
-        ) : isOffDay ? (
-          <div className="wizard-body">
-            <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
-              <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>Shop closed</h3>
-              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>This day will be marked as an off day — no sales recorded.</p>
-              <div className="field">
-                <label>Note (optional)</label>
-                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Holiday, rain, personal day" />
-              </div>
-              {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
-            </div>
-          </div>
-        ) : (
-          <div className="wizard-body">
 
             {step === 0 && (
               <div className="card">
@@ -286,7 +347,7 @@ export default function EntryPage() {
                 </div>
                 {summary.isShort && (
                   <div className="insight red" style={{ marginTop: 10 }}>
-                    <b>Box is short.</b> Not enough to cover tomorrow's advance and bhangti. Go back and adjust.
+                    <b>Box is short.</b> Not enough to cover tomorrow's advance and bhangti.
                   </div>
                 )}
                 <div className="field" style={{ marginTop: 12 }}>
@@ -299,19 +360,21 @@ export default function EntryPage() {
           </div>
         )}
 
-        {/* Footer */}
-        {!loading && (
+        {/* Footer — only when editing */}
+        {!loading && editing && (
           <div className="wizard-footer">
             {isOffDay ? (
               <>
-                <div />
+                <button className="btn secondary" onClick={() => { setEditing(false); setIsOffDay(hadExistingEntry ? !!existingEntry?.is_off_day : false); }}>Cancel</button>
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
-                  {saving ? 'Saving…' : hadExistingEntry ? '✓ Update' : '✓ Mark off day'}
+                  {saving ? 'Saving…' : '✓ Mark off day'}
                 </button>
               </>
             ) : (
               <>
-                <button className="btn secondary" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>← Back</button>
+                <button className="btn secondary" onClick={() => step === 0 ? setEditing(false) : setStep(Math.max(0, step - 1))}>
+                  {step === 0 ? '✕ Cancel' : '← Back'}
+                </button>
                 <span className="step-counter">{step + 1} / {TOTAL_STEPS}</span>
                 {step < TOTAL_STEPS - 1 ? (
                   <button className="btn" onClick={() => setStep(step + 1)}>Next →</button>
@@ -334,7 +397,7 @@ export default function EntryPage() {
                 {isOffDay
                   ? `Mark ${formatDateDisplay(date)} as a shop off day.`
                   : hadExistingEntry
-                  ? `You're about to overwrite the saved data for ${formatDateDisplay(date)}. The previous version will be kept in the audit log.`
+                  ? `Overwrite the saved data for ${formatDateDisplay(date)}? Previous version will be kept in the audit log.`
                   : `Save the cash entry for ${formatDateDisplay(date)}?`
                 }
               </p>
