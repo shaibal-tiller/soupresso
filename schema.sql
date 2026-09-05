@@ -58,3 +58,15 @@ INSERT INTO menu_items (name, price, sort_order) VALUES
   ('Chicken Meat Box', 80, 5),
   ('Nachos', 100, 6)
 ON CONFLICT (name) DO NOTHING;
+
+-- Audit log: captures the previous state of an entry before it's edited.
+-- Only logs when an EXISTING entry is updated (not the first save).
+CREATE TABLE IF NOT EXISTS entry_edit_log (
+  id             SERIAL PRIMARY KEY,
+  entry_date     DATE NOT NULL,
+  edited_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  previous_data  JSONB NOT NULL,       -- full snapshot of the row before the edit
+  notes          TEXT                   -- optional reason for the edit
+);
+
+CREATE INDEX IF NOT EXISTS idx_edit_log_date ON entry_edit_log (entry_date, edited_at DESC);

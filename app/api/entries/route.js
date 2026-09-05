@@ -104,6 +104,19 @@ export async function POST(request) {
   });
 
   try {
+    // If an entry for this date already exists, snapshot it into the audit log
+    // before overwriting — so every edit to a past day is traceable.
+    const existing = await query(
+      `SELECT * FROM daily_entries WHERE entry_date = $1`, [entryDate]
+    );
+    if (existing.rows.length) {
+      await query(
+        `INSERT INTO entry_edit_log (entry_date, previous_data, notes)
+         VALUES ($1, $2, $3)`,
+        [entryDate, JSON.stringify(existing.rows[0]), `Edited — previous values saved`]
+      );
+    }
+
     const { rows } = await query(
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
