@@ -120,6 +120,95 @@ table.receipt-table { width: 100%; border-collapse: collapse; font-size: 13.5px;
 table.receipt-table td { padding: 8px 4px; border-bottom: 1px dashed var(--border2); }
 table.receipt-table td:last-child { text-align: right; font-family: var(--mono); font-weight: 600; }
 
+/* ---- WIZARD (Daily Entry) ---- */
+.wizard-shell {
+  display: flex; flex-direction: column;
+  height: calc(100vh - 90px); /* below topbar+tabbar */
+  max-height: calc(100dvh - 90px);
+  overflow: hidden;
+}
+.wizard-header { flex-shrink: 0; padding: 12px 0 0; }
+
+.wizard-badge {
+  font-size: 11.5px; font-weight: 600; text-align: center;
+  padding: 4px 12px; border-radius: 6px; margin-bottom: 8px;
+}
+.wizard-badge.edit { background: rgba(31,140,90,.1); color: var(--green); }
+.wizard-badge.carry { background: rgba(79,120,200,.1); color: #2A6F97; }
+
+.step-dots {
+  display: flex; gap: 2px; justify-content: center; margin-bottom: 6px;
+}
+.step-dot {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer; padding: 4px 8px;
+  min-width: 0; flex: 1;
+}
+.dot-circle {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; font-family: var(--mono);
+  border: 2px solid var(--border2); color: var(--text3); background: var(--bg);
+  transition: all .15s;
+}
+.step-dot.active .dot-circle { border-color: var(--brand-green); color: #fff; background: var(--brand-green); }
+.step-dot.done .dot-circle { border-color: var(--green); color: var(--green); background: rgba(31,140,90,.1); font-size: 11px; }
+.dot-label { font-size: 10px; color: var(--text3); font-weight: 600; white-space: nowrap; }
+.step-dot.active .dot-label { color: var(--brand-green); }
+
+.wizard-body {
+  flex: 1; overflow-y: auto; padding: 8px 0;
+  scrollbar-width: thin;
+}
+.wizard-body .card { margin-bottom: 0; }
+
+.wizard-footer {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; gap: 10px;
+  border-top: 1px solid var(--border);
+}
+.step-counter { font-size: 12px; color: var(--text3); font-family: var(--mono); font-weight: 600; }
+
+/* ---- Denomination grid (compact for wizard) ---- */
+.denom-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+}
+.denom-cell {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg); border-radius: 8px; padding: 6px 8px;
+}
+.denom-note { font-family: var(--mono); font-size: 12px; color: var(--text2); width: 40px; flex-shrink: 0; }
+.denom-cell input {
+  width: 52px; padding: 6px; font-size: 14px; text-align: center;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px;
+  font-family: var(--mono); color: var(--text);
+}
+.denom-cell input:focus { outline: none; border-color: var(--brand-green); }
+.denom-sub { font-size: 10.5px; color: var(--text3); font-family: var(--mono); flex: 1; text-align: right; }
+
+/* ---- Step result / calculation blocks ---- */
+.step-result {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg); border-radius: 10px; padding: 12px 14px;
+  margin-top: 12px; font-size: 14px; font-weight: 600;
+}
+.step-result strong { font-family: var(--display); font-size: 18px; }
+.step-result.warn { background: rgba(209,67,67,.08); color: var(--red); }
+.step-result.good { background: rgba(31,140,90,.08); color: var(--green); }
+.step-hint { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+
+.step-calc { border-radius: 10px; overflow: hidden; }
+.calc-row {
+  display: flex; justify-content: space-between; padding: 9px 14px;
+  font-size: 13.5px; color: var(--text2); border-bottom: 1px solid var(--border);
+}
+.calc-row:last-child { border-bottom: none; }
+.calc-row span:last-child { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.calc-row.result { background: var(--bg); font-weight: 700; font-size: 15px; padding: 12px 14px; }
+.calc-row.result span:first-child { color: var(--text); }
+.calc-row.result.short { background: rgba(209,67,67,.08); }
+.calc-row .g { color: var(--green) !important; }
+.calc-row .r { color: var(--red) !important; }
+
 @media print {
   .topbar, .tabbar, .no-print { display: none !important; }
   body { background: #fff; }
