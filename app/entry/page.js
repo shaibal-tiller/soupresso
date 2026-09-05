@@ -40,6 +40,7 @@ export default function EntryPage() {
   const [msg, setMsg] = useState(null);
   const [carryForwardNote, setCarryForwardNote] = useState(null);
   const [hadExistingEntry, setHadExistingEntry] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const load = useCallback(async (d) => {
     setLoading(true);
@@ -313,10 +314,41 @@ export default function EntryPage() {
                 Next →
               </button>
             ) : (
-              <button className="btn" style={{ background: 'var(--green)' }} onClick={handleSave} disabled={saving}>
+              <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
                 {saving ? 'Saving…' : hadExistingEntry ? '✓ Update' : '✓ Save'}
               </button>
             )}
+          </div>
+        )}
+
+        {/* Confirmation modal */}
+        {showConfirm && (
+          <div className="modal-overlay" onClick={() => setShowConfirm(false)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <h3>{hadExistingEntry ? 'Update this entry?' : 'Save this entry?'}</h3>
+              <p>
+                {hadExistingEntry
+                  ? `You're about to overwrite the saved data for ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. The previous version will be kept in the audit log.`
+                  : `Save the cash entry for ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}?`
+                }
+              </p>
+              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text2)' }}>Total sales</span>
+                  <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>৳{summary.totalSales.toLocaleString()}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'var(--text2)' }}>Cash taken home</span>
+                  <strong style={{ color: summary.cashTakenHome >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>৳{summary.cashTakenHome.toLocaleString()}</strong>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn secondary" onClick={() => setShowConfirm(false)}>Cancel</button>
+                <button className="btn" style={{ background: 'var(--green)' }} onClick={() => { setShowConfirm(false); handleSave(); }} disabled={saving}>
+                  {hadExistingEntry ? 'Yes, update' : 'Yes, save'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

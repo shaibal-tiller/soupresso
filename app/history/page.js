@@ -3,9 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../AppShell';
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 export default function HistoryPage() {
   const [date, setDate] = useState(todayStr());
@@ -14,25 +12,15 @@ export default function HistoryPage() {
   const [notFound, setNotFound] = useState(false);
 
   const load = useCallback(async (d) => {
-    setLoading(true);
-    setNotFound(false);
+    setLoading(true); setNotFound(false);
     try {
       const res = await fetch(`/api/entries?date=${d}`);
       const data = await res.json();
-      if (data.entry) {
-        setEntry(data.entry);
-      } else {
-        setEntry(null);
-        setNotFound(true);
-      }
-    } finally {
-      setLoading(false);
-    }
+      if (data.entry) { setEntry(data.entry); } else { setEntry(null); setNotFound(true); }
+    } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    load(date);
-  }, [date, load]);
+  useEffect(() => { load(date); }, [date, load]);
 
   function shiftDate(days) {
     const d = new Date(date + 'T00:00:00');
@@ -40,7 +28,7 @@ export default function HistoryPage() {
     setDate(d.toISOString().slice(0, 10));
   }
 
-  const fmt = (n) => `৳${Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  const fmt = (n) => `৳${Math.abs(Number(n)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   return (
     <AppShell>
@@ -53,43 +41,77 @@ export default function HistoryPage() {
       </div>
 
       {loading ? (
-        <div className="card">Loading…</div>
+        <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div>
       ) : notFound ? (
-        <div className="card">
-          <p style={{ color: 'var(--text2)' }}>No entry saved for this day yet.</p>
-          <a href="/entry" className="btn" style={{ marginTop: 12, display: 'inline-flex' }}>Go to Daily Entry</a>
+        <div className="card" style={{ textAlign: 'center', padding: 30 }}>
+          <p style={{ color: 'var(--text2)', marginBottom: 12 }}>No entry for this day.</p>
+          <a href="/entry" className="btn" style={{ display: 'inline-flex' }}>Go to Daily Entry</a>
         </div>
       ) : (
-        <div className="card">
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div className="brand-name" style={{ fontSize: 19 }}>Soupresso</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)' }}>Daily Cash Receipt</div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>{new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+        <div className="receipt-card">
+          {/* Header with logo */}
+          <div className="receipt-header">
+            <img src="/logo.jpg" alt="Soupresso" className="receipt-logo" />
+            <div>
+              <div className="receipt-brand">Soupresso</div>
+              <div className="receipt-subtitle">Daily Cash Receipt</div>
+            </div>
           </div>
 
-          <table className="receipt-table">
-            <tbody>
-              <tr><td>Total counted in box</td><td>{fmt(entry.total_counted)}</td></tr>
-              <tr><td>Opening bhangti</td><td>-{fmt(entry.opening_bhangti)}</td></tr>
-              <tr style={{ fontWeight: 700 }}><td>Total sales</td><td>{fmt(entry.total_sales)}</td></tr>
-              <tr><td style={{ paddingTop: 14 }}>Bazar advance received</td><td style={{ paddingTop: 14 }}>{fmt(entry.bazar_advance_received)}</td></tr>
-              <tr><td>Actual bazar cost</td><td>{fmt(entry.bazar_actual_cost)}</td></tr>
-              <tr><td>Bazar variance {Number(entry.bazar_variance) > 0 ? '(given to chef)' : Number(entry.bazar_variance) < 0 ? '(returned by chef)' : ''}</td><td>{fmt(Math.abs(entry.bazar_variance))}</td></tr>
-              <tr><td style={{ paddingTop: 14 }}>Bazar advance for tomorrow</td><td style={{ paddingTop: 14 }}>-{fmt(entry.next_bazar_advance)}</td></tr>
-              <tr><td>Bhangti kept for tomorrow</td><td>-{fmt(entry.next_bhangti)}</td></tr>
-              <tr style={{ fontWeight: 700, fontSize: 15 }}><td style={{ paddingTop: 14 }}>Cash taken home</td><td style={{ paddingTop: 14, color: Number(entry.cash_taken_home) >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmt(entry.cash_taken_home)}</td></tr>
-            </tbody>
-          </table>
+          <div className="receipt-date">
+            {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          </div>
+
+          <div className="receipt-divider" />
+
+          {/* Key numbers */}
+          <div className="receipt-row highlight green">
+            <span className="receipt-label">Total Sales</span>
+            <span className="receipt-value">{fmt(entry.total_sales)}</span>
+          </div>
+
+          <div className="receipt-row highlight red">
+            <span className="receipt-label">Expense (Bazar)</span>
+            <span className="receipt-value">{fmt(entry.bazar_actual_cost)}</span>
+          </div>
+
+          <div className="receipt-divider dashed" />
+
+          <div className="receipt-row">
+            <span className="receipt-label">Next day bazar advance</span>
+            <span className="receipt-value">{fmt(entry.next_bazar_advance)}</span>
+          </div>
+
+          <div className="receipt-row">
+            <span className="receipt-label">Bhangti in box</span>
+            <span className="receipt-value">{fmt(entry.next_bhangti)}</span>
+          </div>
+
+          <div className="receipt-divider" />
+
+          <div className="receipt-row highlight big">
+            <span className="receipt-label">Cash Taken Home</span>
+            <span className={`receipt-value ${Number(entry.cash_taken_home) >= 0 ? 'green' : 'red'}`}>
+              {Number(entry.cash_taken_home) < 0 ? '−' : ''}{fmt(entry.cash_taken_home)}
+            </span>
+          </div>
 
           {entry.notes && (
-            <div className="insight amber" style={{ marginTop: 14 }}>
-              <b>Note:</b> {entry.notes}
-            </div>
+            <>
+              <div className="receipt-divider dashed" />
+              <div className="receipt-note">
+                <span className="note-icon">📝</span>
+                <span>{entry.notes}</span>
+              </div>
+            </>
           )}
 
-          <button className="btn secondary block no-print" style={{ marginTop: 18 }} onClick={() => window.print()}>
-            🖨 Print this receipt
-          </button>
+          <div className="receipt-footer">
+            <button className="btn secondary no-print" style={{ flex: 1 }} onClick={() => window.print()}>🖨 Print</button>
+            <a href={`/entry`} className="btn no-print" style={{ flex: 1, justifyContent: 'center' }} onClick={() => {
+              // Navigate to entry page — date state isn't shared, but the day-nav on entry lets them find it
+            }}>✎ Edit this day</a>
+          </div>
         </div>
       )}
     </AppShell>

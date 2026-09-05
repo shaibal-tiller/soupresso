@@ -120,6 +120,62 @@ table.receipt-table { width: 100%; border-collapse: collapse; font-size: 13.5px;
 table.receipt-table td { padding: 8px 4px; border-bottom: 1px dashed var(--border2); }
 table.receipt-table td:last-child { text-align: right; font-family: var(--mono); font-weight: 600; }
 
+/* ---- RECEIPT CARD ---- */
+.receipt-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 24px 22px; box-shadow: var(--shadow-sm); margin-bottom: 16px;
+}
+.receipt-header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.receipt-logo { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; box-shadow: var(--shadow-sm); }
+.receipt-brand { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--brand-green); line-height: 1.1; }
+.receipt-subtitle { font-size: 11.5px; color: var(--text3); font-weight: 500; }
+.receipt-date { text-align: center; font-size: 14px; font-weight: 600; color: var(--text); margin: 14px 0 4px; }
+
+.receipt-divider { height: 1px; background: var(--border); margin: 14px 0; }
+.receipt-divider.dashed { border-top: 1px dashed var(--border2); background: none; }
+
+.receipt-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; margin-bottom: 4px; }
+.receipt-row.highlight { font-weight: 700; }
+.receipt-row.highlight.green { background: rgba(31,140,90,.08); }
+.receipt-row.highlight.red { background: rgba(209,67,67,.06); }
+.receipt-row.highlight.big { font-size: 16px; padding: 14px; }
+.receipt-label { font-size: 13.5px; color: var(--text2); }
+.receipt-row.highlight .receipt-label { color: var(--text); }
+.receipt-value { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--text); }
+.receipt-row.highlight.green .receipt-value { color: var(--green); }
+.receipt-row.highlight.red .receipt-value { color: var(--red); }
+.receipt-value.green { color: var(--green) !important; }
+.receipt-value.red { color: var(--red) !important; }
+.receipt-row.highlight.big .receipt-value { font-size: 20px; font-family: var(--display); }
+
+.receipt-note {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 10px 14px; background: rgba(193,121,26,.06); border-radius: 10px;
+  font-size: 13px; color: var(--text2); line-height: 1.5;
+}
+.note-icon { font-size: 15px; flex-shrink: 0; }
+
+.receipt-footer { display: flex; gap: 10px; margin-top: 18px; }
+
+@media print {
+  .receipt-card { box-shadow: none; border: 1px solid #ccc; }
+}
+
+/* ---- CONFIRM MODAL ---- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(43,33,24,.45); z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-card {
+  background: var(--bg2); border-radius: 18px; padding: 28px 24px;
+  max-width: 400px; width: 100%; box-shadow: 0 20px 50px -12px rgba(43,33,24,.4);
+  text-align: center;
+}
+.modal-card h3 { font-family: var(--display); font-size: 18px; margin-bottom: 8px; color: var(--text); }
+.modal-card p { font-size: 13px; color: var(--text2); margin-bottom: 18px; line-height: 1.6; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .btn { flex: 1; justify-content: center; }
+
 /* ---- WIZARD (Daily Entry) ---- */
 .wizard-shell {
   display: flex; flex-direction: column;
