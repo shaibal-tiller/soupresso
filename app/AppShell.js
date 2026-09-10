@@ -1,6 +1,8 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
+import LangToggle from './LangToggle';
+import { useLang } from './LangProvider';
 
 const TABS = [
   { href: '/entry', label: 'Daily Entry' },
@@ -12,6 +14,7 @@ const TABS = [
 export default function AppShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useLang();
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -27,14 +30,17 @@ export default function AppShell({ children }) {
             <div className="brand-logo"><img src="/logo.jpg" alt="Soupresso" /></div>
             <div className="brand-name">Soupresso</div>
           </div>
-          <button className="btn secondary" style={{ padding: '7px 14px', fontSize: 12.5 }} onClick={logout}>
-            Log out
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <LangToggle />
+            <button className="btn secondary" style={{ padding: '7px 14px', fontSize: 12.5 }} onClick={logout}>
+              {t('Log out')}
+            </button>
+          </div>
         </div>
         <nav className="tabbar">
-          {TABS.map((t) => (
-            <a key={t.href} href={t.href} className={pathname.startsWith(t.href) ? 'active' : ''}>
-              {t.label}
+          {TABS.map((tab) => (
+            <a key={tab.href} href={tab.href} className={pathname.startsWith(tab.href) ? 'active' : ''}>
+              {t(tab.label)}
             </a>
           ))}
         </nav>
