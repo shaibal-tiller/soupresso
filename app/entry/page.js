@@ -14,7 +14,7 @@ function emptyDenoms() {
 const TOTAL_STEPS = 5;
 
 export default function EntryPage() {
-  const { t, taka, num, dateNice, dateDisplay } = useLang();
+  const { t, taka, num, digits, dateNice, dateDisplay } = useLang();
   const [date, setDate] = useState(todayStr());
   const [editing, setEditing] = useState(false); // locked until user explicitly starts
   const [step, setStep] = useState(0);
@@ -90,6 +90,10 @@ export default function EntryPage() {
     } finally {
       setLoading(false);
     }
+    // t intentionally omitted from deps: including it would recreate load on every
+    // language toggle and reset an in-progress wizard. Error toasts from load may
+    // briefly show the pre-toggle language — an accepted tradeoff.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { load(date); }, [date, load]);
@@ -269,8 +273,8 @@ export default function EntryPage() {
                   <div className="denom-grid">
                     {STANDARD_DENOMINATIONS.map((d) => (
                       <div key={d} className="denom-cell">
-                        <span className="denom-note">{taka(d)}</span>
-                        <NumberInput value={denoms[d] || 0} min={0}
+                        <span className="denom-note">{'৳'}{digits(String(d))}</span>
+                        <NumberInput value={denoms[d] || ''} min={0}
                           onValueChange={(n) => setDenoms({ ...denoms, [d]: Math.max(0, n ?? 0) })} />
                         <span className="denom-sub">= {taka(d * (denoms[d] || 0))}</span>
                       </div>
@@ -279,7 +283,7 @@ export default function EntryPage() {
                 ) : (
                   <div className="field">
                     <label>{t('Total amount in box (৳)')}</label>
-                    <NumberInput value={totalDirect} min={0} onValueChange={(n, raw) => setTotalDirect(n == null ? '' : String(n))} placeholder={t('e.g. 10000')} autoFocus />
+                    <NumberInput value={totalDirect} min={0} onValueChange={(n) => setTotalDirect(n == null ? '' : String(n))} placeholder={t('e.g. 10000')} autoFocus />
                   </div>
                 )}
                 <div className="step-result"><span>{t('Total counted')}</span><strong>{taka(totalCounted)}</strong></div>
