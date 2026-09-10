@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
+import { useLang } from '../LangProvider';
+import NumberInput from '../NumberInput';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
-import { todayStr, shiftDateStr, formatDateDisplay, formatDateNice } from '@/lib/dates';
+import { todayStr, shiftDateStr } from '@/lib/dates';
 
 function emptyDenoms() {
   return Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, 0]));
@@ -12,6 +14,7 @@ function emptyDenoms() {
 const TOTAL_STEPS = 5;
 
 export default function EntryPage() {
+  const { t, taka, num, dateNice, dateDisplay } = useLang();
   const [date, setDate] = useState(todayStr());
   const [editing, setEditing] = useState(false); // locked until user explicitly starts
   const [step, setStep] = useState(0);
@@ -76,14 +79,14 @@ export default function EntryPage() {
         if (data.carryForward) {
           setOpeningBhangti(data.carryForward.openingBhangti);
           setBazarAdvanceReceived(data.carryForward.bazarAdvanceReceived);
-          setCarryForwardNote(`Carried forward from ${formatDateNice(data.carryForward.fromDate)}`);
+          setCarryForwardNote(`${t('Carried forward from')} ${dateNice(data.carryForward.fromDate)}`);
         } else {
           setOpeningBhangti(0);
           setBazarAdvanceReceived(0);
         }
       }
     } catch {
-      setMsg({ type: 'err', text: 'Could not load this day.' });
+      setMsg({ type: 'err', text: t('Could not load this day.') });
     } finally {
       setLoading(false);
     }
@@ -123,22 +126,21 @@ export default function EntryPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setMsg({ type: 'err', text: data.error || 'Save failed.' });
+        setMsg({ type: 'err', text: data.error || t('Save failed.') });
       } else {
-        setMsg({ type: 'ok', text: 'Saved successfully!' });
+        setMsg({ type: 'ok', text: t('Saved successfully!') });
         setHadExistingEntry(true);
         setEditing(false);
         load(date); // reload to show the updated summary
       }
     } catch {
-      setMsg({ type: 'err', text: 'Could not reach the server.' });
+      setMsg({ type: 'err', text: t('Could not reach the server.') });
     } finally {
       setSaving(false);
     }
   }
 
   const stepLabels = ['Count box', 'Sales', 'Bazar', 'Tomorrow', 'Review'];
-  const fmt = (n) => `৳${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   return (
     <AppShell>
@@ -150,7 +152,7 @@ export default function EntryPage() {
             <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
             <button className="date-picker-btn" onClick={() => dateRef.current?.showPicker?.()}>
               <span className="cal-icon">📅</span>
-              <span>{formatDateDisplay(date)}</span>
+              <span>{dateDisplay(date)}</span>
               <input
                 ref={dateRef}
                 type="date" value={date}
@@ -164,7 +166,7 @@ export default function EntryPage() {
 
         {/* Body */}
         {loading ? (
-          <div className="wizard-body"><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div></div>
+          <div className="wizard-body"><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div></div>
 
         ) : !editing ? (
           /* ============ LOCKED STATE: summary or empty ============ */
@@ -174,24 +176,24 @@ export default function EntryPage() {
                 /* Off day summary */
                 <div className="card" style={{ textAlign: 'center', padding: '30px 20px' }}>
                   <div style={{ fontSize: 36, marginBottom: 8 }}>🚫</div>
-                  <h3 style={{ color: 'var(--text)', marginBottom: 4 }}>Shop was closed</h3>
+                  <h3 style={{ color: 'var(--text)', marginBottom: 4 }}>{t('Shop was closed')}</h3>
                   {existingEntry.notes && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{existingEntry.notes}</p>}
                   <button className="btn secondary" onClick={() => { setEditing(true); }} style={{ marginTop: 8 }}>
-                    ✎ Edit this day
+                    ✎ {t('Edit this day')}
                   </button>
                 </div>
               ) : (
                 /* Existing entry summary */
                 <div className="card">
-                  <div className="card-title">Saved entry</div>
+                  <div className="card-title">{t('Saved entry')}</div>
                   <div className="step-calc">
-                    <div className="calc-row"><span>Total sales</span><span className="g">{fmt(existingEntry.total_sales)}</span></div>
-                    <div className="calc-row"><span>Expense (bazar)</span><span style={{ color: 'var(--red)' }}>{fmt(existingEntry.bazar_actual_cost)}</span></div>
-                    <div className="calc-row"><span>Bazar advance (tomorrow)</span><span>{fmt(existingEntry.next_bazar_advance)}</span></div>
-                    <div className="calc-row"><span>Bhangti in box</span><span>{fmt(existingEntry.next_bhangti)}</span></div>
+                    <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(existingEntry.total_sales)}</span></div>
+                    <div className="calc-row"><span>{t('Expense (bazar)')}</span><span style={{ color: 'var(--red)' }}>{taka(existingEntry.bazar_actual_cost)}</span></div>
+                    <div className="calc-row"><span>{t('Bazar advance (tomorrow)')}</span><span>{taka(existingEntry.next_bazar_advance)}</span></div>
+                    <div className="calc-row"><span>{t('Bhangti in box')}</span><span>{taka(existingEntry.next_bhangti)}</span></div>
                     <div className={`calc-row result`}>
-                      <span>Cash taken home</span>
-                      <span className={Number(existingEntry.cash_taken_home) >= 0 ? 'g' : 'r'}>{fmt(existingEntry.cash_taken_home)}</span>
+                      <span>{t('Cash taken home')}</span>
+                      <span className={Number(existingEntry.cash_taken_home) >= 0 ? 'g' : 'r'}>{taka(existingEntry.cash_taken_home)}</span>
                     </div>
                   </div>
                   {existingEntry.notes && (
@@ -201,7 +203,7 @@ export default function EntryPage() {
                     </div>
                   )}
                   <button className="btn secondary block" onClick={() => setEditing(true)} style={{ marginTop: 16 }}>
-                    ✎ Edit this entry
+                    ✎ {t('Edit this entry')}
                   </button>
                 </div>
               )
@@ -209,17 +211,17 @@ export default function EntryPage() {
               /* No entry yet */
               <div className="card" style={{ textAlign: 'center', padding: '36px 20px' }}>
                 <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
-                <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>No entry yet</h3>
+                <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>{t('No entry yet')}</h3>
                 <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-                  {formatDateDisplay(date)}
+                  {dateDisplay(date)}
                 </p>
                 {carryForwardNote && <div className="wizard-badge carry" style={{ marginBottom: 16 }}>{carryForwardNote}</div>}
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
-                    ＋ Start entry
+                    ＋ {t('Start entry')}
                   </button>
                   <button className="btn secondary" onClick={() => { setEditing(true); setIsOffDay(true); }}>
-                    🚫 Mark off day
+                    🚫 {t('Mark off day')}
                   </button>
                 </div>
               </div>
@@ -232,11 +234,11 @@ export default function EntryPage() {
           <div className="wizard-body">
             <div className="card" style={{ textAlign: 'center', padding: '30px 20px' }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>🚫</div>
-              <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>Shop closed</h3>
-              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>This day will be marked as an off day — no sales recorded.</p>
+              <h3 style={{ color: 'var(--text)', marginBottom: 6 }}>{t('Shop closed')}</h3>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{t('This day will be marked as an off day — no sales recorded.')}</p>
               <div className="field" style={{ textAlign: 'left' }}>
-                <label>Note (optional)</label>
-                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Holiday, rain, personal day" />
+                <label>{t('Note (optional)')}</label>
+                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('e.g. Holiday, rain, personal day')} />
               </div>
               {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
             </div>
@@ -250,66 +252,66 @@ export default function EntryPage() {
             <div className="step-dots" style={{ marginBottom: 8 }}>
               {stepLabels.map((label, i) => (
                 <button key={i} className={`step-dot ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`} onClick={() => setStep(i)}>
-                  <span className="dot-circle">{i < step ? '✓' : i + 1}</span>
-                  <span className="dot-label">{label}</span>
+                  <span className="dot-circle">{i < step ? '✓' : num(i + 1)}</span>
+                  <span className="dot-label">{t(label)}</span>
                 </button>
               ))}
             </div>
 
             {step === 0 && (
               <div className="card">
-                <div className="card-title">Count today's box</div>
+                <div className="card-title">{t("Count today's box")}</div>
                 <div className="toggle-row" style={{ marginBottom: 10 }}>
-                  <button className={mode === 'denom' ? 'on' : ''} onClick={() => setMode('denom')}>By denomination</button>
-                  <button className={mode === 'total' ? 'on' : ''} onClick={() => setMode('total')}>Enter total</button>
+                  <button className={mode === 'denom' ? 'on' : ''} onClick={() => setMode('denom')}>{t('By denomination')}</button>
+                  <button className={mode === 'total' ? 'on' : ''} onClick={() => setMode('total')}>{t('Enter total')}</button>
                 </div>
                 {mode === 'denom' ? (
                   <div className="denom-grid">
                     {STANDARD_DENOMINATIONS.map((d) => (
                       <div key={d} className="denom-cell">
-                        <span className="denom-note">৳{d}</span>
-                        <input type="number" min="0" inputMode="numeric" value={denoms[d] || 0}
-                          onChange={(e) => setDenoms({ ...denoms, [d]: Math.max(0, Number(e.target.value) || 0) })} />
-                        <span className="denom-sub">= ৳{(d * (denoms[d] || 0)).toLocaleString()}</span>
+                        <span className="denom-note">{taka(d)}</span>
+                        <NumberInput value={denoms[d] || 0} min={0}
+                          onValueChange={(n) => setDenoms({ ...denoms, [d]: Math.max(0, n ?? 0) })} />
+                        <span className="denom-sub">= {taka(d * (denoms[d] || 0))}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="field">
-                    <label>Total amount in box (৳)</label>
-                    <input type="number" min="0" inputMode="numeric" value={totalDirect} onChange={(e) => setTotalDirect(e.target.value)} placeholder="e.g. 10000" autoFocus />
+                    <label>{t('Total amount in box (৳)')}</label>
+                    <NumberInput value={totalDirect} min={0} onValueChange={(n, raw) => setTotalDirect(n == null ? '' : String(n))} placeholder={t('e.g. 10000')} autoFocus />
                   </div>
                 )}
-                <div className="step-result"><span>Total counted</span><strong>৳{totalCounted.toLocaleString()}</strong></div>
+                <div className="step-result"><span>{t('Total counted')}</span><strong>{taka(totalCounted)}</strong></div>
               </div>
             )}
 
             {step === 1 && (
               <div className="card">
-                <div className="card-title">Today's total sales</div>
-                <p className="step-hint">How much bhangti (loose change) was already in the box from yesterday?</p>
+                <div className="card-title">{t("Today's total sales")}</div>
+                <p className="step-hint">{t('How much bhangti (loose change) was already in the box from yesterday?')}</p>
                 <div className="field">
-                  <label>Opening bhangti (৳)</label>
-                  <input type="number" min="0" inputMode="numeric" value={openingBhangti} onChange={(e) => setOpeningBhangti(e.target.value)} autoFocus />
+                  <label>{t('Opening bhangti (৳)')}</label>
+                  <NumberInput value={openingBhangti} min={0} onValueChange={(n) => setOpeningBhangti(n ?? '')} autoFocus />
                 </div>
                 <div className="step-calc">
-                  <div className="calc-row"><span>Total counted</span><span>৳{totalCounted.toLocaleString()}</span></div>
-                  <div className="calc-row"><span>− Opening bhangti</span><span>৳{Number(openingBhangti || 0).toLocaleString()}</span></div>
-                  <div className="calc-row result"><span>Today's sales</span><span className={summary.totalSales >= 0 ? 'g' : 'r'}>৳{summary.totalSales.toLocaleString()}</span></div>
+                  <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
+                  <div className="calc-row"><span>{t('− Opening bhangti')}</span><span>{taka(Number(openingBhangti) || 0)}</span></div>
+                  <div className="calc-row result"><span>{t("Today's sales")}</span><span className={summary.totalSales >= 0 ? 'g' : 'r'}>{taka(summary.totalSales)}</span></div>
                 </div>
               </div>
             )}
 
             {step === 2 && (
               <div className="card">
-                <div className="card-title">Settle yesterday's bazar</div>
+                <div className="card-title">{t("Settle yesterday's bazar")}</div>
                 <div className="field">
-                  <label>Bazar advance received (for today's shopping)</label>
-                  <input type="number" min="0" inputMode="numeric" value={bazarAdvanceReceived} onChange={(e) => setBazarAdvanceReceived(e.target.value)} autoFocus />
+                  <label>{t("Bazar advance received (for today's shopping)")}</label>
+                  <NumberInput value={bazarAdvanceReceived} min={0} onValueChange={(n) => setBazarAdvanceReceived(n ?? '')} autoFocus />
                 </div>
                 <div className="field">
-                  <label>Actual bazar cost today</label>
-                  <input type="number" min="0" inputMode="numeric" value={bazarActualCost} onChange={(e) => setBazarActualCost(e.target.value)} />
+                  <label>{t('Actual bazar cost today')}</label>
+                  <NumberInput value={bazarActualCost} min={0} onValueChange={(n) => setBazarActualCost(n ?? '')} />
                 </div>
                 <div className={`step-result ${summary.bazarVariance > 0 ? 'warn' : summary.bazarVariance < 0 ? 'good' : ''}`}>
                   <span>{summary.bazarVarianceLabel}</span>
@@ -319,40 +321,40 @@ export default function EntryPage() {
 
             {step === 3 && (
               <div className="card">
-                <div className="card-title">Set aside for tomorrow</div>
+                <div className="card-title">{t('Set aside for tomorrow')}</div>
                 <div className="field">
-                  <label>Bazar advance to give chef now (৳)</label>
-                  <input type="number" min="0" inputMode="numeric" value={nextBazarAdvance} onChange={(e) => setNextBazarAdvance(e.target.value)} autoFocus />
+                  <label>{t('Bazar advance to give chef now (৳)')}</label>
+                  <NumberInput value={nextBazarAdvance} min={0} onValueChange={(n) => setNextBazarAdvance(n ?? '')} autoFocus />
                 </div>
                 <div className="field">
-                  <label>Bhangti to keep in the box (৳)</label>
-                  <input type="number" min="0" inputMode="numeric" value={nextBhangti} onChange={(e) => setNextBhangti(e.target.value)} />
+                  <label>{t('Bhangti to keep in the box (৳)')}</label>
+                  <NumberInput value={nextBhangti} min={0} onValueChange={(n) => setNextBhangti(n ?? '')} />
                 </div>
               </div>
             )}
 
             {step === 4 && (
               <div className="card">
-                <div className="card-title">Review & save</div>
+                <div className="card-title">{t('Review & save')}</div>
                 <div className="step-calc">
-                  <div className="calc-row"><span>Total counted</span><span>৳{totalCounted.toLocaleString()}</span></div>
-                  <div className="calc-row"><span>Total sales</span><span className="g">৳{summary.totalSales.toLocaleString()}</span></div>
-                  <div className="calc-row"><span>Bazar variance</span><span>{summary.bazarVariance >= 0 ? '−' : '+'}৳{Math.abs(summary.bazarVariance).toLocaleString()}</span></div>
-                  <div className="calc-row"><span>Tomorrow's bazar</span><span>−৳{Number(nextBazarAdvance || 0).toLocaleString()}</span></div>
-                  <div className="calc-row"><span>Tomorrow's bhangti</span><span>−৳{Number(nextBhangti || 0).toLocaleString()}</span></div>
+                  <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
+                  <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(summary.totalSales)}</span></div>
+                  <div className="calc-row"><span>{t('Bazar variance')}</span><span>{summary.bazarVariance >= 0 ? '−' : '+'}{taka(Math.abs(summary.bazarVariance))}</span></div>
+                  <div className="calc-row"><span>{t("Tomorrow's bazar")}</span><span>{'−'}{taka(Number(nextBazarAdvance) || 0)}</span></div>
+                  <div className="calc-row"><span>{t("Tomorrow's bhangti")}</span><span>{'−'}{taka(Number(nextBhangti) || 0)}</span></div>
                   <div className={`calc-row result ${summary.isShort ? 'short' : ''}`}>
-                    <span>Cash taken home</span>
-                    <span className={summary.cashTakenHome >= 0 ? 'g' : 'r'}>৳{summary.cashTakenHome.toLocaleString()}</span>
+                    <span>{t('Cash taken home')}</span>
+                    <span className={summary.cashTakenHome >= 0 ? 'g' : 'r'}>{taka(summary.cashTakenHome)}</span>
                   </div>
                 </div>
                 {summary.isShort && (
                   <div className="insight red" style={{ marginTop: 10 }}>
-                    <b>Box is short.</b> Not enough to cover tomorrow's advance and bhangti.
+                    <b>{t('Box is short.')}</b> {t("Not enough to cover tomorrow's advance and bhangti.")}
                   </div>
                 )}
                 <div className="field" style={{ marginTop: 12 }}>
-                  <label>Notes (optional)</label>
-                  <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything to remember" />
+                  <label>{t('Notes (optional)')}</label>
+                  <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Anything to remember')} />
                 </div>
                 {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
               </div>
@@ -365,22 +367,22 @@ export default function EntryPage() {
           <div className="wizard-footer">
             {isOffDay ? (
               <>
-                <button className="btn secondary" onClick={() => { setEditing(false); setIsOffDay(hadExistingEntry ? !!existingEntry?.is_off_day : false); }}>Cancel</button>
+                <button className="btn secondary" onClick={() => { setEditing(false); setIsOffDay(hadExistingEntry ? !!existingEntry?.is_off_day : false); }}>{t('Cancel')}</button>
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
-                  {saving ? 'Saving…' : '✓ Mark off day'}
+                  {saving ? t('Saving…') : t('✓ Mark off day')}
                 </button>
               </>
             ) : (
               <>
                 <button className="btn secondary" onClick={() => step === 0 ? setEditing(false) : setStep(Math.max(0, step - 1))}>
-                  {step === 0 ? '✕ Cancel' : '← Back'}
+                  {step === 0 ? t('✕ Cancel') : t('← Back')}
                 </button>
-                <span className="step-counter">{step + 1} / {TOTAL_STEPS}</span>
+                <span className="step-counter">{num(step + 1)} / {num(TOTAL_STEPS)}</span>
                 {step < TOTAL_STEPS - 1 ? (
-                  <button className="btn" onClick={() => setStep(step + 1)}>Next →</button>
+                  <button className="btn" onClick={() => setStep(step + 1)}>{t('Next →')}</button>
                 ) : (
                   <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
-                    {saving ? 'Saving…' : hadExistingEntry ? '✓ Update' : '✓ Save'}
+                    {saving ? t('Saving…') : hadExistingEntry ? t('✓ Update') : t('✓ Save')}
                   </button>
                 )}
               </>
@@ -392,31 +394,31 @@ export default function EntryPage() {
         {showConfirm && (
           <div className="modal-overlay" onClick={() => setShowConfirm(false)}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-              <h3>{isOffDay ? 'Mark as off day?' : hadExistingEntry ? 'Update this entry?' : 'Save this entry?'}</h3>
+              <h3>{isOffDay ? t('Mark as off day?') : hadExistingEntry ? t('Update this entry?') : t('Save this entry?')}</h3>
               <p>
                 {isOffDay
-                  ? `Mark ${formatDateDisplay(date)} as a shop off day.`
+                  ? <>{dateDisplay(date)} — {t('This day will be marked as an off day — no sales recorded.')}</>
                   : hadExistingEntry
-                  ? `Overwrite the saved data for ${formatDateDisplay(date)}? Previous version will be kept in the audit log.`
-                  : `Save the cash entry for ${formatDateDisplay(date)}?`
+                  ? <>{t('Update this entry?')} — {dateDisplay(date)}</>
+                  : <>{t('Save this entry?')} — {dateDisplay(date)}</>
                 }
               </p>
               {!isOffDay && (
                 <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, textAlign: 'left' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                    <span style={{ color: 'var(--text2)' }}>Total sales</span>
-                    <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>৳{summary.totalSales.toLocaleString()}</strong>
+                    <span style={{ color: 'var(--text2)' }}>{t('Total sales')}</span>
+                    <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>{taka(summary.totalSales)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: 'var(--text2)' }}>Cash taken home</span>
-                    <strong style={{ color: summary.cashTakenHome >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>৳{summary.cashTakenHome.toLocaleString()}</strong>
+                    <span style={{ color: 'var(--text2)' }}>{t('Cash taken home')}</span>
+                    <strong style={{ color: summary.cashTakenHome >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>{taka(summary.cashTakenHome)}</strong>
                   </div>
                 </div>
               )}
               <div className="modal-actions">
-                <button className="btn secondary" onClick={() => setShowConfirm(false)}>Cancel</button>
+                <button className="btn secondary" onClick={() => setShowConfirm(false)}>{t('Cancel')}</button>
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => { setShowConfirm(false); handleSave(); }} disabled={saving}>
-                  {isOffDay ? 'Yes, mark off' : hadExistingEntry ? 'Yes, update' : 'Yes, save'}
+                  {isOffDay ? t('Yes, mark off') : hadExistingEntry ? t('Yes, update') : t('Yes, save')}
                 </button>
               </div>
             </div>
