@@ -32,7 +32,7 @@ export default function EntryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [carryForwardNote, setCarryForwardNote] = useState(null);
+  const [carryForwardFrom, setCarryForwardFrom] = useState(null);
   const [hadExistingEntry, setHadExistingEntry] = useState(false);
   const [existingEntry, setExistingEntry] = useState(null); // raw entry for the summary card
   const [showConfirm, setShowConfirm] = useState(false);
@@ -41,7 +41,7 @@ export default function EntryPage() {
   const load = useCallback(async (d) => {
     setLoading(true);
     setMsg(null);
-    setCarryForwardNote(null);
+    setCarryForwardFrom(null);
     setStep(0);
     setIsOffDay(false);
     setEditing(false);
@@ -79,7 +79,7 @@ export default function EntryPage() {
         if (data.carryForward) {
           setOpeningBhangti(data.carryForward.openingBhangti);
           setBazarAdvanceReceived(data.carryForward.bazarAdvanceReceived);
-          setCarryForwardNote(`${t('Carried forward from')} ${dateNice(data.carryForward.fromDate)}`);
+          setCarryForwardFrom(data.carryForward.fromDate);
         } else {
           setOpeningBhangti(0);
           setBazarAdvanceReceived(0);
@@ -215,7 +215,7 @@ export default function EntryPage() {
                 <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
                   {dateDisplay(date)}
                 </p>
-                {carryForwardNote && <div className="wizard-badge carry" style={{ marginBottom: 16 }}>{carryForwardNote}</div>}
+                {carryForwardFrom && <div className="wizard-badge carry" style={{ marginBottom: 16 }}>{t('Carried forward from')} {dateNice(carryForwardFrom)}</div>}
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
                     ＋ {t('Start entry')}
@@ -314,7 +314,13 @@ export default function EntryPage() {
                   <NumberInput value={bazarActualCost} min={0} onValueChange={(n) => setBazarActualCost(n ?? '')} />
                 </div>
                 <div className={`step-result ${summary.bazarVariance > 0 ? 'warn' : summary.bazarVariance < 0 ? 'good' : ''}`}>
-                  <span>{summary.bazarVarianceLabel}</span>
+                  <span>
+                    {summary.bazarVariance > 0
+                      ? `${t('Give chef extra:')} ${taka(summary.bazarVariance)}`
+                      : summary.bazarVariance < 0
+                      ? `${t('Chef returns:')} ${taka(Math.abs(summary.bazarVariance))}`
+                      : t('Exact — no variance')}
+                  </span>
                 </div>
               </div>
             )}

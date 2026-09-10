@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { parseLocaleNumber, formatNumber } from '@/lib/numerals';
 import { useLang } from './LangProvider';
 
@@ -22,14 +22,17 @@ export default function NumberInput({
 }) {
   const { lang } = useLang();
   const [text, setText] = useState(() => seed(value));
-  const lastExternal = useRef(value);
 
-  // Re-seed when a parent resets the value (e.g. form clear, day switch).
+  // Re-seed local text only when the incoming value differs from what the
+  // field already represents — i.e. a genuine external change (day switch,
+  // form reset), not the echo of the user's own keystroke.
   useEffect(() => {
-    if (value !== lastExternal.current) {
-      lastExternal.current = value;
+    const incoming = value == null || value === '' ? null : Number(value);
+    const shown = parseLocaleNumber(text);
+    if (incoming !== shown) {
       setText(seed(value));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   const parsed = parseLocaleNumber(text);
