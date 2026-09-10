@@ -1,4 +1,5 @@
 import './globals.css';
+import LangProvider from './LangProvider';
 
 export const metadata = {
   title: 'Soupresso — Daily Cash Register',
@@ -26,7 +27,9 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LangProvider>{children}</LangProvider>
+      </body>
     </html>
   );
 }
