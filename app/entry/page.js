@@ -30,6 +30,7 @@ export default function EntryPage() {
   const [openingBhangti, setOpeningBhangti] = useState(0);
   const [bazarAdvanceReceived, setBazarAdvanceReceived] = useState(0);
   const [bazarActualCost, setBazarActualCost] = useState(0);
+  const [bazarTakenFromBox, setBazarTakenFromBox] = useState(0);
   const [nextBazarAdvance, setNextBazarAdvance] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
   const [notes, setNotes] = useState('');
@@ -71,6 +72,7 @@ export default function EntryPage() {
         setOpeningBhangti(Number(e.opening_bhangti));
         setBazarAdvanceReceived(Number(e.bazar_advance_received));
         setBazarActualCost(Number(e.bazar_actual_cost));
+        setBazarTakenFromBox(Number(e.bazar_taken_from_box) || 0);
         setNextBazarAdvance(Number(e.next_bazar_advance));
         setNextBhangti(Number(e.next_bhangti));
         setNotes(e.notes || '');
@@ -81,6 +83,7 @@ export default function EntryPage() {
         setDenoms(emptyDenoms());
         setTotalDirect('');
         setBazarActualCost(0);
+        setBazarTakenFromBox(0);
         setNextBazarAdvance(0);
         setNextBhangti(0);
         setNotes('');
@@ -108,20 +111,34 @@ export default function EntryPage() {
   useEffect(() => { load(date); }, [date, load]);
 
   const totalCounted = mode === 'denom' ? denominationTotal(denoms) : Number(totalDirect) || 0;
+
+  // Tomorrow's bhangti, when counting by denomination: each note can be marked
+  // in/out (default: marked for ৳20 and under, unmarked above) with an
+  // independently editable count (default: today's counted quantity for that
+  // note). Only entries the user has actually touched are stored here; the
+  // rest fall back to the defaults live, so this stays in sync if today's
+  // count changes before the user customizes anything.
+  const [nextBhangtiQtyOverride, setNextBhangtiQtyOverride] = useState({});
+  const [nextBhangtiMarkOverride, setNextBhangtiMarkOverride] = useState({});
+  const bhangtiQtyFor = (d) => (nextBhangtiQtyOverride[d] !== undefined ? nextBhangtiQtyOverride[d] : (denoms[d] || 0));
+  const bhangtiMarkedFor = (d) => (nextBhangtiMarkOverride[d] !== undefined ? nextBhangtiMarkOverride[d] : d <= 20);
+  const toggleBhangtiMark = (d) => setNextBhangtiMarkOverride((prev) => ({ ...prev, [d]: !bhangtiMarkedFor(d) }));
+  const setBhangtiQty = (d, n) => setNextBhangtiQtyOverride((prev) => ({ ...prev, [d]: Math.max(0, n ?? 0) }));
+  const nextBhangtiFromDenoms = STANDARD_DENOMINATIONS.reduce(
+    (sum, d) => sum + (bhangtiMarkedFor(d) ? d * bhangtiQtyFor(d) : 0),
+    0
+  );
+  const effectiveNextBhangti = mode === 'denom' ? nextBhangtiFromDenoms : (Number(nextBhangti) || 0);
+
   const summary = computeCashSummary({
     totalCounted,
     openingBhangti: Number(openingBhangti) || 0,
     bazarAdvanceReceived: Number(bazarAdvanceReceived) || 0,
     bazarActualCost: Number(bazarActualCost) || 0,
+    bazarTakenFromBox: Number(bazarTakenFromBox) || 0,
     nextBazarAdvance: Number(nextBazarAdvance) || 0,
-    nextBhangti: Number(nextBhangti) || 0,
+    nextBhangti: effectiveNextBhangti,
   });
-
-  const SMALL_NOTES = STANDARD_DENOMINATIONS.filter((d) => d <= 50); // 50,20,10,5,2,1
-  const suggestedBhangtiNotes = mode === 'denom'
-    ? SMALL_NOTES.filter((d) => (denoms[d] || 0) > 0).map((d) => ({ d, qty: denoms[d], subtotal: d * denoms[d] }))
-    : [];
-  const suggestedBhangtiTotal = suggestedBhangtiNotes.reduce((sum, n) => sum + n.subtotal, 0);
 
   async function handleSave() {
     setSaving(true);
@@ -138,8 +155,9 @@ export default function EntryPage() {
           openingBhangti: isOffDay ? 0 : (Number(openingBhangti) || 0),
           bazarAdvanceReceived: isOffDay ? 0 : (Number(bazarAdvanceReceived) || 0),
           bazarActualCost: isOffDay ? 0 : (Number(bazarActualCost) || 0),
+          bazarTakenFromBox: isOffDay ? 0 : (Number(bazarTakenFromBox) || 0),
           nextBazarAdvance: isOffDay ? 0 : (Number(nextBazarAdvance) || 0),
-          nextBhangti: isOffDay ? 0 : (Number(nextBhangti) || 0),
+          nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
           notes: isOffDay ? (notes || 'Shop closed') : notes,
           closedBy: isOffDay ? [] : closedBy,
         }),
@@ -333,10 +351,19 @@ export default function EntryPage() {
                   <label>{t('Actual bazar cost today')}</label>
                   <NumberInput value={bazarActualCost} min={0} onValueChange={(n) => setBazarActualCost(n ?? '')} />
                 </div>
+                {summary.bazarVariance > 0 && (
+                  <div className="field">
+                    <label>{t('How much of that did the chef already take from the box?')}</label>
+                    <NumberInput value={bazarTakenFromBox} min={0} onValueChange={(n) => setBazarTakenFromBox(n ?? '')} />
+                    <p className="step-hint">{t("Leave at ৳0 if he paid it from his own pocket — you'll pay him back from the box at Review.")}</p>
+                  </div>
+                )}
                 <div className={`step-result ${summary.bazarVariance > 0 ? 'warn' : summary.bazarVariance < 0 ? 'good' : ''}`}>
                   <span>
                     {summary.bazarVariance > 0
-                      ? `${t('Give chef extra:')} ${taka(summary.bazarVariance)}`
+                      ? (summary.toReimburse > 0
+                          ? `${t('Reimburse chef from box:')} ${taka(summary.toReimburse)}`
+                          : t('Already settled — nothing more to pay'))
                       : summary.bazarVariance < 0
                       ? `${t('Chef returns:')} ${taka(Math.abs(summary.bazarVariance))}`
                       : t('Exact — no variance')}
@@ -348,31 +375,40 @@ export default function EntryPage() {
             {step === 3 && (
               <div className="card">
                 <div className="card-title">{t('Set aside for tomorrow')}</div>
-                {mode === 'denom' && suggestedBhangtiNotes.length > 0 && (
-                  <div className="step-result" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-                    <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--text2)' }}>{t('Suggested bhangti')}</div>
-                    {suggestedBhangtiNotes.map((n) => (
-                      <div key={n.d} className="calc-row" style={{ padding: '2px 0' }}>
-                        <span>{'৳'}{digits(String(n.d))} × {num(n.qty)}</span>
-                        <span>{taka(n.subtotal)}</span>
-                      </div>
-                    ))}
-                    <div className="calc-row result" style={{ padding: '6px 0' }}>
-                      <span>{t('Total')}</span>
-                      <span>{taka(suggestedBhangtiTotal)}</span>
-                    </div>
-                    <button type="button" className="btn secondary" onClick={() => setNextBhangti(suggestedBhangtiTotal)}>
-                      {t('Use this amount')}
-                    </button>
-                  </div>
-                )}
                 <div className="field">
                   <label>{t('Bazar advance to give chef now (৳)')}</label>
                   <NumberInput value={nextBazarAdvance} min={0} onValueChange={(n) => setNextBazarAdvance(n ?? '')} autoFocus />
                 </div>
                 <div className="field">
                   <label>{t('Bhangti to keep in the box (৳)')}</label>
-                  <NumberInput value={nextBhangti} min={0} onValueChange={(n) => setNextBhangti(n ?? '')} />
+                  {mode === 'denom' ? (
+                    <>
+                      <div className="denom-grid">
+                        {STANDARD_DENOMINATIONS.map((d) => {
+                          const marked = bhangtiMarkedFor(d);
+                          const qty = bhangtiQtyFor(d);
+                          return (
+                            <div key={d} className={`denom-cell${marked ? '' : ' off'}`}>
+                              <button
+                                type="button"
+                                className="denom-mark"
+                                aria-pressed={marked}
+                                onClick={() => toggleBhangtiMark(d)}
+                              >
+                                {marked ? '✓' : ''}
+                              </button>
+                              <span className="denom-note">{'৳'}{digits(String(d))}</span>
+                              <NumberInput value={qty} min={0} disabled={!marked} onValueChange={(n) => setBhangtiQty(d, n)} />
+                              <span className="denom-sub">= {taka(marked ? d * qty : 0)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="step-result"><span>{t('Total')}</span><strong>{taka(nextBhangtiFromDenoms)}</strong></div>
+                    </>
+                  ) : (
+                    <NumberInput value={nextBhangti} min={0} onValueChange={(n) => setNextBhangti(n ?? '')} />
+                  )}
                 </div>
               </div>
             )}
@@ -383,9 +419,11 @@ export default function EntryPage() {
                 <div className="step-calc">
                   <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
                   <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(summary.totalSales)}</span></div>
-                  <div className="calc-row"><span>{t('Bazar variance')}</span><span>{summary.bazarVariance >= 0 ? '−' : '+'}{taka(Math.abs(summary.bazarVariance))}</span></div>
+                  {summary.toReimburse > 0 && (
+                    <div className="calc-row"><span>{t('Reimbursed to chef (from box)')}</span><span>{'−'}{taka(summary.toReimburse)}</span></div>
+                  )}
                   <div className="calc-row"><span>{t("Tomorrow's bazar")}</span><span>{'−'}{taka(Number(nextBazarAdvance) || 0)}</span></div>
-                  <div className="calc-row"><span>{t("Tomorrow's bhangti")}</span><span>{'−'}{taka(Number(nextBhangti) || 0)}</span></div>
+                  <div className="calc-row"><span>{t("Tomorrow's bhangti")}</span><span>{'−'}{taka(effectiveNextBhangti)}</span></div>
                   <div className={`calc-row result ${summary.isShort ? 'short' : ''}`}>
                     <span>{t('Cash taken home')}</span>
                     <span className={summary.cashTakenHome >= 0 ? 'g' : 'r'}>{taka(summary.cashTakenHome)}</span>
