@@ -265,6 +265,34 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .denom-cell.off { opacity: 0.5; }
 .denom-cell.off .denom-mark { color: transparent; }
 
+/* ---- Bazar item-card picker ---- */
+.bazar-picker .chip-select { margin-bottom: 10px; }
+.bazar-item-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.bazar-item-card {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 6px; cursor: pointer; text-align: center;
+}
+.bazar-item-card:disabled, .bazar-item-card.added { opacity: 0.4; cursor: default; border-color: var(--brand-green); }
+.bazar-item-icon { font-size: 20px; }
+.bazar-item-name { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.2; }
+.bazar-item-unit { font-size: 9.5px; color: var(--text3); }
+
+.bazar-basket { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.bazar-basket-row {
+  display: grid; grid-template-columns: 1fr 58px 68px auto; align-items: center; gap: 6px;
+  background: var(--bg); border-radius: 8px; padding: 6px 8px;
+}
+.bazar-basket-name { font-size: 12.5px; color: var(--text); min-width: 0; }
+.bazar-basket-unit { color: var(--text3); font-size: 11px; }
+.bazar-basket-row input {
+  width: 100%; padding: 5px 6px; font-size: 12.5px; text-align: center;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px;
+  font-family: var(--mono); color: var(--text);
+}
+.bazar-basket-total { font-family: var(--mono); font-size: 12.5px; text-align: right; white-space: nowrap; }
+.bazar-basket-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+
 /* ---- Step result / calculation blocks ---- */
 .step-result {
   display: flex; justify-content: space-between; align-items: center;

@@ -4,8 +4,24 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
+import BazarItemPicker from '../BazarItemPicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
 import { todayStr, shiftDateStr } from '@/lib/dates';
+
+function lineTotal(l) {
+  return (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
+}
+
+function rowsToLines(rows) {
+  return (rows || []).map((r) => ({
+    key: `saved-${r.id}`,
+    itemId: r.item_id,
+    name: r.name,
+    unit: r.unit,
+    quantity: String(Number(r.quantity)),
+    unitPrice: String(Number(r.unit_price)),
+  }));
+}
 
 function emptyDenoms() {
   return Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, 0]));
@@ -29,10 +45,13 @@ export default function EntryPage() {
   const [totalDirect, setTotalDirect] = useState('');
   const [openingBhangti, setOpeningBhangti] = useState(0);
   const [bazarAdvanceReceived, setBazarAdvanceReceived] = useState(0);
-  const [bazarActualCost, setBazarActualCost] = useState(0);
   const [bazarTakenFromBox, setBazarTakenFromBox] = useState(0);
-  const [nextBazarAdvance, setNextBazarAdvance] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
+  const [bazarCatalog, setBazarCatalog] = useState([]);
+  const [actualLines, setActualLines] = useState([]); // today's actual bazar, corrected from yesterday's plan
+  const [actualBazarAdjustment, setActualBazarAdjustment] = useState(0);
+  const [plannedLines, setPlannedLines] = useState([]); // tomorrow's planned bazar
+  const [nextBazarAdjustment, setNextBazarAdjustment] = useState(0);
   const [notes, setNotes] = useState('');
   const [closedBy, setClosedBy] = useState([]);
   const [isOffDay, setIsOffDay] = useState(false);
@@ -46,6 +65,10 @@ export default function EntryPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const dateRef = useRef(null);
 
+  useEffect(() => {
+    fetch('/api/bazar-items').then((r) => r.json()).then((d) => setBazarCatalog(d.items || []));
+  }, []);
+
   const load = useCallback(async (d) => {
     setLoading(true);
     setMsg(null);
@@ -55,8 +78,30 @@ export default function EntryPage() {
     setEditing(false);
     setExistingEntry(null);
     try {
-      const res = await fetch(`/api/entries?date=${d}`);
-      const data = await res.json();
+      const tomorrow = shiftDateStr(d, 1);
+      const [entryRes, actualRes, plannedForTodayRes, plannedForTomorrowRes] = await Promise.all([
+        fetch(`/api/entries?date=${d}`),
+        fetch(`/api/bazar-plan?date=${d}&kind=actual`),
+        fetch(`/api/bazar-plan?date=${d}&kind=planned`),
+        fetch(`/api/bazar-plan?date=${tomorrow}&kind=planned`),
+      ]);
+      const data = await entryRes.json();
+      const actualData = await actualRes.json();
+      const plannedForTodayData = await plannedForTodayRes.json();
+      const plannedForTomorrowData = await plannedForTomorrowRes.json();
+
+      // Today's actual bazar list: use what was already saved as actual; if
+      // nothing's saved yet, start from yesterday's plan for today, so there's
+      // something to correct rather than a blank list.
+      const actualStartRows = (actualData.items && actualData.items.length > 0)
+        ? actualData.items
+        : plannedForTodayData.items;
+      const actualStartLines = rowsToLines(actualStartRows);
+      setActualLines(actualStartLines);
+
+      const plannedTomorrowLines = rowsToLines(plannedForTomorrowData.items);
+      setPlannedLines(plannedTomorrowLines);
+
       if (data.entry) {
         const e = data.entry;
         setHadExistingEntry(true);
@@ -71,23 +116,27 @@ export default function EntryPage() {
         }
         setOpeningBhangti(Number(e.opening_bhangti));
         setBazarAdvanceReceived(Number(e.bazar_advance_received));
-        setBazarActualCost(Number(e.bazar_actual_cost));
         setBazarTakenFromBox(Number(e.bazar_taken_from_box) || 0);
-        setNextBazarAdvance(Number(e.next_bazar_advance));
         setNextBhangti(Number(e.next_bhangti));
         setNotes(e.notes || '');
         setClosedBy(e.closed_by || []);
+        // Reconstruct each manual adjustment so re-opening a saved day shows
+        // the same totals it was saved with (itemsTotal + adjustment = saved).
+        const actualItemsTotal = actualStartLines.reduce((s, l) => s + lineTotal(l), 0);
+        setActualBazarAdjustment(Number(e.bazar_actual_cost) - actualItemsTotal);
+        const plannedItemsTotal = plannedTomorrowLines.reduce((s, l) => s + lineTotal(l), 0);
+        setNextBazarAdjustment(Number(e.next_bazar_advance) - plannedItemsTotal);
       } else {
         setHadExistingEntry(false);
         setMode('denom');
         setDenoms(emptyDenoms());
         setTotalDirect('');
-        setBazarActualCost(0);
         setBazarTakenFromBox(0);
-        setNextBazarAdvance(0);
         setNextBhangti(0);
         setNotes('');
         setClosedBy([]);
+        setActualBazarAdjustment(0);
+        setNextBazarAdjustment(0);
         if (data.carryForward) {
           setOpeningBhangti(data.carryForward.openingBhangti);
           setBazarAdvanceReceived(data.carryForward.bazarAdvanceReceived);
@@ -130,38 +179,64 @@ export default function EntryPage() {
   );
   const effectiveNextBhangti = mode === 'denom' ? nextBhangtiFromDenoms : (Number(nextBhangti) || 0);
 
+  // Bazar actual cost / next-day advance are each: sum of the item-card list
+  // (see BazarItemPicker) plus a manual adjustment (can be negative) — the
+  // adjustment alone reproduces the old plain-number entry when there are no
+  // items at all.
+  const actualItemsTotal = actualLines.reduce((sum, l) => sum + lineTotal(l), 0);
+  const effectiveBazarActualCost = actualItemsTotal + (Number(actualBazarAdjustment) || 0);
+  const plannedItemsTotal = plannedLines.reduce((sum, l) => sum + lineTotal(l), 0);
+  const effectiveNextBazarAdvance = plannedItemsTotal + (Number(nextBazarAdjustment) || 0);
+
   const summary = computeCashSummary({
     totalCounted,
     openingBhangti: Number(openingBhangti) || 0,
     bazarAdvanceReceived: Number(bazarAdvanceReceived) || 0,
-    bazarActualCost: Number(bazarActualCost) || 0,
+    bazarActualCost: effectiveBazarActualCost,
     bazarTakenFromBox: Number(bazarTakenFromBox) || 0,
-    nextBazarAdvance: Number(nextBazarAdvance) || 0,
+    nextBazarAdvance: effectiveNextBazarAdvance,
     nextBhangti: effectiveNextBhangti,
   });
+
+  function bazarPlanPayload(forDate, kind, lines) {
+    return fetch('/api/bazar-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: forDate,
+        kind,
+        items: lines.map((l) => ({ itemId: l.itemId, name: l.name, unit: l.unit, quantity: l.quantity, unitPrice: l.unitPrice })),
+      }),
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
     setMsg(null);
     try {
-      const res = await fetch('/api/entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          entryDate: date,
-          isOffDay,
-          denominations: isOffDay ? null : (mode === 'denom' ? denoms : null),
-          totalCounted: isOffDay ? 0 : totalCounted,
-          openingBhangti: isOffDay ? 0 : (Number(openingBhangti) || 0),
-          bazarAdvanceReceived: isOffDay ? 0 : (Number(bazarAdvanceReceived) || 0),
-          bazarActualCost: isOffDay ? 0 : (Number(bazarActualCost) || 0),
-          bazarTakenFromBox: isOffDay ? 0 : (Number(bazarTakenFromBox) || 0),
-          nextBazarAdvance: isOffDay ? 0 : (Number(nextBazarAdvance) || 0),
-          nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
-          notes: isOffDay ? (notes || 'Shop closed') : notes,
-          closedBy: isOffDay ? [] : closedBy,
+      const tomorrow = shiftDateStr(date, 1);
+      const [res] = await Promise.all([
+        fetch('/api/entries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            entryDate: date,
+            isOffDay,
+            denominations: isOffDay ? null : (mode === 'denom' ? denoms : null),
+            totalCounted: isOffDay ? 0 : totalCounted,
+            openingBhangti: isOffDay ? 0 : (Number(openingBhangti) || 0),
+            bazarAdvanceReceived: isOffDay ? 0 : (Number(bazarAdvanceReceived) || 0),
+            bazarActualCost: isOffDay ? 0 : effectiveBazarActualCost,
+            bazarTakenFromBox: isOffDay ? 0 : (Number(bazarTakenFromBox) || 0),
+            nextBazarAdvance: isOffDay ? 0 : effectiveNextBazarAdvance,
+            nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
+            notes: isOffDay ? (notes || 'Shop closed') : notes,
+            closedBy: isOffDay ? [] : closedBy,
+          }),
         }),
-      });
+        isOffDay ? Promise.resolve() : bazarPlanPayload(date, 'actual', actualLines),
+        isOffDay ? Promise.resolve() : bazarPlanPayload(tomorrow, 'planned', plannedLines),
+      ]);
       const data = await res.json();
       if (!res.ok) {
         setMsg({ type: 'err', text: data.error || t('Save failed.') });
@@ -349,7 +424,14 @@ export default function EntryPage() {
                 </div>
                 <div className="field">
                   <label>{t('Actual bazar cost today')}</label>
-                  <NumberInput value={bazarActualCost} min={0} onValueChange={(n) => setBazarActualCost(n ?? '')} />
+                  <p className="step-hint">{t("Correct yesterday's plan to what was actually bought — adjust quantities and prices, remove what wasn't bought, add anything extra.")}</p>
+                  <BazarItemPicker
+                    catalog={bazarCatalog}
+                    lines={actualLines}
+                    onLinesChange={setActualLines}
+                    adjustment={actualBazarAdjustment}
+                    onAdjustmentChange={setActualBazarAdjustment}
+                  />
                 </div>
                 {summary.bazarVariance > 0 && (
                   <div className="field">
@@ -377,7 +459,13 @@ export default function EntryPage() {
                 <div className="card-title">{t('Set aside for tomorrow')}</div>
                 <div className="field">
                   <label>{t('Bazar advance to give chef now (৳)')}</label>
-                  <NumberInput value={nextBazarAdvance} min={0} onValueChange={(n) => setNextBazarAdvance(n ?? '')} autoFocus />
+                  <BazarItemPicker
+                    catalog={bazarCatalog}
+                    lines={plannedLines}
+                    onLinesChange={setPlannedLines}
+                    adjustment={nextBazarAdjustment}
+                    onAdjustmentChange={setNextBazarAdjustment}
+                  />
                 </div>
                 <div className="field">
                   <label>{t('Bhangti to keep in the box (৳)')}</label>
@@ -422,7 +510,7 @@ export default function EntryPage() {
                   {summary.toReimburse > 0 && (
                     <div className="calc-row"><span>{t('Reimbursed to chef (from box)')}</span><span>{'−'}{taka(summary.toReimburse)}</span></div>
                   )}
-                  <div className="calc-row"><span>{t("Tomorrow's bazar")}</span><span>{'−'}{taka(Number(nextBazarAdvance) || 0)}</span></div>
+                  <div className="calc-row"><span>{t("Tomorrow's bazar")}</span><span>{'−'}{taka(effectiveNextBazarAdvance)}</span></div>
                   <div className="calc-row"><span>{t("Tomorrow's bhangti")}</span><span>{'−'}{taka(effectiveNextBhangti)}</span></div>
                   <div className={`calc-row result ${summary.isShort ? 'short' : ''}`}>
                     <span>{t('Cash taken home')}</span>

@@ -98,3 +98,97 @@ CREATE TABLE IF NOT EXISTS investments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_investments_date ON investments (spent_on DESC);
+
+-- Bazar item catalog — a tappable card list (photo/emoji, category, unit) so
+-- planning tomorrow's shopping or correcting today's actual doesn't mean
+-- retyping item names every time. Purely a picker convenience; the resulting
+-- bazar_plan_items rows snapshot their own name/unit so editing or removing
+-- a catalog item never corrupts a day's already-saved list.
+CREATE TABLE IF NOT EXISTS bazar_items (
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL UNIQUE,
+  category     TEXT NOT NULL,
+  unit         TEXT NOT NULL,
+  icon         TEXT,
+  active       BOOLEAN NOT NULL DEFAULT true,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- One row per item per day's bazar list. `for_date` is the day the shopping
+-- is FOR (not necessarily the day the row was created — a 'planned' list for
+-- tomorrow is entered today). `kind='planned'` is the advance-shopping plan;
+-- `kind='actual'` is the corrected, actually-bought list entered the next
+-- day, which sums to that day's bazar_actual_cost. Not FK'd to daily_entries
+-- (a 'planned' row for tomorrow is created before tomorrow's daily_entries
+-- row exists). A day's list is replaced wholesale on save, not diffed.
+CREATE TABLE IF NOT EXISTS bazar_plan_items (
+  id           SERIAL PRIMARY KEY,
+  for_date     DATE NOT NULL,
+  kind         TEXT NOT NULL CHECK (kind IN ('planned', 'actual')),
+  item_id      INTEGER REFERENCES bazar_items(id) ON DELETE SET NULL,
+  name         TEXT NOT NULL,
+  unit         TEXT,
+  quantity     NUMERIC(10,2) NOT NULL DEFAULT 0,
+  unit_price   NUMERIC(10,2) NOT NULL DEFAULT 0,
+  line_total   NUMERIC(12,2) NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bazar_plan_items_date_kind ON bazar_plan_items (for_date, kind);
+
+-- Seed the bazar item catalog (safe to re-run — only inserts when empty).
+DO $$
+BEGIN
+  IF (SELECT COUNT(*) FROM bazar_items) = 0 THEN
+    INSERT INTO bazar_items (name, category, unit, icon, sort_order) VALUES
+      ('Chicken', 'Meat & Egg', 'kg', '🍗', 1),
+      ('Egg', 'Meat & Egg', 'pc', '🥚', 2),
+      ('Mushroom', 'Meat & Egg', 'kg', '🍄', 3),
+      ('Onion', 'Vegetables', 'kg', '🧅', 10),
+      ('Potato', 'Vegetables', 'kg', '🥔', 11),
+      ('Ginger', 'Vegetables', 'kg', '🫚', 12),
+      ('Garlic', 'Vegetables', 'kg', '🧄', 13),
+      ('Green Chili', 'Vegetables', 'kg', '🌶️', 14),
+      ('Carrot', 'Vegetables', 'kg', '🥕', 15),
+      ('Cabbage', 'Vegetables', 'pc', '🥬', 16),
+      ('Tomato', 'Vegetables', 'kg', '🍅', 17),
+      ('Cucumber', 'Vegetables', 'kg', '🥒', 18),
+      ('Eggplant', 'Vegetables', 'kg', '🍆', 19),
+      ('Lemon', 'Vegetables', 'pc', '🍋', 20),
+      ('Spring Onion', 'Vegetables', 'kg', '🌱', 21),
+      ('Capsicum', 'Vegetables', 'kg', '🫑', 22),
+      ('Dried Chili', 'Raw Spices', 'kg', '🌶️', 30),
+      ('Turmeric', 'Raw Spices', 'kg', '🟡', 31),
+      ('Cumin', 'Raw Spices', 'kg', '⚫', 32),
+      ('Coriander Seed', 'Raw Spices', 'kg', '🌿', 33),
+      ('Bay Leaf', 'Raw Spices', 'pack', '🍃', 34),
+      ('Cardamom', 'Raw Spices', 'kg', '⚪', 35),
+      ('Cinnamon', 'Raw Spices', 'kg', '🟤', 36),
+      ('Chili Powder', 'Raw Spices', 'kg', '🌶️', 37),
+      ('Garam Masala', 'Raw Spices', 'kg', '🧂', 38),
+      ('Curry Powder', 'Raw Spices', 'kg', '🧂', 39),
+      ('Ginger-Garlic Paste', 'Processed Spices & Sauces', 'kg', '🥣', 40),
+      ('Soy Sauce', 'Processed Spices & Sauces', 'litre', '🍶', 41),
+      ('Chili Sauce', 'Processed Spices & Sauces', 'litre', '🌶️', 42),
+      ('Vinegar', 'Processed Spices & Sauces', 'litre', '🍶', 43),
+      ('Cooking Oil', 'Cooking Essentials', 'litre', '🛢️', 50),
+      ('Salt', 'Cooking Essentials', 'kg', '🧂', 51),
+      ('Sugar', 'Cooking Essentials', 'kg', '🍚', 52),
+      ('Milk', 'Cooking Essentials', 'litre', '🥛', 53),
+      ('Butter', 'Cooking Essentials', 'kg', '🧈', 54),
+      ('Rice', 'Cooking Essentials', 'kg', '🍚', 55),
+      ('Flour', 'Cooking Essentials', 'kg', '🌾', 56),
+      ('Cheese', 'Cooking Essentials', 'kg', '🧀', 57),
+      ('Soup Bowl', 'Packaging', 'pc', '🥣', 60),
+      ('Parcel Box', 'Packaging', 'pc', '📦', 61),
+      ('Poly Bag', 'Packaging', 'pack', '🛍️', 62),
+      ('Foil Paper', 'Packaging', 'roll', '📜', 63),
+      ('Napkin / Tissue', 'Packaging', 'pack', '🧻', 64),
+      ('Plate & Spoon', 'Packaging', 'pack', '🍽️', 65),
+      ('Auto Fare', 'Other', 'trip', '🛺', 70),
+      ('Chef Breakfast', 'Other', 'day', '🍳', 71),
+      ('Cold Drink', 'Other', 'pc', '🥤', 72)
+    ON CONFLICT (name) DO NOTHING;
+  END IF;
+END $$;
