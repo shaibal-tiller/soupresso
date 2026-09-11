@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { parseLocaleNumber, formatNumber } from '@/lib/numerals';
 import { useLang } from './LangProvider';
 
@@ -23,6 +23,7 @@ export default function NumberInput({
 }) {
   const { lang } = useLang();
   const [text, setText] = useState(() => seed(value));
+  const inputRef = useRef(null);
 
   // Re-seed local text only when the incoming value differs from what the
   // field already represents — i.e. a genuine external change (day switch,
@@ -35,6 +36,17 @@ export default function NumberInput({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
+
+  // Reformat to the new language's digit script when the language toggles
+  // while this field isn't focused (a focused field is left alone so we
+  // never fight the user's own typing).
+  useEffect(() => {
+    const parsedNow = parseLocaleNumber(text);
+    if (parsedNow != null && document.activeElement !== inputRef.current) {
+      setText(formatNumber(parsedNow, lang));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const parsed = parseLocaleNumber(text);
   const invalid = text.trim() !== '' && (parsed == null || (min != null && parsed < Number(min)));
@@ -52,6 +64,7 @@ export default function NumberInput({
   return (
     <input
       {...rest}
+      ref={inputRef}
       id={id}
       type="text"
       inputMode="decimal"

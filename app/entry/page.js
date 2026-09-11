@@ -407,10 +407,10 @@ export default function EntryPage() {
               <h3>{isOffDay ? t('Mark as off day?') : hadExistingEntry ? t('Update this entry?') : t('Save this entry?')}</h3>
               <p>
                 {isOffDay
-                  ? <>{dateDisplay(date)} — {t('This day will be marked as an off day — no sales recorded.')}</>
+                  ? dateDisplay(date)
                   : hadExistingEntry
-                  ? <>{t('Update this entry?')} — {dateDisplay(date)}</>
-                  : <>{t('Save this entry?')} — {dateDisplay(date)}</>
+                  ? <>{t('Previous version will be kept in the audit log.')} — {dateDisplay(date)}</>
+                  : dateDisplay(date)
                 }
               </p>
               {!isOffDay && (

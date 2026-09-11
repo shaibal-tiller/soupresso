@@ -140,7 +140,7 @@ export default function ProductsPage() {
             {items.length > 0 && (
               <>
                 <div className="kpi-row" style={{ marginTop: 12 }}>
-                  <div className="kpi"><div className="kpi-label">{t('Total units sold')}</div><div className="kpi-value">{num(totalUnits)}</div></div>
+                  <div className="kpi"><div className="kpi-label">{t('Total units sold')}</div><div className="kpi-value">{digits(String(totalUnits))}</div></div>
                   <div className="kpi"><div className="kpi-label">{t('Menu value')}</div><div className="kpi-value">৳{num(totalValue)}</div></div>
                 </div>
                 {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}

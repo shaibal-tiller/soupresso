@@ -71,7 +71,7 @@ export default function DashboardPage() {
         <div className="kpi"><div className="kpi-label">{t('Avg daily')}</div><div className="kpi-value">{taka(s.avgDailySales)}</div></div>
         <div className="kpi"><div className="kpi-label">{t('Total expense')}</div><div className="kpi-value r">{taka(s.totalExpense)}</div></div>
         <div className="kpi"><div className="kpi-label">{t('Taken home')}</div><div className={`kpi-value ${Number(s.totalTakeHome) >= 0 ? 'g' : 'r'}`}>{taka(s.totalTakeHome)}</div></div>
-        <div className="kpi"><div className="kpi-label">{t('Days recorded')}</div><div className="kpi-value">{num(s.daysRecorded || 0)}</div></div>
+        <div className="kpi"><div className="kpi-label">{t('Days recorded')}</div><div className="kpi-value">{digits(String(s.daysRecorded || 0))}</div></div>
         <div className="kpi">
           <div className="kpi-label">{t('Best day')}</div>
           <div className="kpi-value g" style={{ fontSize: 16 }}>
