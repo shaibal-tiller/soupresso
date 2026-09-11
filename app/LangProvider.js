@@ -3,7 +3,7 @@
 import { createContext, useContext, useCallback, useEffect, useState } from 'react';
 import { translate, LANGS, DEFAULT_LANG, LANG_STORAGE_KEY } from '@/lib/i18n';
 import { formatTaka, formatNumber, toLocaleDigits } from '@/lib/numerals';
-import { formatDateLong, formatDateDisplay, formatDateNice } from '@/lib/dates';
+import { formatDateLong, formatDateDisplay, formatDateNice, formatDateShort } from '@/lib/dates';
 
 const LangContext = createContext(null);
 
@@ -46,6 +46,7 @@ export default function LangProvider({ children }) {
     dateLong: useCallback((d) => formatDateLong(d, lang), [lang]),
     dateDisplay: useCallback((d) => formatDateDisplay(d, lang), [lang]),
     dateNice: useCallback((d) => formatDateNice(d, lang), [lang]),
+    dateShort: useCallback((d, opts) => formatDateShort(d, lang, opts), [lang]),
   };
 
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>;

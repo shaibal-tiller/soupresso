@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../AppShell';
-import { todayStr, shiftDateStr, formatDateDisplay } from '@/lib/dates';
+import { todayStr, shiftDateStr } from '@/lib/dates';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
 
 export default function ProductsPage() {
-  const { t, num, digits } = useLang();
+  const { t, num, digits, dateDisplay } = useLang();
   const [tab, setTab] = useState('sales'); // 'sales' | 'menu'
   const [date, setDate] = useState(todayStr());
   const [items, setItems] = useState([]);
@@ -104,7 +104,7 @@ export default function ProductsPage() {
         <>
           <div className="day-nav">
             <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
-            <div className="date-display">{formatDateDisplay(date)}</div>
+            <div className="date-display">{dateDisplay(date)}</div>
             <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
           </div>
 

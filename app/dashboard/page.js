@@ -19,7 +19,7 @@ const VIEWS = [
 ];
 
 export default function DashboardPage() {
-  const { t, taka, num, digits } = useLang();
+  const { t, taka, num, digits, dateShort } = useLang();
   const [range, setRange] = useState('month');
   const [view, setView] = useState('daily');
   const [data, setData] = useState(null);
@@ -40,10 +40,7 @@ export default function DashboardPage() {
   const maxSale = chartData?.length ? Math.max(...chartData.map((r) => Number(r.total_sales)), 1) : 1;
 
   function chartLabel(row) {
-    if (view === 'weekly') {
-      const d = new Date(row.week_start);
-      return digits(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-    }
+    if (view === 'weekly') return dateShort(row.week_start);
     if (view === 'monthly') return digits(row.month);
     const d = new Date(row.entry_date);
     return num(d.getDate());
@@ -52,7 +49,7 @@ export default function DashboardPage() {
   function chartTooltip(row) {
     // Native `title` attribute — left English structure; low priority.
     const sales = taka(row.total_sales);
-    if (view === 'weekly') return `Week of ${new Date(row.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${sales} (${row.days_count}d)`;
+    if (view === 'weekly') return `Week of ${dateShort(row.week_start)}: ${sales} (${row.days_count}d)`;
     if (view === 'monthly') return `${row.month}: ${sales} (${row.days_count}d)`;
     return `${row.entry_date}: ${sales}`;
   }
@@ -80,7 +77,7 @@ export default function DashboardPage() {
           <div className="kpi-value g" style={{ fontSize: 16 }}>
             {s.bestDay ? taka(s.bestDay.total_sales) : '—'}
           </div>
-          {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{digits(new Date(s.bestDay.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}</div>}
+          {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{dateShort(s.bestDay.entry_date)}</div>}
         </div>
       </div>
 
@@ -90,7 +87,7 @@ export default function DashboardPage() {
           <div>
             <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{t('Last recorded')}</div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>
-              {digits(new Date(data.mostRecent.entry_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))}
+              {dateShort(data.mostRecent.entry_date, { weekday: 'short' })}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -157,7 +154,7 @@ export default function DashboardPage() {
             </thead>
             <tbody>
               {chartData.map((r, i) => {
-                const label = view === 'weekly' ? digits(new Date(r.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : digits(r.month);
+                const label = view === 'weekly' ? dateShort(r.week_start) : digits(r.month);
                 return (
                   <tr key={i}>
                     <td style={{ color: 'var(--text)', fontWeight: 500, fontFamily: 'var(--sans)' }}>{label}</td>
