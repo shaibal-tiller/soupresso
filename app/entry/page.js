@@ -13,6 +13,12 @@ function emptyDenoms() {
 
 const TOTAL_STEPS = 5;
 
+const HISHAB_CLOSERS = [
+  'Ashraful', 'Shagor', 'Shaibal', 'Sadman', 'Arman (Josh)', 'Arman Mahmud',
+  'Himel', 'Hridoy', 'Zamil', 'Ezaz', 'Shakil', 'Limon', 'Nazmul Rabbi',
+  'Supto', 'Chef (Sujit)',
+];
+
 export default function EntryPage() {
   const { t, taka, num, digits, dateNice, dateDisplay } = useLang();
   const [date, setDate] = useState(todayStr());
@@ -27,6 +33,7 @@ export default function EntryPage() {
   const [nextBazarAdvance, setNextBazarAdvance] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
   const [notes, setNotes] = useState('');
+  const [closedBy, setClosedBy] = useState([]);
   const [isOffDay, setIsOffDay] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -67,6 +74,7 @@ export default function EntryPage() {
         setNextBazarAdvance(Number(e.next_bazar_advance));
         setNextBhangti(Number(e.next_bhangti));
         setNotes(e.notes || '');
+        setClosedBy(e.closed_by || []);
       } else {
         setHadExistingEntry(false);
         setMode('denom');
@@ -76,6 +84,7 @@ export default function EntryPage() {
         setNextBazarAdvance(0);
         setNextBhangti(0);
         setNotes('');
+        setClosedBy([]);
         if (data.carryForward) {
           setOpeningBhangti(data.carryForward.openingBhangti);
           setBazarAdvanceReceived(data.carryForward.bazarAdvanceReceived);
@@ -132,6 +141,7 @@ export default function EntryPage() {
           nextBazarAdvance: isOffDay ? 0 : (Number(nextBazarAdvance) || 0),
           nextBhangti: isOffDay ? 0 : (Number(nextBhangti) || 0),
           notes: isOffDay ? (notes || 'Shop closed') : notes,
+          closedBy: isOffDay ? [] : closedBy,
         }),
       });
       const data = await res.json();
@@ -387,6 +397,21 @@ export default function EntryPage() {
                   </div>
                 )}
                 <div className="field" style={{ marginTop: 12 }}>
+                  <label>{t("Who's closing today?")}</label>
+                  <div className="chip-select">
+                    {HISHAB_CLOSERS.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className={closedBy.includes(name) ? 'on' : ''}
+                        onClick={() => setClosedBy((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name])}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
                   <label>{t('Notes (optional)')}</label>
                   <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Anything to remember')} />
                 </div>

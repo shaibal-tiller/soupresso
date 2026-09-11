@@ -83,11 +83,14 @@ export async function POST(request) {
     nextBhangti,
     notes,
     isOffDay,
+    closedBy,
   } = body || {};
 
   if (!entryDate || !/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
     return NextResponse.json({ error: 'entryDate (YYYY-MM-DD) is required' }, { status: 400 });
   }
+
+  const closedByArr = Array.isArray(closedBy) ? closedBy.filter((n) => typeof n === 'string') : [];
 
   const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, nextBazarAdvance, nextBhangti };
   for (const [key, val] of Object.entries(nums)) {
@@ -123,8 +126,8 @@ export async function POST(request) {
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
          bazar_advance_received, bazar_actual_cost, next_bazar_advance, next_bhangti,
-         total_sales, bazar_variance, cash_taken_home, is_off_day, notes, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())
+         total_sales, bazar_variance, cash_taken_home, is_off_day, notes, closed_by, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -138,6 +141,7 @@ export async function POST(request) {
          cash_taken_home = EXCLUDED.cash_taken_home,
          is_off_day = EXCLUDED.is_off_day,
          notes = EXCLUDED.notes,
+         closed_by = EXCLUDED.closed_by,
          updated_at = now()
        RETURNING *`,
       [
@@ -154,6 +158,7 @@ export async function POST(request) {
         summary.cashTakenHome,
         !!isOffDay,
         notes || null,
+        closedByArr,
       ]
     );
     return NextResponse.json({ entry: rows[0] });
