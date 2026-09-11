@@ -128,12 +128,15 @@ scripts/init-db.js — one-time setup script (runs schema.sql against DATABASE_U
 ## The math, precisely
 
 - **Total Sales** = total counted in the box − opening bhangti (the float
-  kept from yesterday). Nothing else — not revenue, not profit.
+  kept from yesterday) + bazar variance (see below). The variance term keeps
+  a chef top-up or refund from inflating or deflating the reported figure.
+  Nothing else — not revenue, not profit.
 - **Bazar variance** = actual bazar cost − bazar advance received. Positive
   means the chef needs more money; negative means the chef returns the
   difference.
-- **Cash taken home** = total counted − bazar variance − tomorrow's bazar
-  advance − tomorrow's bhangti.
+- **Cash taken home** = total counted − tomorrow's bazar advance − tomorrow's
+  bhangti. (It does not subtract bazar variance again — total counted already
+  reflects however that settlement happened.)
 
 This logic lives in one place (`lib/cash-math.js`) and is unit-tested by the
 project's test scripts before every change.
