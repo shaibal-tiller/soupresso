@@ -77,3 +77,20 @@ ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS is_off_day BOOLEAN NOT NULL D
 
 -- If your database already has daily_entries without closed_by, run this:
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS closed_by TEXT[] NOT NULL DEFAULT '{}';
+
+-- Startup capital / investment expenses (deliverable 5 — data entry only, no
+-- return/ROI analysis yet). category is free text, not an enum; the
+-- Investments page derives its filter options from whatever is actually in
+-- the table rather than a hardcoded list.
+CREATE TABLE IF NOT EXISTS investments (
+  id           SERIAL PRIMARY KEY,
+  spent_on     DATE NOT NULL,
+  category     TEXT NOT NULL,
+  description  TEXT NOT NULL,
+  amount       NUMERIC(12,2) NOT NULL,
+  notes        TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_investments_date ON investments (spent_on DESC);

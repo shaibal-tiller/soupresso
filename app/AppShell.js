@@ -9,6 +9,7 @@ const TABS = [
   { href: '/history', label: 'Receipts' },
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/products', label: 'Products' },
+  { href: '/investments', label: 'Investments' },
 ];
 
 export default function AppShell({ children }) {
