@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query, getPool } from '@/lib/db';
+import { coerceLocaleNumber } from '@/lib/numerals';
 
 export const dynamic = 'force-dynamic'; // always hits the live database, never statically cached
 
@@ -57,7 +58,7 @@ export async function POST(request) {
         `INSERT INTO daily_product_sales (entry_date, item_id, quantity)
          VALUES ($1, $2, $3)
          ON CONFLICT (entry_date, item_id) DO UPDATE SET quantity = EXCLUDED.quantity`,
-        [date, itemId, Math.max(0, Number(quantity) || 0)]
+        [date, itemId, Math.max(0, coerceLocaleNumber(quantity) ?? 0)]
       );
     }
     await client.query('COMMIT');

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { computeCashSummary } from '@/lib/cash-math';
+import { coerceLocaleNumber } from '@/lib/numerals';
 
 export const dynamic = 'force-dynamic'; // always hits the live database, never statically cached
 
@@ -90,18 +91,18 @@ export async function POST(request) {
 
   const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, nextBazarAdvance, nextBhangti };
   for (const [key, val] of Object.entries(nums)) {
-    if (val !== undefined && val !== null && isNaN(Number(val))) {
+    if (coerceLocaleNumber(val) == null && val !== '' && val != null) {
       return NextResponse.json({ error: `${key} must be a number` }, { status: 400 });
     }
   }
 
   const summary = computeCashSummary({
-    totalCounted: Number(totalCounted) || 0,
-    openingBhangti: Number(openingBhangti) || 0,
-    bazarAdvanceReceived: Number(bazarAdvanceReceived) || 0,
-    bazarActualCost: Number(bazarActualCost) || 0,
-    nextBazarAdvance: Number(nextBazarAdvance) || 0,
-    nextBhangti: Number(nextBhangti) || 0,
+    totalCounted: coerceLocaleNumber(totalCounted) ?? 0,
+    openingBhangti: coerceLocaleNumber(openingBhangti) ?? 0,
+    bazarAdvanceReceived: coerceLocaleNumber(bazarAdvanceReceived) ?? 0,
+    bazarActualCost: coerceLocaleNumber(bazarActualCost) ?? 0,
+    nextBazarAdvance: coerceLocaleNumber(nextBazarAdvance) ?? 0,
+    nextBhangti: coerceLocaleNumber(nextBhangti) ?? 0,
   });
 
   try {
@@ -142,12 +143,12 @@ export async function POST(request) {
       [
         entryDate,
         denominations ? JSON.stringify(denominations) : null,
-        Number(totalCounted) || 0,
-        Number(openingBhangti) || 0,
-        Number(bazarAdvanceReceived) || 0,
-        Number(bazarActualCost) || 0,
-        Number(nextBazarAdvance) || 0,
-        Number(nextBhangti) || 0,
+        coerceLocaleNumber(totalCounted) ?? 0,
+        coerceLocaleNumber(openingBhangti) ?? 0,
+        coerceLocaleNumber(bazarAdvanceReceived) ?? 0,
+        coerceLocaleNumber(bazarActualCost) ?? 0,
+        coerceLocaleNumber(nextBazarAdvance) ?? 0,
+        coerceLocaleNumber(nextBhangti) ?? 0,
         summary.totalSales,
         summary.bazarVariance,
         summary.cashTakenHome,
