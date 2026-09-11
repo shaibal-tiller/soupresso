@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AppShell from '../AppShell';
+import { useLang } from '../LangProvider';
 
 const RANGES = [
   { key: '7d', label: '7 days' },
@@ -18,6 +19,7 @@ const VIEWS = [
 ];
 
 export default function DashboardPage() {
+  const { t, taka, num, digits, dateDisplay } = useLang();
   const [range, setRange] = useState('month');
   const [view, setView] = useState('daily');
   const [data, setData] = useState(null);
@@ -31,9 +33,7 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [range]);
 
-  const fmt = (n) => `৳${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-
-  if (loading) return <AppShell><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div></AppShell>;
+  if (loading) return <AppShell><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div></AppShell>;
 
   const s = data?.summary || {};
   const chartData = view === 'weekly' ? data?.weekly : view === 'monthly' ? data?.monthly : data?.daily;
@@ -42,15 +42,16 @@ export default function DashboardPage() {
   function chartLabel(row) {
     if (view === 'weekly') {
       const d = new Date(row.week_start);
-      return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      return digits(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     }
-    if (view === 'monthly') return row.month;
+    if (view === 'monthly') return digits(row.month);
     const d = new Date(row.entry_date);
-    return d.getDate();
+    return num(d.getDate());
   }
 
   function chartTooltip(row) {
-    const sales = fmt(row.total_sales);
+    // Native `title` attribute — left English structure; low priority.
+    const sales = taka(row.total_sales);
     if (view === 'weekly') return `Week of ${new Date(row.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${sales} (${row.days_count}d)`;
     if (view === 'monthly') return `${row.month}: ${sales} (${row.days_count}d)`;
     return `${row.entry_date}: ${sales}`;
@@ -62,24 +63,24 @@ export default function DashboardPage() {
       <div className="toggle-row" style={{ marginBottom: 6 }}>
         {RANGES.map((r) => (
           <button key={r.key} className={range === r.key ? 'on' : ''} onClick={() => setRange(r.key)} style={{ fontSize: 12, padding: '7px 10px' }}>
-            {r.label}
+            {t(r.label)}
           </button>
         ))}
       </div>
 
       {/* KPIs */}
       <div className="kpi-row">
-        <div className="kpi"><div className="kpi-label">Total sales</div><div className="kpi-value">{fmt(s.totalSales)}</div></div>
-        <div className="kpi"><div className="kpi-label">Avg daily</div><div className="kpi-value">{fmt(s.avgDailySales)}</div></div>
-        <div className="kpi"><div className="kpi-label">Total expense</div><div className="kpi-value r">{fmt(s.totalExpense)}</div></div>
-        <div className="kpi"><div className="kpi-label">Taken home</div><div className={`kpi-value ${Number(s.totalTakeHome) >= 0 ? 'g' : 'r'}`}>{fmt(s.totalTakeHome)}</div></div>
-        <div className="kpi"><div className="kpi-label">Days recorded</div><div className="kpi-value">{s.daysRecorded || 0}</div></div>
+        <div className="kpi"><div className="kpi-label">{t('Total sales')}</div><div className="kpi-value">{taka(s.totalSales)}</div></div>
+        <div className="kpi"><div className="kpi-label">{t('Avg daily')}</div><div className="kpi-value">{taka(s.avgDailySales)}</div></div>
+        <div className="kpi"><div className="kpi-label">{t('Total expense')}</div><div className="kpi-value r">{taka(s.totalExpense)}</div></div>
+        <div className="kpi"><div className="kpi-label">{t('Taken home')}</div><div className={`kpi-value ${Number(s.totalTakeHome) >= 0 ? 'g' : 'r'}`}>{taka(s.totalTakeHome)}</div></div>
+        <div className="kpi"><div className="kpi-label">{t('Days recorded')}</div><div className="kpi-value">{num(s.daysRecorded || 0)}</div></div>
         <div className="kpi">
-          <div className="kpi-label">Best day</div>
+          <div className="kpi-label">{t('Best day')}</div>
           <div className="kpi-value g" style={{ fontSize: 16 }}>
-            {s.bestDay ? fmt(s.bestDay.total_sales) : '—'}
+            {s.bestDay ? taka(s.bestDay.total_sales) : '—'}
           </div>
-          {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{new Date(s.bestDay.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>}
+          {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{dateDisplay(String(s.bestDay.entry_date).slice(0, 10))}</div>}
         </div>
       </div>
 
@@ -87,14 +88,14 @@ export default function DashboardPage() {
       {data?.mostRecent && (
         <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Last recorded</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{t('Last recorded')}</div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>
-              {new Date(data.mostRecent.entry_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              {dateDisplay(String(data.mostRecent.entry_date).slice(0, 10))}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--display)', color: 'var(--brand-green)' }}>{fmt(data.mostRecent.total_sales)}</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>sales</div>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--display)', color: 'var(--brand-green)' }}>{taka(data.mostRecent.total_sales)}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t('sales')}</div>
           </div>
         </div>
       )}
@@ -102,7 +103,7 @@ export default function DashboardPage() {
       {/* Chart with view toggle */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div className="card-title" style={{ margin: 0 }}>Sales — {data?.range}</div>
+          <div className="card-title" style={{ margin: 0 }}>{t('Sales')} — {t(data?.range || '')}</div>
           <div style={{ display: 'flex', gap: 4 }}>
             {VIEWS.map((v) => (
               <button key={v.key}
@@ -112,7 +113,7 @@ export default function DashboardPage() {
                   background: view === v.key ? 'var(--brand-green)' : 'var(--bg)',
                   color: view === v.key ? '#fff' : 'var(--text3)', fontWeight: 600, cursor: 'pointer',
                 }}>
-                {v.label}
+                {t(v.label)}
               </button>
             ))}
           </div>
@@ -126,7 +127,7 @@ export default function DashboardPage() {
               return (
                 <div key={i} style={{ flex: 1, textAlign: 'center', minWidth: 0 }} title={chartTooltip(r)}>
                   <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {fmt(val)}
+                    {taka(val)}
                   </div>
                   <div style={{ height: barH, background: 'var(--brand-green)', borderRadius: '4px 4px 0 0', margin: '0 auto', maxWidth: view === 'daily' ? 20 : 40 }} />
                   <div style={{ fontSize: view === 'daily' ? 9 : 10, color: 'var(--text3)', marginTop: 3, fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -137,7 +138,7 @@ export default function DashboardPage() {
             })}
           </div>
         ) : (
-          <p style={{ color: 'var(--text2)', fontSize: 13, textAlign: 'center', padding: 20 }}>No data for this range yet.</p>
+          <p style={{ color: 'var(--text2)', fontSize: 13, textAlign: 'center', padding: 20 }}>{t('No data for this range yet.')}</p>
         )}
       </div>
 
@@ -147,24 +148,23 @@ export default function DashboardPage() {
           <table className="receipt-table" style={{ fontSize: 12.5 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>{view === 'weekly' ? 'Week' : 'Month'}</td>
-                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>Days</td>
-                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>Sales</td>
-                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>Expense</td>
-                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>Net</td>
+                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>{view === 'weekly' ? t('Week') : t('Month')}</td>
+                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>{t('Days')}</td>
+                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>{t('Sales')}</td>
+                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>{t('Expense')}</td>
+                <td style={{ fontWeight: 700, color: 'var(--text2)', fontSize: 10, textTransform: 'uppercase' }}>{t('Net')}</td>
               </tr>
             </thead>
             <tbody>
               {chartData.map((r, i) => {
-                const label = view === 'weekly' ? new Date(r.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : r.month;
-                const net = Number(r.total_take_home || r.total_sales) - Number(r.total_expense || 0);
+                const label = view === 'weekly' ? digits(new Date(r.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : digits(r.month);
                 return (
                   <tr key={i}>
                     <td style={{ color: 'var(--text)', fontWeight: 500, fontFamily: 'var(--sans)' }}>{label}</td>
-                    <td>{r.days_count}</td>
-                    <td style={{ color: 'var(--brand-green)' }}>{fmt(r.total_sales)}</td>
-                    <td style={{ color: 'var(--red)' }}>{fmt(r.total_expense)}</td>
-                    <td style={{ color: Number(r.total_take_home) >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmt(r.total_take_home)}</td>
+                    <td>{num(r.days_count)}</td>
+                    <td style={{ color: 'var(--brand-green)' }}>{taka(r.total_sales)}</td>
+                    <td style={{ color: 'var(--red)' }}>{taka(r.total_expense)}</td>
+                    <td style={{ color: Number(r.total_take_home) >= 0 ? 'var(--green)' : 'var(--red)' }}>{taka(r.total_take_home)}</td>
                   </tr>
                 );
               })}
