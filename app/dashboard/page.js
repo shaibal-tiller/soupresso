@@ -19,7 +19,7 @@ const VIEWS = [
 ];
 
 export default function DashboardPage() {
-  const { t, taka, num, digits, dateDisplay } = useLang();
+  const { t, taka, num, digits } = useLang();
   const [range, setRange] = useState('month');
   const [view, setView] = useState('daily');
   const [data, setData] = useState(null);
@@ -80,7 +80,7 @@ export default function DashboardPage() {
           <div className="kpi-value g" style={{ fontSize: 16 }}>
             {s.bestDay ? taka(s.bestDay.total_sales) : '—'}
           </div>
-          {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{dateDisplay(String(s.bestDay.entry_date).slice(0, 10))}</div>}
+          {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{digits(new Date(s.bestDay.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}</div>}
         </div>
       </div>
 
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           <div>
             <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{t('Last recorded')}</div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>
-              {dateDisplay(String(data.mostRecent.entry_date).slice(0, 10))}
+              {digits(new Date(data.mostRecent.entry_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
