@@ -144,7 +144,7 @@ export default function EntryPage() {
     }
   }
 
-  const stepLabels = ['Count box', 'Sales', 'Bazar', 'Tomorrow', 'Review'];
+  const stepLabels = ['Count box', 'Bazar', 'Sales', 'Tomorrow', 'Review'];
 
   return (
     <AppShell>
@@ -290,7 +290,7 @@ export default function EntryPage() {
               </div>
             )}
 
-            {step === 1 && (
+            {step === 2 && (
               <div className="card">
                 <div className="card-title">{t("Today's total sales")}</div>
                 <p className="step-hint">{t('How much bhangti (loose change) was already in the box from yesterday?')}</p>
@@ -306,7 +306,7 @@ export default function EntryPage() {
               </div>
             )}
 
-            {step === 2 && (
+            {step === 1 && (
               <div className="card">
                 <div className="card-title">{t("Settle yesterday's bazar")}</div>
                 <div className="field">
