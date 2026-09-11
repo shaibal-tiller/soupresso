@@ -6,3 +6,5 @@ node_modules/
 *.log
 .DS_Store
 .superpowers/
+Dockerfile
+docker-compose.dev.yml
