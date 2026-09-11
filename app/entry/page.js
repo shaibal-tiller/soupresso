@@ -108,6 +108,12 @@ export default function EntryPage() {
     nextBhangti: Number(nextBhangti) || 0,
   });
 
+  const SMALL_NOTES = STANDARD_DENOMINATIONS.filter((d) => d <= 50); // 50,20,10,5,2,1
+  const suggestedBhangtiNotes = mode === 'denom'
+    ? SMALL_NOTES.filter((d) => (denoms[d] || 0) > 0).map((d) => ({ d, qty: denoms[d], subtotal: d * denoms[d] }))
+    : [];
+  const suggestedBhangtiTotal = suggestedBhangtiNotes.reduce((sum, n) => sum + n.subtotal, 0);
+
   async function handleSave() {
     setSaving(true);
     setMsg(null);
@@ -332,6 +338,24 @@ export default function EntryPage() {
             {step === 3 && (
               <div className="card">
                 <div className="card-title">{t('Set aside for tomorrow')}</div>
+                {mode === 'denom' && suggestedBhangtiNotes.length > 0 && (
+                  <div className="step-result" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--text2)' }}>{t('Suggested bhangti')}</div>
+                    {suggestedBhangtiNotes.map((n) => (
+                      <div key={n.d} className="calc-row" style={{ padding: '2px 0' }}>
+                        <span>{'৳'}{digits(String(n.d))} × {num(n.qty)}</span>
+                        <span>{taka(n.subtotal)}</span>
+                      </div>
+                    ))}
+                    <div className="calc-row result" style={{ padding: '6px 0' }}>
+                      <span>{t('Total')}</span>
+                      <span>{taka(suggestedBhangtiTotal)}</span>
+                    </div>
+                    <button type="button" className="btn secondary" onClick={() => setNextBhangti(suggestedBhangtiTotal)}>
+                      {t('Use this amount')}
+                    </button>
+                  </div>
+                )}
                 <div className="field">
                   <label>{t('Bazar advance to give chef now (৳)')}</label>
                   <NumberInput value={nextBazarAdvance} min={0} onValueChange={(n) => setNextBazarAdvance(n ?? '')} autoFocus />
