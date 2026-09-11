@@ -3,8 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../AppShell';
 import { todayStr, shiftDateStr, formatDateDisplay } from '@/lib/dates';
+import { useLang } from '../LangProvider';
+import NumberInput from '../NumberInput';
 
 export default function ProductsPage() {
+  const { t, num, digits } = useLang();
   const [tab, setTab] = useState('sales'); // 'sales' | 'menu'
   const [date, setDate] = useState(todayStr());
   const [items, setItems] = useState([]);
@@ -49,7 +52,7 @@ export default function ProductsPage() {
       }),
     });
     setSaving(false);
-    setMsg(res.ok ? { type: 'ok', text: 'Saved.' } : { type: 'err', text: 'Save failed.' });
+    setMsg(res.ok ? { type: 'ok', text: t('Saved.') } : { type: 'err', text: t('Save failed.') });
   }
 
   async function addMenuItem() {
@@ -93,8 +96,8 @@ export default function ProductsPage() {
   return (
     <AppShell>
       <div className="toggle-row">
-        <button className={tab === 'sales' ? 'on' : ''} onClick={() => setTab('sales')}>Daily quantities</button>
-        <button className={tab === 'menu' ? 'on' : ''} onClick={() => setTab('menu')}>Manage menu</button>
+        <button className={tab === 'sales' ? 'on' : ''} onClick={() => setTab('sales')}>{t('Daily quantities')}</button>
+        <button className={tab === 'menu' ? 'on' : ''} onClick={() => setTab('menu')}>{t('Manage menu')}</button>
       </div>
 
       {tab === 'sales' ? (
@@ -106,29 +109,29 @@ export default function ProductsPage() {
           </div>
 
           <div className="card">
-            <div className="card-title">How many sold today</div>
+            <div className="card-title">{t('How many sold today')}</div>
             {loading ? (
-              <p style={{ color: 'var(--text2)' }}>Loading…</p>
+              <p style={{ color: 'var(--text2)' }}>{t('Loading…')}</p>
             ) : items.length === 0 ? (
-              <p style={{ color: 'var(--text2)', fontSize: 13 }}>No menu items yet — add some under "Manage menu".</p>
+              <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No menu items yet — add some under "Manage menu".')}</p>
             ) : (
               <table className="denom-table">
-                <thead><tr><th>Item</th><th>Qty</th><th>Value</th></tr></thead>
+                <thead><tr><th>{t('Item')}</th><th>{t('Qty')}</th><th>{t('Value')}</th></tr></thead>
                 <tbody>
                   {items.map((item, idx) => (
                     <tr key={item.id}>
-                      <td>{item.name}<div style={{ fontSize: 11, color: 'var(--text3)' }}>৳{Number(item.price)}/unit</div></td>
+                      <td>{item.name}<div style={{ fontSize: 11, color: 'var(--text3)' }}>{'৳'}{digits(String(Number(item.price)))}{t('/unit')}</div></td>
                       <td>
-                        <input
-                          type="number" min="0" value={item.quantity}
-                          onChange={(e) => {
+                        <NumberInput
+                          value={item.quantity} min={0}
+                          onValueChange={(n) => {
                             const next = [...items];
-                            next[idx] = { ...item, quantity: Math.max(0, Number(e.target.value) || 0) };
+                            next[idx] = { ...item, quantity: Math.max(0, n ?? 0) };
                             setItems(next);
                           }}
                         />
                       </td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>৳{(item.quantity * Number(item.price)).toLocaleString()}</td>
+                      <td style={{ fontFamily: 'var(--mono)' }}>৳{num(item.quantity * Number(item.price))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -137,59 +140,59 @@ export default function ProductsPage() {
             {items.length > 0 && (
               <>
                 <div className="kpi-row" style={{ marginTop: 12 }}>
-                  <div className="kpi"><div className="kpi-label">Total units sold</div><div className="kpi-value">{totalUnits}</div></div>
-                  <div className="kpi"><div className="kpi-label">Menu value</div><div className="kpi-value">৳{totalValue.toLocaleString()}</div></div>
+                  <div className="kpi"><div className="kpi-label">{t('Total units sold')}</div><div className="kpi-value">{num(totalUnits)}</div></div>
+                  <div className="kpi"><div className="kpi-label">{t('Menu value')}</div><div className="kpi-value">৳{num(totalValue)}</div></div>
                 </div>
                 {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
-                <button className="btn block" onClick={saveSales} disabled={saving}>{saving ? 'Saving…' : 'Save quantities'}</button>
+                <button className="btn block" onClick={saveSales} disabled={saving}>{saving ? t('Saving…') : t('Save quantities')}</button>
               </>
             )}
           </div>
         </>
       ) : (
         <div className="card">
-          <div className="card-title">Menu items</div>
+          <div className="card-title">{t('Menu items')}</div>
           {loading ? (
-            <p style={{ color: 'var(--text2)' }}>Loading…</p>
+            <p style={{ color: 'var(--text2)' }}>{t('Loading…')}</p>
           ) : (
             <>
               <table className="denom-table">
-                <thead><tr><th>Item</th><th>Price (৳)</th><th>Active</th></tr></thead>
+                <thead><tr><th>{t('Item')}</th><th>{t('Price (৳)')}</th><th>{t('Active')}</th></tr></thead>
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id} style={{ opacity: item.active ? 1 : 0.5 }}>
                       <td>{item.name}</td>
                       <td>
-                        <input
-                          type="number" min="0" defaultValue={item.price}
+                        <NumberInput
+                          value={item.price} min={0} className=""
                           style={{ width: 80 }}
-                          onBlur={(e) => { if (Number(e.target.value) !== Number(item.price)) updatePrice(item, e.target.value); }}
+                          onValueChange={(n) => { if (n != null && n !== Number(item.price)) updatePrice(item, n); }}
                         />
                       </td>
                       <td>
                         <button className="btn secondary" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => toggleActive(item)}>
-                          {item.active ? 'Hide' : 'Show'}
+                          {item.active ? t('Hide') : t('Show')}
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>Edit a price and click away from the field to save it.</p>
+              <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>{t('Edit a price and click away from the field to save it.')}</p>
             </>
           )}
 
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-            <div className="card-title">Add a new item</div>
+            <div className="card-title">{t('Add a new item')}</div>
             <div className="field">
-              <label>Name</label>
-              <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Chicken Roll" />
+              <label>{t('Name')}</label>
+              <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('e.g. Chicken Roll')} />
             </div>
             <div className="field">
-              <label>Price (৳)</label>
-              <input type="number" min="0" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="e.g. 50" />
+              <label>{t('Price (৳)')}</label>
+              <NumberInput value={newPrice} min={0} placeholder={t('e.g. 50')} onValueChange={(n) => setNewPrice(n == null ? '' : String(n))} />
             </div>
-            <button className="btn block" onClick={addMenuItem} disabled={saving || !newName || !newPrice}>Add item</button>
+            <button className="btn block" onClick={addMenuItem} disabled={saving || !newName || !newPrice}>{t('Add item')}</button>
           </div>
         </div>
       )}
