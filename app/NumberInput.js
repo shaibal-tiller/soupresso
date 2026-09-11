@@ -12,6 +12,7 @@ function seed(value) {
 export default function NumberInput({
   value,
   onValueChange,
+  onBlur,
   placeholder,
   min,
   autoFocus,
@@ -45,6 +46,7 @@ export default function NumberInput({
 
   function handleBlur() {
     if (parsed != null) setText(formatNumber(parsed, lang));
+    if (onBlur) onBlur(parsed);
   }
 
   return (

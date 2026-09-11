@@ -166,7 +166,8 @@ export default function ProductsPage() {
                         <NumberInput
                           value={item.price} min={0} className=""
                           style={{ width: 80 }}
-                          onValueChange={(n) => { if (n != null && n !== Number(item.price)) updatePrice(item, n); }}
+                          onValueChange={() => {}}
+                          onBlur={(n) => { if (n != null && n !== Number(item.price)) updatePrice(item, n); }}
                         />
                       </td>
                       <td>
