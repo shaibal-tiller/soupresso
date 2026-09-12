@@ -37,7 +37,7 @@ function emptyDenoms() {
   return Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, 0]));
 }
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 const HISHAB_CLOSERS = [
   'Ashraful', 'Shagor', 'Shaibal', 'Sadman', 'Arman (Josh)', 'Arman Mahmud',
@@ -57,6 +57,7 @@ export default function EntryPage() {
   const [bazarAdvanceReceived, setBazarAdvanceReceived] = useState(0);
   const [bazarTakenFromBox, setBazarTakenFromBox] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
+  const [nextBhangtiMode, setNextBhangtiMode] = useState('denom'); // 'denom' | 'total' — independent of today's count mode
   const [bazarCatalog, setBazarCatalog] = useState([]);
   const [actualLines, setActualLines] = useState([]); // today's actual bazar, corrected from yesterday's plan
   const [actualBazarAdjustment, setActualBazarAdjustment] = useState(0);
@@ -125,9 +126,11 @@ export default function EntryPage() {
         setIsOffDay(!!e.is_off_day);
         if (e.denominations) {
           setMode('denom');
+          setNextBhangtiMode('denom');
           setDenoms({ ...emptyDenoms(), ...e.denominations });
         } else {
           setMode('total');
+          setNextBhangtiMode('total');
           setTotalDirect(String(e.total_counted));
         }
         setOpeningBhangti(Number(e.opening_bhangti));
@@ -147,6 +150,7 @@ export default function EntryPage() {
       } else {
         setHadExistingEntry(false);
         setMode('denom');
+        setNextBhangtiMode('denom');
         setDenoms(emptyDenoms());
         setTotalDirect('');
         setBazarTakenFromBox(0);
@@ -197,7 +201,7 @@ export default function EntryPage() {
     (sum, d) => sum + (bhangtiMarkedFor(d) ? d * bhangtiQtyFor(d) : 0),
     0
   );
-  const effectiveNextBhangti = mode === 'denom' ? nextBhangtiFromDenoms : (Number(nextBhangti) || 0);
+  const effectiveNextBhangti = nextBhangtiMode === 'denom' ? nextBhangtiFromDenoms : (Number(nextBhangti) || 0);
 
   // Bazar actual cost / next-day advance are each: sum of the item-card list
   // (see BazarItemPicker) plus a manual adjustment (can be negative) — the
@@ -332,7 +336,7 @@ export default function EntryPage() {
     }, 180);
   }
 
-  const stepLabels = ['Count box', 'Bazar', 'Sales', 'Tomorrow', 'Review'];
+  const stepLabels = ['Count box', 'Bazar', 'Sales', 'Bazar advance', 'Bhangti', 'Review'];
 
   return (
     <AppShell>
@@ -554,7 +558,7 @@ export default function EntryPage() {
 
             {step === 3 && (
               <div className="card">
-                <div className="card-title">{t('Set aside for tomorrow')}</div>
+                <div className="card-title">{t("Tomorrow's bazar advance")}</div>
                 <div className="field">
                   <label>{t('Bazar advance to give chef now (৳)')}</label>
                   <div className="toggle-row" style={{ marginBottom: 10 }}>
@@ -573,9 +577,19 @@ export default function EntryPage() {
                     <NumberInput value={nextSimpleAmount} min={0} onValueChange={(n) => setNextSimpleAmount(n ?? '')} placeholder={t('e.g. 2500')} />
                   )}
                 </div>
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="card">
+                <div className="card-title">{t('Set aside for tomorrow')}</div>
                 <div className="field">
                   <label>{t('Bhangti to keep in the box (৳)')}</label>
-                  {mode === 'denom' ? (
+                  <div className="toggle-row" style={{ marginBottom: 10 }}>
+                    <button className={nextBhangtiMode === 'denom' ? 'on' : ''} onClick={() => setNextBhangtiMode('denom')}>{t('By denomination')}</button>
+                    <button className={nextBhangtiMode === 'total' ? 'on' : ''} onClick={() => setNextBhangtiMode('total')}>{t('Enter total')}</button>
+                  </div>
+                  {nextBhangtiMode === 'denom' ? (
                     <>
                       <div className="denom-grid">
                         {STANDARD_DENOMINATIONS.map((d) => {
@@ -601,13 +615,13 @@ export default function EntryPage() {
                       <div className="step-result"><span>{t('Total')}</span><strong>{taka(nextBhangtiFromDenoms)}</strong></div>
                     </>
                   ) : (
-                    <NumberInput value={nextBhangti} min={0} onValueChange={(n) => setNextBhangti(n ?? '')} />
+                    <NumberInput value={nextBhangti} min={0} onValueChange={(n) => setNextBhangti(n ?? '')} placeholder={t('e.g. 2500')} />
                   )}
                 </div>
               </div>
             )}
 
-            {step === 4 && (
+            {step === 5 && (
               <div className="card">
                 <div className="card-title">{t('Review & save')}</div>
                 <div className="step-calc">
