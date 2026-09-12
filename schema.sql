@@ -147,31 +147,33 @@ BEGIN
   IF (SELECT COUNT(*) FROM bazar_items) = 0 THEN
     INSERT INTO bazar_items (name, name_bn, category, unit, icon, sort_order) VALUES
       ('Chicken', 'মুরগি', 'Meat & Egg', 'kg', '🍗', 1),
-      ('Egg', 'ডিম', 'Meat & Egg', 'pc', '🥚', 2),
+      ('Egg', 'ডিম', 'Meat & Egg', 'dozen', '🥚', 2),
       ('Mushroom', 'মাশরুম', 'Meat & Egg', 'kg', '🍄', 3),
       ('Onion', 'পেঁয়াজ', 'Vegetables', 'kg', '🧅', 10),
       ('Potato', 'আলু', 'Vegetables', 'kg', '🥔', 11),
       ('Ginger', 'আদা', 'Vegetables', 'kg', '🫚', 12),
       ('Garlic', 'রসুন', 'Vegetables', 'kg', '🧄', 13),
-      ('Green Chili', 'কাঁচা মরিচ', 'Vegetables', 'kg', '🌶️', 14),
+      ('Green Chili', 'কাঁচা মরিচ', 'Vegetables', '250g', '🌶️', 14),
       ('Carrot', 'গাজর', 'Vegetables', 'kg', '🥕', 15),
       ('Cabbage', 'বাঁধাকপি', 'Vegetables', 'pc', '🥬', 16),
       ('Tomato', 'টমেটো', 'Vegetables', 'kg', '🍅', 17),
       ('Cucumber', 'শসা', 'Vegetables', 'kg', '🥒', 18),
       ('Eggplant', 'বেগুন', 'Vegetables', 'kg', '🍆', 19),
-      ('Lemon', 'লেবু', 'Vegetables', 'pc', '🍋', 20),
+      ('Lemon', 'লেবু', 'Vegetables', 'hali', '🍋', 20),
       ('Spring Onion', 'পেঁয়াজ পাতা', 'Vegetables', 'kg', '🌱', 21),
       ('Capsicum', 'ক্যাপসিকাম', 'Vegetables', 'kg', '🫑', 22),
-      ('Dried Chili', 'শুকনা মরিচ', 'Raw Spices', 'kg', '🌶️', 30),
-      ('Turmeric', 'হলুদ', 'Raw Spices', 'kg', '🟡', 31),
-      ('Cumin', 'জিরা', 'Raw Spices', 'kg', '⚫', 32),
-      ('Coriander Seed', 'ধনে', 'Raw Spices', 'kg', '🌿', 33),
+      ('Coriander Leaves', 'ধনে পাতা', 'Vegetables', '250g', '🌿', 23),
+      ('Thai Leaves', 'থাই পাতা', 'Vegetables', '250g', '🌿', 24),
+      ('Dried Chili', 'শুকনা মরিচ', 'Raw Spices', 'gm', '🌶️', 30),
+      ('Turmeric', 'হলুদ', 'Raw Spices', 'gm', '🟡', 31),
+      ('Cumin', 'জিরা', 'Raw Spices', 'gm', '⚫', 32),
+      ('Coriander Seed', 'ধনে', 'Raw Spices', 'gm', '🌿', 33),
       ('Bay Leaf', 'তেজপাতা', 'Raw Spices', 'pack', '🍃', 34),
-      ('Cardamom', 'এলাচ', 'Raw Spices', 'kg', '⚪', 35),
-      ('Cinnamon', 'দারুচিনি', 'Raw Spices', 'kg', '🟤', 36),
-      ('Chili Powder', 'মরিচের গুঁড়া', 'Raw Spices', 'kg', '🌶️', 37),
-      ('Garam Masala', 'গরম মসলা', 'Raw Spices', 'kg', '🧂', 38),
-      ('Curry Powder', 'কারি পাউডার', 'Raw Spices', 'kg', '🧂', 39),
+      ('Cardamom', 'এলাচ', 'Raw Spices', 'gm', '⚪', 35),
+      ('Cinnamon', 'দারুচিনি', 'Raw Spices', 'gm', '🟤', 36),
+      ('Chili Powder', 'মরিচের গুঁড়া', 'Raw Spices', 'gm', '🌶️', 37),
+      ('Garam Masala', 'গরম মসলা', 'Raw Spices', 'gm', '🧂', 38),
+      ('Curry Powder', 'কারি পাউডার', 'Raw Spices', 'gm', '🧂', 39),
       ('Ginger-Garlic Paste', 'আদা-রসুন পেস্ট', 'Processed Spices & Sauces', 'kg', '🥣', 40),
       ('Soy Sauce', 'সয়া সস', 'Processed Spices & Sauces', 'litre', '🍶', 41),
       ('Chili Sauce', 'চিলি সস', 'Processed Spices & Sauces', 'litre', '🌶️', 42),
@@ -182,20 +184,58 @@ BEGIN
       ('Milk', 'দুধ', 'Cooking Essentials', 'litre', '🥛', 53),
       ('Butter', 'মাখন', 'Cooking Essentials', 'kg', '🧈', 54),
       ('Rice', 'চাল', 'Cooking Essentials', 'kg', '🍚', 55),
-      ('Flour', 'ময়দা', 'Cooking Essentials', 'kg', '🌾', 56),
+      ('AP Flour (Moyda)', 'ময়দা', 'Cooking Essentials', 'kg', '🌾', 56),
       ('Cheese', 'পনির', 'Cooking Essentials', 'kg', '🧀', 57),
+      ('Corn Flour', 'ভুট্টার আটা', 'Cooking Essentials', 'kg', '🌽', 58),
       ('Soup Bowl', 'স্যুপ বাটি', 'Packaging', 'pc', '🥣', 60),
       ('Parcel Box', 'পার্সেল বক্স', 'Packaging', 'pc', '📦', 61),
       ('Poly Bag', 'পলি ব্যাগ', 'Packaging', 'pack', '🛍️', 62),
       ('Foil Paper', 'ফয়েল পেপার', 'Packaging', 'roll', '📜', 63),
       ('Napkin / Tissue', 'ন্যাপকিন/টিস্যু', 'Packaging', 'pack', '🧻', 64),
       ('Plate & Spoon', 'প্লেট ও চামচ', 'Packaging', 'pack', '🍽️', 65),
+      ('Gloves', 'গ্লাভস', 'Packaging', 'pack', '🧤', 66),
+      ('Mask', 'মাস্ক', 'Packaging', 'pack', '😷', 67),
+      ('Hair Net', 'হেয়ার নেট', 'Packaging', 'pack', '🧢', 68),
+      ('Tissue Box', 'টিস্যু বক্স', 'Packaging', 'pc', '🧻', 69),
       ('Auto Fare', 'অটো ভাড়া', 'Other', 'trip', '🛺', 70),
-      ('Chef Breakfast', 'বাবুর্চির নাস্তা', 'Other', 'day', '🍳', 71),
-      ('Cold Drink', 'কোল্ড ড্রিংক', 'Other', 'pc', '🥤', 72)
+      ('Cold Drink', 'কোল্ড ড্রিংক', 'Other', 'pc', '🥤', 72),
+      ('Chef Breakfast', 'বাবুর্চির নাস্তা', 'Staff & Home', 'day', '🍳', 80),
+      ('Salary', 'বেতন', 'Staff & Home', 'person', '💰', 81),
+      ('Home Utility', 'বাসার ইউটিলিটি বিল', 'Staff & Home', 'month', '💡', 82),
+      ('Home Essentials', 'বাসার প্রয়োজনীয় জিনিস', 'Staff & Home', 'trip', '🏠', 83),
+      ('Nasta (Snack)', 'নাস্তা', 'Staff & Home', 'day', '🍪', 84),
+      ('Lunch', 'দুপুরের খাবার', 'Staff & Home', 'day', '🍛', 85),
+      ('Dinner', 'রাতের খাবার', 'Staff & Home', 'day', '🍽️', 86)
     ON CONFLICT (name) DO NOTHING;
   END IF;
 END $$;
+
+-- Usability round (2026-09-12, round 4): unit/category fixes and new
+-- catalog items for a catalog that was already seeded before this list
+-- existed. Safe to always re-run — every statement below sets the same
+-- deterministic target value, and the INSERTs are ON CONFLICT DO NOTHING.
+INSERT INTO bazar_items (name, name_bn, category, unit, icon, sort_order) VALUES
+  ('Coriander Leaves', 'ধনে পাতা', 'Vegetables', '250g', '🌿', 23),
+  ('Thai Leaves', 'থাই পাতা', 'Vegetables', '250g', '🌿', 24),
+  ('Corn Flour', 'ভুট্টার আটা', 'Cooking Essentials', 'kg', '🌽', 58),
+  ('Gloves', 'গ্লাভস', 'Packaging', 'pack', '🧤', 66),
+  ('Mask', 'মাস্ক', 'Packaging', 'pack', '😷', 67),
+  ('Hair Net', 'হেয়ার নেট', 'Packaging', 'pack', '🧢', 68),
+  ('Tissue Box', 'টিস্যু বক্স', 'Packaging', 'pc', '🧻', 69),
+  ('Salary', 'বেতন', 'Staff & Home', 'person', '💰', 81),
+  ('Home Utility', 'বাসার ইউটিলিটি বিল', 'Staff & Home', 'month', '💡', 82),
+  ('Home Essentials', 'বাসার প্রয়োজনীয় জিনিস', 'Staff & Home', 'trip', '🏠', 83),
+  ('Nasta (Snack)', 'নাস্তা', 'Staff & Home', 'day', '🍪', 84),
+  ('Lunch', 'দুপুরের খাবার', 'Staff & Home', 'day', '🍛', 85),
+  ('Dinner', 'রাতের খাবার', 'Staff & Home', 'day', '🍽️', 86)
+ON CONFLICT (name) DO NOTHING;
+
+UPDATE bazar_items SET name = 'AP Flour (Moyda)' WHERE name = 'Flour';
+UPDATE bazar_items SET category = 'Staff & Home', sort_order = 80 WHERE name = 'Chef Breakfast';
+UPDATE bazar_items SET unit = 'dozen' WHERE name = 'Egg';
+UPDATE bazar_items SET unit = 'hali' WHERE name = 'Lemon';
+UPDATE bazar_items SET unit = '250g' WHERE name = 'Green Chili';
+UPDATE bazar_items SET unit = 'gm' WHERE category = 'Raw Spices' AND name != 'Bay Leaf';
 
 -- Backfill name_bn on a catalog seeded before it existed (safe to re-run —
 -- only fills rows that don't already have one).

@@ -572,6 +572,7 @@ export default function EntryPage() {
                       onLinesChange={setPlannedLines}
                       adjustment={nextBazarAdjustment}
                       onAdjustmentChange={setNextBazarAdjustment}
+                      totalEntryMode
                     />
                   ) : (
                     <NumberInput value={nextSimpleAmount} min={0} onValueChange={(n) => setNextSimpleAmount(n ?? '')} placeholder={t('e.g. 2500')} />

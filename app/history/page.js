@@ -152,6 +152,20 @@ export default function HistoryPage() {
             </>
           )}
 
+          {entry.closed_by && entry.closed_by.length > 0 && (
+            <>
+              <div className="receipt-divider dashed" />
+              <div className="receipt-closers">
+                <div className="receipt-closers-label">{t("Closed by")}</div>
+                <div className="receipt-closers-grid">
+                  {entry.closed_by.map((name) => (
+                    <span key={name} className="receipt-closers-name">{name}</span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="receipt-footer">
             <button className="btn secondary no-print" style={{ flex: 1 }} onClick={handleDownload} disabled={downloading}>
               {downloading ? t('Preparing…') : `⬇ ${t('Download')}`}

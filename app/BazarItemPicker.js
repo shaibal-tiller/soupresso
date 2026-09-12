@@ -8,13 +8,34 @@ function itemLabel(lang, name, nameBn) {
   return lang === 'bn' && nameBn ? nameBn : name;
 }
 
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+const CATEGORY_ICONS = {
+  'Meat & Egg': '🍗',
+  'Vegetables': '🥬',
+  'Raw Spices': '🌶️',
+  'Processed Spices & Sauces': '🍶',
+  'Cooking Essentials': '🛢️',
+  'Packaging': '📦',
+  'Staff & Home': '🧑‍🍳',
+  'Other': '🗂️',
+};
+
 // A tappable, category-filtered card picker for building one day's bazar
 // list — used both for tomorrow's planned shopping and for correcting
 // today's actual purchases. Fully controlled: the parent owns `lines` and
 // `adjustment`; this component only renders the picker UI and calls back.
 // Category browsing lives in a popup so the step itself stays short — only
 // the search box and the basket are always on the page.
-export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustment, onAdjustmentChange }) {
+//
+// `totalEntryMode`: when true, the bottom field asks for the final total
+// amount to give/pay instead of an adjustment delta, and the adjustment is
+// derived backwards (total − itemsTotal) — used for Tomorrow's bazar
+// advance, where the user knows the amount they're handing over, not the
+// difference from the item list.
+export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustment, onAdjustmentChange, totalEntryMode = false }) {
   const { t, lang, taka } = useLang();
   const [search, setSearch] = useState('');
   const [showBrowse, setShowBrowse] = useState(false);
@@ -69,6 +90,35 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     onLinesChange(lines.map((l) => (l.key === key ? { ...l, [field]: value } : l)));
   }
 
+  // Quantity and unit price are the two stored fields; total is a derived
+  // convenience the user can also type directly — whichever of unit price
+  // or total wasn't just edited gets recomputed so qty × price always
+  // equals the shown total.
+  function updateQuantity(line, n) {
+    const qty = n == null ? '' : n;
+    onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: qty === '' ? '' : String(qty) } : l)));
+  }
+
+  function updateUnitPrice(line, n) {
+    const unitPrice = n == null ? '' : n;
+    onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unitPrice: unitPrice === '' ? '' : String(unitPrice) } : l)));
+  }
+
+  function updateTotal(line, n) {
+    const total = n == null ? 0 : n;
+    const qty = Number(line.quantity) || 0;
+    if (qty > 0) {
+      onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unitPrice: String(round2(total / qty)) } : l)));
+    } else {
+      // No quantity yet — default to 1 so unit price stays meaningful.
+      onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: '1', unitPrice: String(round2(total)) } : l)));
+    }
+  }
+
+  function updateUnit(line, unit) {
+    onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unit } : l)));
+  }
+
   function removeLine(key) {
     onLinesChange(lines.filter((l) => l.key !== key));
   }
@@ -80,6 +130,11 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
 
   const itemsTotal = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
   const grandTotal = itemsTotal + (Number(adjustment) || 0);
+
+  function handleGrandTotalChange(n) {
+    const total = n == null ? 0 : n;
+    onAdjustmentChange(round2(total - itemsTotal));
+  }
 
   return (
     <div className="bazar-picker">
@@ -138,22 +193,38 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
               <div className="bazar-basket-main">
                 <div className="bazar-basket-name">
                   {itemLabel(lang, line.name, line.nameBn)}
-                  {line.unit && <span className="bazar-basket-unit">({line.unit})</span>}
                 </div>
                 <div className="bazar-basket-inputs">
                   <NumberInput
+                    className="bazar-basket-qty"
                     value={line.quantity}
                     min={0}
                     placeholder={t('Qty')}
-                    onValueChange={(n) => updateLine(line.key, 'quantity', n == null ? '' : String(n))}
+                    onValueChange={(n) => updateQuantity(line, n)}
                   />
+                  <input
+                    type="text"
+                    className="bazar-basket-unit-input"
+                    value={line.unit || ''}
+                    placeholder={t('unit')}
+                    onChange={(e) => updateUnit(line, e.target.value)}
+                  />
+                  <span className="bazar-basket-sign">×</span>
                   <NumberInput
+                    className="bazar-basket-price"
                     value={line.unitPrice}
                     min={0}
                     placeholder={t('Price')}
-                    onValueChange={(n) => updateLine(line.key, 'unitPrice', n == null ? '' : String(n))}
+                    onValueChange={(n) => updateUnitPrice(line, n)}
                   />
-                  <span className="bazar-basket-total">{taka((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0))}</span>
+                  <span className="bazar-basket-sign">=</span>
+                  <NumberInput
+                    className="bazar-basket-total-input"
+                    value={String(round2((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)))}
+                    min={0}
+                    placeholder={t('Total')}
+                    onValueChange={(n) => updateTotal(line, n)}
+                  />
                 </div>
               </div>
               <button type="button" className="bazar-basket-remove" onClick={() => removeLine(line.key)} aria-label={t('Remove')}>
@@ -167,11 +238,20 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
       <div className="step-calc" style={{ marginBottom: 10 }}>
         <div className="calc-row"><span>{t('Items total')}</span><span>{taka(itemsTotal)}</span></div>
       </div>
-      <div className="field">
-        <label>{t('Adjustment (+/-)')}</label>
-        <NumberInput value={adjustment} onValueChange={(n) => onAdjustmentChange(n ?? 0)} />
-      </div>
-      <div className="step-result"><span>{t('Total')}</span><strong>{taka(grandTotal)}</strong></div>
+      {totalEntryMode ? (
+        <div className="field">
+          <label>{t('Total advance given (৳)')}</label>
+          <NumberInput value={String(round2(grandTotal))} min={0} onValueChange={handleGrandTotalChange} />
+        </div>
+      ) : (
+        <>
+          <div className="field">
+            <label>{t('Adjustment (+/-)')}</label>
+            <NumberInput value={adjustment} onValueChange={(n) => onAdjustmentChange(n ?? 0)} />
+          </div>
+          <div className="step-result"><span>{t('Total')}</span><strong>{taka(grandTotal)}</strong></div>
+        </>
+      )}
 
       {showBrowse && (
         <div className="modal-overlay" onClick={() => setShowBrowse(false)}>
@@ -205,11 +285,12 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                 </div>
               </>
             ) : (
-              <div className="bazar-category-list">
+              <div className="bazar-item-grid bazar-item-grid-modal">
                 {categories.map((c) => (
-                  <button key={c} type="button" className="bazar-category-row" onClick={() => setActiveCategory(c)}>
-                    <span>{t(c)}</span>
-                    <span className="bazar-category-count">{catalog.filter((i) => i.category === c).length}</span>
+                  <button key={c} type="button" className="bazar-item-card bazar-category-card" onClick={() => setActiveCategory(c)}>
+                    <span className="bazar-item-icon">{CATEGORY_ICONS[c] || '🗂️'}</span>
+                    <span className="bazar-item-name">{t(c)}</span>
+                    <span className="bazar-item-unit">{catalog.filter((i) => i.category === c).length}</span>
                   </button>
                 ))}
               </div>

@@ -155,6 +155,11 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 }
 .note-icon { font-size: 15px; flex-shrink: 0; }
 
+.receipt-closers { padding: 4px 2px 0; }
+.receipt-closers-label { font-size: 10px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.receipt-closers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; }
+.receipt-closers-name { font-size: 11px; color: var(--text2); }
+
 .receipt-footer { display: flex; gap: 10px; margin-top: 18px; }
 
 @media print {
@@ -326,16 +331,19 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
   background: var(--bg); border-radius: 10px; padding: 8px 10px;
 }
 .bazar-basket-icon { font-size: 18px; flex-shrink: 0; }
-.bazar-basket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.bazar-basket-name { font-size: 12.5px; color: var(--text); min-width: 0; }
-.bazar-basket-unit { color: var(--text3); font-size: 11px; margin-left: 4px; }
-.bazar-basket-inputs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
+.bazar-basket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.bazar-basket-name { font-size: 13.5px; font-weight: 700; color: var(--text); min-width: 0; }
+.bazar-basket-inputs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .bazar-basket-inputs input {
-  width: 100%; padding: 5px 6px; font-size: 12.5px; text-align: center;
+  padding: 5px 5px; font-size: 12px; text-align: center;
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px;
   font-family: var(--mono); color: var(--text);
 }
-.bazar-basket-total { font-family: var(--mono); font-size: 12.5px; text-align: right; white-space: nowrap; min-width: 60px; }
+.bazar-basket-qty { width: 42px; }
+.bazar-basket-unit-input { width: 52px; font-family: var(--sans) !important; }
+.bazar-basket-price { width: 56px; }
+.bazar-basket-total-input { width: 60px; font-weight: 700; border-color: var(--border) !important; }
+.bazar-basket-sign { font-size: 12px; color: var(--text3); flex-shrink: 0; }
 .bazar-basket-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 4px; flex-shrink: 0; }
 
 /* ---- Bazar category-browse popup ---- */
@@ -353,14 +361,9 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
   cursor: pointer; padding: 0 0 12px; text-align: left; flex-shrink: 0;
 }
 .bazar-item-grid-modal { overflow-y: auto; padding-bottom: 4px; }
-.bazar-category-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
-.bazar-category-row {
-  display: flex; align-items: center; justify-content: space-between; width: 100%;
-  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 14px; font-size: 13.5px; font-weight: 600; color: var(--text); cursor: pointer;
-}
-.bazar-category-row:hover { border-color: var(--border2); }
-.bazar-category-count { font-family: var(--mono); font-size: 11.5px; color: var(--text3); font-weight: 500; }
+.bazar-category-card { padding: 16px 6px; }
+.bazar-category-card .bazar-item-icon { font-size: 26px; }
+.bazar-category-card .bazar-item-name { font-size: 12px; }
 
 /* ---- Step result / calculation blocks ---- */
 .step-result {
