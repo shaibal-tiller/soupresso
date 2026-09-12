@@ -331,19 +331,25 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
   background: var(--bg); border-radius: 10px; padding: 8px 10px;
 }
 .bazar-basket-icon { font-size: 18px; flex-shrink: 0; }
-.bazar-basket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.bazar-basket-name { font-size: 13.5px; font-weight: 700; color: var(--text); min-width: 0; }
-.bazar-basket-inputs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.bazar-basket-inputs input {
-  padding: 5px 5px; font-size: 12px; text-align: center;
-  background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px;
-  font-family: var(--mono); color: var(--text);
+.bazar-basket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.bazar-basket-name { font-size: 13px; font-weight: 700; color: var(--text); min-width: 0; }
+.bazar-basket-unit { color: var(--text3); font-size: 11px; font-weight: 500; margin-left: 4px; }
+.bazar-basket-unit-select {
+  margin-left: 4px; font-size: 10.5px; font-weight: 500; color: var(--text3);
+  background: none; border: none; padding: 0; font-family: var(--sans);
 }
-.bazar-basket-qty { width: 42px; }
-.bazar-basket-unit-input { width: 52px; font-family: var(--sans) !important; }
-.bazar-basket-price { width: 56px; }
-.bazar-basket-total-input { width: 60px; font-weight: 700; border-color: var(--border) !important; }
-.bazar-basket-sign { font-size: 12px; color: var(--text3); flex-shrink: 0; }
+.bazar-basket-inputs { display: flex; align-items: baseline; gap: 5px; }
+.bazar-basket-qty, .bazar-basket-price {
+  width: 38px; padding: 3px 2px; font-size: 11.5px; text-align: center;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
+  font-family: var(--mono); color: var(--text2);
+}
+.bazar-basket-sign { font-size: 11px; color: var(--text3); flex-shrink: 0; }
+.bazar-basket-total-input {
+  flex: 1; min-width: 0; padding: 0; text-align: right; font-size: 15px; font-weight: 700;
+  background: none; border: none; font-family: var(--mono); color: var(--text);
+}
+.bazar-basket-total-input:focus { outline: none; }
 .bazar-basket-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 4px; flex-shrink: 0; }
 
 /* ---- Bazar category-browse popup ---- */

@@ -23,6 +23,14 @@ const CATEGORY_ICONS = {
   'Other': '🗂️',
 };
 
+// A small, precise set of alternate units for the handful of items that are
+// genuinely bought either way — everything else uses its catalog default
+// unit as fixed text, not a free-text field.
+const UNIT_OPTIONS = {
+  'Mushroom': ['kg', 'gm'],
+  'Cooking Oil': ['litre', '1L pack', '2L pack', '5L pack'],
+};
+
 // A tappable, category-filtered card picker for building one day's bazar
 // list — used both for tomorrow's planned shopping and for correcting
 // today's actual purchases. Fully controlled: the parent owns `lines` and
@@ -193,6 +201,17 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
               <div className="bazar-basket-main">
                 <div className="bazar-basket-name">
                   {itemLabel(lang, line.name, line.nameBn)}
+                  {UNIT_OPTIONS[line.name] ? (
+                    <select
+                      className="bazar-basket-unit-select"
+                      value={line.unit || UNIT_OPTIONS[line.name][0]}
+                      onChange={(e) => updateUnit(line, e.target.value)}
+                    >
+                      {UNIT_OPTIONS[line.name].map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  ) : (
+                    line.unit && <span className="bazar-basket-unit">({line.unit})</span>
+                  )}
                 </div>
                 <div className="bazar-basket-inputs">
                   <NumberInput
@@ -201,13 +220,6 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                     min={0}
                     placeholder={t('Qty')}
                     onValueChange={(n) => updateQuantity(line, n)}
-                  />
-                  <input
-                    type="text"
-                    className="bazar-basket-unit-input"
-                    value={line.unit || ''}
-                    placeholder={t('unit')}
-                    onChange={(e) => updateUnit(line, e.target.value)}
                   />
                   <span className="bazar-basket-sign">×</span>
                   <NumberInput
