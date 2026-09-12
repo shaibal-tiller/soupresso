@@ -107,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_investments_date ON investments (spent_on DESC);
 CREATE TABLE IF NOT EXISTS bazar_items (
   id           SERIAL PRIMARY KEY,
   name         TEXT NOT NULL UNIQUE,
+  name_bn      TEXT,
   category     TEXT NOT NULL,
   unit         TEXT NOT NULL,
   icon         TEXT,
@@ -114,6 +115,9 @@ CREATE TABLE IF NOT EXISTS bazar_items (
   sort_order   INTEGER NOT NULL DEFAULT 0,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- If your database already has bazar_items without name_bn, run this:
+ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS name_bn TEXT;
 
 -- One row per item per day's bazar list. `for_date` is the day the shopping
 -- is FOR (not necessarily the day the row was created — a 'planned' list for
@@ -141,54 +145,77 @@ CREATE INDEX IF NOT EXISTS idx_bazar_plan_items_date_kind ON bazar_plan_items (f
 DO $$
 BEGIN
   IF (SELECT COUNT(*) FROM bazar_items) = 0 THEN
-    INSERT INTO bazar_items (name, category, unit, icon, sort_order) VALUES
-      ('Chicken', 'Meat & Egg', 'kg', '🍗', 1),
-      ('Egg', 'Meat & Egg', 'pc', '🥚', 2),
-      ('Mushroom', 'Meat & Egg', 'kg', '🍄', 3),
-      ('Onion', 'Vegetables', 'kg', '🧅', 10),
-      ('Potato', 'Vegetables', 'kg', '🥔', 11),
-      ('Ginger', 'Vegetables', 'kg', '🫚', 12),
-      ('Garlic', 'Vegetables', 'kg', '🧄', 13),
-      ('Green Chili', 'Vegetables', 'kg', '🌶️', 14),
-      ('Carrot', 'Vegetables', 'kg', '🥕', 15),
-      ('Cabbage', 'Vegetables', 'pc', '🥬', 16),
-      ('Tomato', 'Vegetables', 'kg', '🍅', 17),
-      ('Cucumber', 'Vegetables', 'kg', '🥒', 18),
-      ('Eggplant', 'Vegetables', 'kg', '🍆', 19),
-      ('Lemon', 'Vegetables', 'pc', '🍋', 20),
-      ('Spring Onion', 'Vegetables', 'kg', '🌱', 21),
-      ('Capsicum', 'Vegetables', 'kg', '🫑', 22),
-      ('Dried Chili', 'Raw Spices', 'kg', '🌶️', 30),
-      ('Turmeric', 'Raw Spices', 'kg', '🟡', 31),
-      ('Cumin', 'Raw Spices', 'kg', '⚫', 32),
-      ('Coriander Seed', 'Raw Spices', 'kg', '🌿', 33),
-      ('Bay Leaf', 'Raw Spices', 'pack', '🍃', 34),
-      ('Cardamom', 'Raw Spices', 'kg', '⚪', 35),
-      ('Cinnamon', 'Raw Spices', 'kg', '🟤', 36),
-      ('Chili Powder', 'Raw Spices', 'kg', '🌶️', 37),
-      ('Garam Masala', 'Raw Spices', 'kg', '🧂', 38),
-      ('Curry Powder', 'Raw Spices', 'kg', '🧂', 39),
-      ('Ginger-Garlic Paste', 'Processed Spices & Sauces', 'kg', '🥣', 40),
-      ('Soy Sauce', 'Processed Spices & Sauces', 'litre', '🍶', 41),
-      ('Chili Sauce', 'Processed Spices & Sauces', 'litre', '🌶️', 42),
-      ('Vinegar', 'Processed Spices & Sauces', 'litre', '🍶', 43),
-      ('Cooking Oil', 'Cooking Essentials', 'litre', '🛢️', 50),
-      ('Salt', 'Cooking Essentials', 'kg', '🧂', 51),
-      ('Sugar', 'Cooking Essentials', 'kg', '🍚', 52),
-      ('Milk', 'Cooking Essentials', 'litre', '🥛', 53),
-      ('Butter', 'Cooking Essentials', 'kg', '🧈', 54),
-      ('Rice', 'Cooking Essentials', 'kg', '🍚', 55),
-      ('Flour', 'Cooking Essentials', 'kg', '🌾', 56),
-      ('Cheese', 'Cooking Essentials', 'kg', '🧀', 57),
-      ('Soup Bowl', 'Packaging', 'pc', '🥣', 60),
-      ('Parcel Box', 'Packaging', 'pc', '📦', 61),
-      ('Poly Bag', 'Packaging', 'pack', '🛍️', 62),
-      ('Foil Paper', 'Packaging', 'roll', '📜', 63),
-      ('Napkin / Tissue', 'Packaging', 'pack', '🧻', 64),
-      ('Plate & Spoon', 'Packaging', 'pack', '🍽️', 65),
-      ('Auto Fare', 'Other', 'trip', '🛺', 70),
-      ('Chef Breakfast', 'Other', 'day', '🍳', 71),
-      ('Cold Drink', 'Other', 'pc', '🥤', 72)
+    INSERT INTO bazar_items (name, name_bn, category, unit, icon, sort_order) VALUES
+      ('Chicken', 'মুরগি', 'Meat & Egg', 'kg', '🍗', 1),
+      ('Egg', 'ডিম', 'Meat & Egg', 'pc', '🥚', 2),
+      ('Mushroom', 'মাশরুম', 'Meat & Egg', 'kg', '🍄', 3),
+      ('Onion', 'পেঁয়াজ', 'Vegetables', 'kg', '🧅', 10),
+      ('Potato', 'আলু', 'Vegetables', 'kg', '🥔', 11),
+      ('Ginger', 'আদা', 'Vegetables', 'kg', '🫚', 12),
+      ('Garlic', 'রসুন', 'Vegetables', 'kg', '🧄', 13),
+      ('Green Chili', 'কাঁচা মরিচ', 'Vegetables', 'kg', '🌶️', 14),
+      ('Carrot', 'গাজর', 'Vegetables', 'kg', '🥕', 15),
+      ('Cabbage', 'বাঁধাকপি', 'Vegetables', 'pc', '🥬', 16),
+      ('Tomato', 'টমেটো', 'Vegetables', 'kg', '🍅', 17),
+      ('Cucumber', 'শসা', 'Vegetables', 'kg', '🥒', 18),
+      ('Eggplant', 'বেগুন', 'Vegetables', 'kg', '🍆', 19),
+      ('Lemon', 'লেবু', 'Vegetables', 'pc', '🍋', 20),
+      ('Spring Onion', 'পেঁয়াজ পাতা', 'Vegetables', 'kg', '🌱', 21),
+      ('Capsicum', 'ক্যাপসিকাম', 'Vegetables', 'kg', '🫑', 22),
+      ('Dried Chili', 'শুকনা মরিচ', 'Raw Spices', 'kg', '🌶️', 30),
+      ('Turmeric', 'হলুদ', 'Raw Spices', 'kg', '🟡', 31),
+      ('Cumin', 'জিরা', 'Raw Spices', 'kg', '⚫', 32),
+      ('Coriander Seed', 'ধনে', 'Raw Spices', 'kg', '🌿', 33),
+      ('Bay Leaf', 'তেজপাতা', 'Raw Spices', 'pack', '🍃', 34),
+      ('Cardamom', 'এলাচ', 'Raw Spices', 'kg', '⚪', 35),
+      ('Cinnamon', 'দারুচিনি', 'Raw Spices', 'kg', '🟤', 36),
+      ('Chili Powder', 'মরিচের গুঁড়া', 'Raw Spices', 'kg', '🌶️', 37),
+      ('Garam Masala', 'গরম মসলা', 'Raw Spices', 'kg', '🧂', 38),
+      ('Curry Powder', 'কারি পাউডার', 'Raw Spices', 'kg', '🧂', 39),
+      ('Ginger-Garlic Paste', 'আদা-রসুন পেস্ট', 'Processed Spices & Sauces', 'kg', '🥣', 40),
+      ('Soy Sauce', 'সয়া সস', 'Processed Spices & Sauces', 'litre', '🍶', 41),
+      ('Chili Sauce', 'চিলি সস', 'Processed Spices & Sauces', 'litre', '🌶️', 42),
+      ('Vinegar', 'ভিনেগার', 'Processed Spices & Sauces', 'litre', '🍶', 43),
+      ('Cooking Oil', 'রান্নার তেল', 'Cooking Essentials', 'litre', '🛢️', 50),
+      ('Salt', 'লবণ', 'Cooking Essentials', 'kg', '🧂', 51),
+      ('Sugar', 'চিনি', 'Cooking Essentials', 'kg', '🍚', 52),
+      ('Milk', 'দুধ', 'Cooking Essentials', 'litre', '🥛', 53),
+      ('Butter', 'মাখন', 'Cooking Essentials', 'kg', '🧈', 54),
+      ('Rice', 'চাল', 'Cooking Essentials', 'kg', '🍚', 55),
+      ('Flour', 'ময়দা', 'Cooking Essentials', 'kg', '🌾', 56),
+      ('Cheese', 'পনির', 'Cooking Essentials', 'kg', '🧀', 57),
+      ('Soup Bowl', 'স্যুপ বাটি', 'Packaging', 'pc', '🥣', 60),
+      ('Parcel Box', 'পার্সেল বক্স', 'Packaging', 'pc', '📦', 61),
+      ('Poly Bag', 'পলি ব্যাগ', 'Packaging', 'pack', '🛍️', 62),
+      ('Foil Paper', 'ফয়েল পেপার', 'Packaging', 'roll', '📜', 63),
+      ('Napkin / Tissue', 'ন্যাপকিন/টিস্যু', 'Packaging', 'pack', '🧻', 64),
+      ('Plate & Spoon', 'প্লেট ও চামচ', 'Packaging', 'pack', '🍽️', 65),
+      ('Auto Fare', 'অটো ভাড়া', 'Other', 'trip', '🛺', 70),
+      ('Chef Breakfast', 'বাবুর্চির নাস্তা', 'Other', 'day', '🍳', 71),
+      ('Cold Drink', 'কোল্ড ড্রিংক', 'Other', 'pc', '🥤', 72)
     ON CONFLICT (name) DO NOTHING;
   END IF;
 END $$;
+
+-- Backfill name_bn on a catalog seeded before it existed (safe to re-run —
+-- only fills rows that don't already have one).
+UPDATE bazar_items AS bi SET name_bn = v.name_bn
+FROM (VALUES
+  ('Chicken', 'মুরগি'), ('Egg', 'ডিম'), ('Mushroom', 'মাশরুম'),
+  ('Onion', 'পেঁয়াজ'), ('Potato', 'আলু'), ('Ginger', 'আদা'), ('Garlic', 'রসুন'),
+  ('Green Chili', 'কাঁচা মরিচ'), ('Carrot', 'গাজর'), ('Cabbage', 'বাঁধাকপি'),
+  ('Tomato', 'টমেটো'), ('Cucumber', 'শসা'), ('Eggplant', 'বেগুন'), ('Lemon', 'লেবু'),
+  ('Spring Onion', 'পেঁয়াজ পাতা'), ('Capsicum', 'ক্যাপসিকাম'),
+  ('Dried Chili', 'শুকনা মরিচ'), ('Turmeric', 'হলুদ'), ('Cumin', 'জিরা'),
+  ('Coriander Seed', 'ধনে'), ('Bay Leaf', 'তেজপাতা'), ('Cardamom', 'এলাচ'),
+  ('Cinnamon', 'দারুচিনি'), ('Chili Powder', 'মরিচের গুঁড়া'), ('Garam Masala', 'গরম মসলা'),
+  ('Curry Powder', 'কারি পাউডার'), ('Ginger-Garlic Paste', 'আদা-রসুন পেস্ট'),
+  ('Soy Sauce', 'সয়া সস'), ('Chili Sauce', 'চিলি সস'), ('Vinegar', 'ভিনেগার'),
+  ('Cooking Oil', 'রান্নার তেল'), ('Salt', 'লবণ'), ('Sugar', 'চিনি'), ('Milk', 'দুধ'),
+  ('Butter', 'মাখন'), ('Rice', 'চাল'), ('Flour', 'ময়দা'), ('Cheese', 'পনির'),
+  ('Soup Bowl', 'স্যুপ বাটি'), ('Parcel Box', 'পার্সেল বক্স'), ('Poly Bag', 'পলি ব্যাগ'),
+  ('Foil Paper', 'ফয়েল পেপার'), ('Napkin / Tissue', 'ন্যাপকিন/টিস্যু'),
+  ('Plate & Spoon', 'প্লেট ও চামচ'), ('Auto Fare', 'অটো ভাড়া'),
+  ('Chef Breakfast', 'বাবুর্চির নাস্তা'), ('Cold Drink', 'কোল্ড ড্রিংক')
+) AS v(name, name_bn)
+WHERE bi.name = v.name AND bi.name_bn IS NULL;
