@@ -334,20 +334,24 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .bazar-basket-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .bazar-basket-name { font-size: 13px; font-weight: 700; color: var(--text); min-width: 0; }
 .bazar-basket-unit { color: var(--text3); font-size: 11px; font-weight: 500; margin-left: 4px; }
-.bazar-basket-unit-select {
-  margin-left: 4px; font-size: 10.5px; font-weight: 500; color: var(--text3);
-  background: none; border: none; padding: 0; font-family: var(--sans);
+/* Scoped under .bazar-picker (2 classes) so these beat the generic
+   ".field input, .field select" rule (1 class + 1 element = higher
+   specificity than a bare single class) whenever the picker sits inside a
+   form .field wrapper, which it always does in app/entry/page.js. */
+.bazar-picker .bazar-basket-unit-select {
+  width: auto; margin-left: 4px; font-size: 10.5px; font-weight: 500; color: var(--text3);
+  background: none; border: none; padding: 0; border-radius: 0; font-family: var(--sans);
 }
 .bazar-basket-inputs { display: flex; align-items: baseline; gap: 5px; }
-.bazar-basket-qty, .bazar-basket-price {
-  width: 38px; padding: 3px 2px; font-size: 11.5px; text-align: center;
+.bazar-picker .bazar-basket-qty, .bazar-picker .bazar-basket-price {
+  width: 38px; flex: 0 0 38px; padding: 3px 2px; font-size: 11.5px; text-align: center;
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
   font-family: var(--mono); color: var(--text2);
 }
 .bazar-basket-sign { font-size: 11px; color: var(--text3); flex-shrink: 0; }
-.bazar-basket-total-input {
-  flex: 1; min-width: 0; padding: 0; text-align: right; font-size: 15px; font-weight: 700;
-  background: none; border: none; font-family: var(--mono); color: var(--text);
+.bazar-picker .bazar-basket-total-input {
+  width: auto; flex: 1 1 auto; min-width: 0; padding: 0; text-align: right; font-size: 15px; font-weight: 700;
+  background: none; border: none; border-radius: 0; font-family: var(--mono); color: var(--text);
 }
 .bazar-basket-total-input:focus { outline: none; }
 .bazar-basket-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 4px; flex-shrink: 0; }
