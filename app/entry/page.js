@@ -12,15 +12,25 @@ function lineTotal(l) {
   return (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
 }
 
-function rowsToLines(rows) {
-  return (rows || []).map((r) => ({
-    key: `saved-${r.id}`,
-    itemId: r.item_id,
-    name: r.name,
-    unit: r.unit,
-    quantity: String(Number(r.quantity)),
-    unitPrice: String(Number(r.unit_price)),
-  }));
+// `catalog` enriches a saved row with its current Bangla name/icon (looked up
+// by item_id) for display; the row's own snapshotted name/unit is always
+// what's shown for an ad-hoc item (item_id null) or if the catalog entry was
+// since removed.
+function rowsToLines(rows, catalog) {
+  const byId = new Map((catalog || []).map((c) => [c.id, c]));
+  return (rows || []).map((r) => {
+    const cat = r.item_id != null ? byId.get(r.item_id) : null;
+    return {
+      key: `saved-${r.id}`,
+      itemId: r.item_id,
+      name: r.name,
+      nameBn: cat ? cat.name_bn : null,
+      unit: r.unit,
+      icon: cat ? cat.icon : null,
+      quantity: String(Number(r.quantity)),
+      unitPrice: String(Number(r.unit_price)),
+    };
+  });
 }
 
 function emptyDenoms() {
@@ -50,8 +60,12 @@ export default function EntryPage() {
   const [bazarCatalog, setBazarCatalog] = useState([]);
   const [actualLines, setActualLines] = useState([]); // today's actual bazar, corrected from yesterday's plan
   const [actualBazarAdjustment, setActualBazarAdjustment] = useState(0);
+  const [actualEntryMode, setActualEntryMode] = useState('items'); // 'items' | 'simple'
+  const [actualSimpleAmount, setActualSimpleAmount] = useState(0);
   const [plannedLines, setPlannedLines] = useState([]); // tomorrow's planned bazar
   const [nextBazarAdjustment, setNextBazarAdjustment] = useState(0);
+  const [plannedEntryMode, setPlannedEntryMode] = useState('items'); // 'items' | 'simple'
+  const [nextSimpleAmount, setNextSimpleAmount] = useState(0);
   const [notes, setNotes] = useState('');
   const [closedBy, setClosedBy] = useState([]);
   const [isOffDay, setIsOffDay] = useState(false);
@@ -65,10 +79,6 @@ export default function EntryPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const dateRef = useRef(null);
 
-  useEffect(() => {
-    fetch('/api/bazar-items').then((r) => r.json()).then((d) => setBazarCatalog(d.items || []));
-  }, []);
-
   const load = useCallback(async (d) => {
     setLoading(true);
     setMsg(null);
@@ -79,16 +89,20 @@ export default function EntryPage() {
     setExistingEntry(null);
     try {
       const tomorrow = shiftDateStr(d, 1);
-      const [entryRes, actualRes, plannedForTodayRes, plannedForTomorrowRes] = await Promise.all([
+      const [entryRes, actualRes, plannedForTodayRes, plannedForTomorrowRes, catalogRes] = await Promise.all([
         fetch(`/api/entries?date=${d}`),
         fetch(`/api/bazar-plan?date=${d}&kind=actual`),
         fetch(`/api/bazar-plan?date=${d}&kind=planned`),
         fetch(`/api/bazar-plan?date=${tomorrow}&kind=planned`),
+        fetch('/api/bazar-items'),
       ]);
       const data = await entryRes.json();
       const actualData = await actualRes.json();
       const plannedForTodayData = await plannedForTodayRes.json();
       const plannedForTomorrowData = await plannedForTomorrowRes.json();
+      const catalogData = await catalogRes.json();
+      const catalog = catalogData.items || [];
+      setBazarCatalog(catalog);
 
       // Today's actual bazar list: use what was already saved as actual; if
       // nothing's saved yet, start from yesterday's plan for today, so there's
@@ -96,11 +110,13 @@ export default function EntryPage() {
       const actualStartRows = (actualData.items && actualData.items.length > 0)
         ? actualData.items
         : plannedForTodayData.items;
-      const actualStartLines = rowsToLines(actualStartRows);
+      const actualStartLines = rowsToLines(actualStartRows, catalog);
       setActualLines(actualStartLines);
+      setActualEntryMode(actualStartLines.length > 0 ? 'items' : 'simple');
 
-      const plannedTomorrowLines = rowsToLines(plannedForTomorrowData.items);
+      const plannedTomorrowLines = rowsToLines(plannedForTomorrowData.items, catalog);
       setPlannedLines(plannedTomorrowLines);
+      setPlannedEntryMode(plannedTomorrowLines.length > 0 ? 'items' : 'simple');
 
       if (data.entry) {
         const e = data.entry;
@@ -124,8 +140,10 @@ export default function EntryPage() {
         // the same totals it was saved with (itemsTotal + adjustment = saved).
         const actualItemsTotal = actualStartLines.reduce((s, l) => s + lineTotal(l), 0);
         setActualBazarAdjustment(Number(e.bazar_actual_cost) - actualItemsTotal);
+        setActualSimpleAmount(Number(e.bazar_actual_cost) || 0);
         const plannedItemsTotal = plannedTomorrowLines.reduce((s, l) => s + lineTotal(l), 0);
         setNextBazarAdjustment(Number(e.next_bazar_advance) - plannedItemsTotal);
+        setNextSimpleAmount(Number(e.next_bazar_advance) || 0);
       } else {
         setHadExistingEntry(false);
         setMode('denom');
@@ -136,7 +154,9 @@ export default function EntryPage() {
         setNotes('');
         setClosedBy([]);
         setActualBazarAdjustment(0);
+        setActualSimpleAmount(0);
         setNextBazarAdjustment(0);
+        setNextSimpleAmount(0);
         if (data.carryForward) {
           setOpeningBhangti(data.carryForward.openingBhangti);
           setBazarAdvanceReceived(data.carryForward.bazarAdvanceReceived);
@@ -184,9 +204,13 @@ export default function EntryPage() {
   // adjustment alone reproduces the old plain-number entry when there are no
   // items at all.
   const actualItemsTotal = actualLines.reduce((sum, l) => sum + lineTotal(l), 0);
-  const effectiveBazarActualCost = actualItemsTotal + (Number(actualBazarAdjustment) || 0);
+  const effectiveBazarActualCost = actualEntryMode === 'items'
+    ? actualItemsTotal + (Number(actualBazarAdjustment) || 0)
+    : (Number(actualSimpleAmount) || 0);
   const plannedItemsTotal = plannedLines.reduce((sum, l) => sum + lineTotal(l), 0);
-  const effectiveNextBazarAdvance = plannedItemsTotal + (Number(nextBazarAdjustment) || 0);
+  const effectiveNextBazarAdvance = plannedEntryMode === 'items'
+    ? plannedItemsTotal + (Number(nextBazarAdjustment) || 0)
+    : (Number(nextSimpleAmount) || 0);
 
   const summary = computeCashSummary({
     totalCounted,
@@ -234,8 +258,8 @@ export default function EntryPage() {
             closedBy: isOffDay ? [] : closedBy,
           }),
         }),
-        isOffDay ? Promise.resolve() : bazarPlanPayload(date, 'actual', actualLines),
-        isOffDay ? Promise.resolve() : bazarPlanPayload(tomorrow, 'planned', plannedLines),
+        isOffDay ? Promise.resolve() : bazarPlanPayload(date, 'actual', actualEntryMode === 'items' ? actualLines : []),
+        isOffDay ? Promise.resolve() : bazarPlanPayload(tomorrow, 'planned', plannedEntryMode === 'items' ? plannedLines : []),
       ]);
       const data = await res.json();
       if (!res.ok) {
@@ -251,6 +275,61 @@ export default function EntryPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Swipe navigation for the wizard steps (touch only — mouse/desktop use the
+  // Back/Next buttons). A swipe only ever moves one step at a time regardless
+  // of how far the finger travels, and never submits — it only calls setStep.
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swipeDragging, setSwipeDragging] = useState(false);
+  const [swipeAnimClass, setSwipeAnimClass] = useState('');
+  const touchRef = useRef({ x: 0, y: 0, active: false, horizontal: null });
+
+  function handleTouchStart(e) {
+    if (swipeAnimClass) return; // ignore new touches mid-animation
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, active: true, horizontal: null };
+    setSwipeDragging(true);
+  }
+
+  function handleTouchMove(e) {
+    if (!touchRef.current.active) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchRef.current.x;
+    const dy = t.clientY - touchRef.current.y;
+    if (touchRef.current.horizontal === null) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      touchRef.current.horizontal = Math.abs(dx) > Math.abs(dy);
+      if (!touchRef.current.horizontal) { touchRef.current.active = false; setSwipeDragging(false); }
+    }
+    if (!touchRef.current.horizontal) return;
+    let offset = dx;
+    if ((step === 0 && offset > 0) || (step === TOTAL_STEPS - 1 && offset < 0)) offset *= 0.3;
+    setSwipeOffset(offset);
+  }
+
+  function handleTouchEnd() {
+    if (!touchRef.current.active) { setSwipeDragging(false); return; }
+    touchRef.current.active = false;
+    setSwipeDragging(false);
+    const THRESHOLD = 56;
+    if (swipeOffset <= -THRESHOLD && step < TOTAL_STEPS - 1) {
+      animateSwipeStep(1);
+    } else if (swipeOffset >= THRESHOLD && step > 0) {
+      animateSwipeStep(-1);
+    } else {
+      setSwipeOffset(0);
+    }
+  }
+
+  function animateSwipeStep(dir) {
+    setSwipeOffset(0);
+    setSwipeAnimClass(dir > 0 ? 'slide-out-left' : 'slide-out-right');
+    setTimeout(() => {
+      setStep((s) => Math.min(TOTAL_STEPS - 1, Math.max(0, s + dir)));
+      setSwipeAnimClass(dir > 0 ? 'slide-in-from-right' : 'slide-in-from-left');
+      setTimeout(() => setSwipeAnimClass(''), 200);
+    }, 180);
   }
 
   const stepLabels = ['Count box', 'Bazar', 'Sales', 'Tomorrow', 'Review'];
@@ -371,6 +450,15 @@ export default function EntryPage() {
               ))}
             </div>
 
+            <div
+              className={`wizard-swipe${swipeDragging ? ' dragging' : ''}${swipeAnimClass ? ` ${swipeAnimClass}` : ''}`}
+              style={!swipeAnimClass && swipeOffset ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+            >
+
             {step === 0 && (
               <div className="card">
                 <div className="card-title">{t("Count today's box")}</div>
@@ -424,14 +512,24 @@ export default function EntryPage() {
                 </div>
                 <div className="field">
                   <label>{t('Actual bazar cost today')}</label>
-                  <p className="step-hint">{t("Correct yesterday's plan to what was actually bought — adjust quantities and prices, remove what wasn't bought, add anything extra.")}</p>
-                  <BazarItemPicker
-                    catalog={bazarCatalog}
-                    lines={actualLines}
-                    onLinesChange={setActualLines}
-                    adjustment={actualBazarAdjustment}
-                    onAdjustmentChange={setActualBazarAdjustment}
-                  />
+                  <div className="toggle-row" style={{ marginBottom: 10 }}>
+                    <button className={actualEntryMode === 'items' ? 'on' : ''} onClick={() => setActualEntryMode('items')}>{t('Item list')}</button>
+                    <button className={actualEntryMode === 'simple' ? 'on' : ''} onClick={() => setActualEntryMode('simple')}>{t('Simple amount')}</button>
+                  </div>
+                  {actualEntryMode === 'items' ? (
+                    <>
+                      <p className="step-hint">{t("Correct yesterday's plan to what was actually bought — adjust quantities and prices, remove what wasn't bought, add anything extra.")}</p>
+                      <BazarItemPicker
+                        catalog={bazarCatalog}
+                        lines={actualLines}
+                        onLinesChange={setActualLines}
+                        adjustment={actualBazarAdjustment}
+                        onAdjustmentChange={setActualBazarAdjustment}
+                      />
+                    </>
+                  ) : (
+                    <NumberInput value={actualSimpleAmount} min={0} onValueChange={(n) => setActualSimpleAmount(n ?? '')} placeholder={t('e.g. 2500')} />
+                  )}
                 </div>
                 {summary.bazarVariance > 0 && (
                   <div className="field">
@@ -459,13 +557,21 @@ export default function EntryPage() {
                 <div className="card-title">{t('Set aside for tomorrow')}</div>
                 <div className="field">
                   <label>{t('Bazar advance to give chef now (৳)')}</label>
-                  <BazarItemPicker
-                    catalog={bazarCatalog}
-                    lines={plannedLines}
-                    onLinesChange={setPlannedLines}
-                    adjustment={nextBazarAdjustment}
-                    onAdjustmentChange={setNextBazarAdjustment}
-                  />
+                  <div className="toggle-row" style={{ marginBottom: 10 }}>
+                    <button className={plannedEntryMode === 'items' ? 'on' : ''} onClick={() => setPlannedEntryMode('items')}>{t('Item list')}</button>
+                    <button className={plannedEntryMode === 'simple' ? 'on' : ''} onClick={() => setPlannedEntryMode('simple')}>{t('Simple amount')}</button>
+                  </div>
+                  {plannedEntryMode === 'items' ? (
+                    <BazarItemPicker
+                      catalog={bazarCatalog}
+                      lines={plannedLines}
+                      onLinesChange={setPlannedLines}
+                      adjustment={nextBazarAdjustment}
+                      onAdjustmentChange={setNextBazarAdjustment}
+                    />
+                  ) : (
+                    <NumberInput value={nextSimpleAmount} min={0} onValueChange={(n) => setNextSimpleAmount(n ?? '')} placeholder={t('e.g. 2500')} />
+                  )}
                 </div>
                 <div className="field">
                   <label>{t('Bhangti to keep in the box (৳)')}</label>
@@ -544,6 +650,8 @@ export default function EntryPage() {
                 {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
               </div>
             )}
+
+            </div>
           </div>
         )}
 
