@@ -74,6 +74,10 @@ function emptyDenoms() {
   return Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, 0]));
 }
 
+function draftKey(d) {
+  return `soupresso-entry-draft:${d}`;
+}
+
 const TOTAL_STEPS = 6;
 
 const HISHAB_CLOSERS = [
@@ -115,6 +119,9 @@ export default function EntryPage() {
   const [hadExistingEntry, setHadExistingEntry] = useState(false);
   const [existingEntry, setExistingEntry] = useState(null); // raw entry for the summary card
   const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState(null); // draft found in localStorage for the loaded date, awaiting restore/discard
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const pendingActionRef = useRef(null); // navigation/reset to run if the user confirms discarding unsaved edits
 
   const load = useCallback(async (d) => {
     setLoading(true);
@@ -123,6 +130,7 @@ export default function EntryPage() {
     setStep(0);
     setIsOffDay(false);
     setEditing(false);
+    setPendingDraft(null);
     setExistingEntry(null);
     try {
       const tomorrow = shiftDateStr(d, 1);
@@ -232,6 +240,12 @@ export default function EntryPage() {
           setBazarAdvanceReceived(0);
         }
       }
+      try {
+        const rawDraft = localStorage.getItem(draftKey(d));
+        setPendingDraft(rawDraft ? JSON.parse(rawDraft) : null);
+      } catch {
+        setPendingDraft(null);
+      }
     } catch {
       setMsg({ type: 'err', text: t('Could not load this day.') });
     } finally {
@@ -338,6 +352,7 @@ export default function EntryPage() {
         setMsg({ type: 'ok', text: t('Saved successfully!') });
         setHadExistingEntry(true);
         setEditing(false);
+        try { localStorage.removeItem(draftKey(date)); } catch {}
         load(date); // reload to show the updated summary
       }
     } catch {
@@ -345,6 +360,107 @@ export default function EntryPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Guard against losing an in-progress entry: while `editing` is true,
+  // anything that would navigate away or reset the wizard (changing date,
+  // hitting Cancel) is deferred behind a confirm modal instead of running
+  // immediately. `action` runs right away if there's nothing to lose.
+  function requestDiscardOrRun(action) {
+    if (editing) {
+      pendingActionRef.current = action;
+      setShowDiscardConfirm(true);
+    } else {
+      action();
+    }
+  }
+
+  function confirmDiscard() {
+    setShowDiscardConfirm(false);
+    try { localStorage.removeItem(draftKey(date)); } catch {}
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (action) action();
+  }
+
+  function cancelDiscard() {
+    setShowDiscardConfirm(false);
+    pendingActionRef.current = null;
+  }
+
+  // Warn on browser-level navigation (tab close, refresh, back button) while
+  // there's an in-progress entry — the confirm modal above only covers
+  // in-app navigation.
+  useEffect(() => {
+    if (!editing) return;
+    function handleBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [editing]);
+
+  // Draft safety net: while editing, debounce-save the whole wizard's state
+  // to localStorage so a crash, accidental discard, or closed tab doesn't
+  // lose the entry outright — load() picks it back up as `pendingDraft`.
+  useEffect(() => {
+    if (!editing) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey(date), JSON.stringify({
+          savedAt: Date.now(),
+          isOffDay, mode, denoms, totalDirect, openingBhangti,
+          bazarAdvanceReceived, bazarTakenFromBox,
+          actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
+          plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
+          nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
+          notes, closedBy, step,
+        }));
+      } catch {}
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [
+    editing, date, isOffDay, mode, denoms, totalDirect, openingBhangti,
+    bazarAdvanceReceived, bazarTakenFromBox,
+    actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
+    plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
+    nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
+    notes, closedBy, step,
+  ]);
+
+  function restoreDraft() {
+    const d = pendingDraft;
+    if (!d) return;
+    setIsOffDay(!!d.isOffDay);
+    setMode(d.mode || 'denom');
+    setDenoms({ ...emptyDenoms(), ...(d.denoms || {}) });
+    setTotalDirect(d.totalDirect || '');
+    setOpeningBhangti(d.openingBhangti ?? 0);
+    setBazarAdvanceReceived(d.bazarAdvanceReceived ?? 0);
+    setBazarTakenFromBox(d.bazarTakenFromBox ?? 0);
+    setActualEntryMode(d.actualEntryMode || 'items');
+    setActualLines(d.actualLines || []);
+    setActualBazarAdjustment(d.actualBazarAdjustment ?? 0);
+    setActualSimpleAmount(d.actualSimpleAmount ?? 0);
+    setPlannedEntryMode(d.plannedEntryMode || 'items');
+    setPlannedLines(d.plannedLines || []);
+    setNextBazarAdjustment(d.nextBazarAdjustment ?? 0);
+    setNextSimpleAmount(d.nextSimpleAmount ?? 0);
+    setNextBhangtiMode(d.nextBhangtiMode || 'denom');
+    setNextBhangti(d.nextBhangti ?? 0);
+    setNextBhangtiQtyOverride(d.nextBhangtiQtyOverride || {});
+    setNextBhangtiMarkOverride(d.nextBhangtiMarkOverride || {});
+    setNotes(d.notes || '');
+    setClosedBy(d.closedBy || []);
+    setStep(d.step || 0);
+    setPendingDraft(null);
+    setEditing(true);
+  }
+
+  function discardDraftPrompt() {
+    try { localStorage.removeItem(draftKey(date)); } catch {}
+    setPendingDraft(null);
   }
 
   // Swipe navigation for the wizard steps (touch only — mouse/desktop use the
@@ -411,9 +527,9 @@ export default function EntryPage() {
         {/* Header: date nav with calendar picker */}
         <div className="wizard-header">
           <div className="day-nav" style={{ marginBottom: 6 }}>
-            <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
-            <DatePicker value={date} onChange={setDate} />
-            <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
+            <button onClick={() => requestDiscardOrRun(() => setDate(shiftDateStr(date, -1)))}>‹</button>
+            <DatePicker value={date} onChange={(d) => requestDiscardOrRun(() => setDate(d))} />
+            <button onClick={() => requestDiscardOrRun(() => setDate(shiftDateStr(date, 1)))}>›</button>
           </div>
         </div>
 
@@ -424,6 +540,16 @@ export default function EntryPage() {
         ) : !editing ? (
           /* ============ LOCKED STATE: summary or empty ============ */
           <div className="wizard-body">
+            {pendingDraft && (
+              <div className="insight amber">
+                <b>{t('Unsaved draft found for this day')}</b>
+                <p style={{ margin: '4px 0 10px' }}>{t("You have changes here that were never saved — from a previous session that didn't finish.")}</p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn secondary" onClick={discardDraftPrompt}>{t('Discard draft')}</button>
+                  <button className="btn" onClick={restoreDraft}>{t('Restore draft')}</button>
+                </div>
+              </div>
+            )}
             {hadExistingEntry && existingEntry ? (
               existingEntry.is_off_day ? (
                 /* Off day summary */
@@ -732,14 +858,14 @@ export default function EntryPage() {
           <div className="wizard-footer">
             {isOffDay ? (
               <>
-                <button className="btn secondary" onClick={() => { setEditing(false); setIsOffDay(hadExistingEntry ? !!existingEntry?.is_off_day : false); }}>{t('Cancel')}</button>
+                <button className="btn secondary" onClick={() => requestDiscardOrRun(() => { setEditing(false); setIsOffDay(hadExistingEntry ? !!existingEntry?.is_off_day : false); })}>{t('Cancel')}</button>
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>
                   {saving ? t('Saving…') : t('✓ Mark off day')}
                 </button>
               </>
             ) : (
               <>
-                <button className="btn secondary" onClick={() => step === 0 ? setEditing(false) : setStep(Math.max(0, step - 1))}>
+                <button className="btn secondary" onClick={() => step === 0 ? requestDiscardOrRun(() => setEditing(false)) : setStep(Math.max(0, step - 1))}>
                   {step === 0 ? t('✕ Cancel') : t('← Back')}
                 </button>
                 <span className="step-counter">{num(step + 1)} / {num(TOTAL_STEPS)}</span>
@@ -785,6 +911,20 @@ export default function EntryPage() {
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => { setShowConfirm(false); handleSave(); }} disabled={saving}>
                   {isOffDay ? t('Yes, mark off') : hadExistingEntry ? t('Yes, update') : t('Yes, save')}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Discard-unsaved-changes confirmation modal */}
+        {showDiscardConfirm && (
+          <div className="modal-overlay" onClick={cancelDiscard}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <h3>{t('Discard unsaved changes?')}</h3>
+              <p>{t("This entry hasn't been saved yet — leaving now will lose what you've entered.")}</p>
+              <div className="modal-actions">
+                <button className="btn secondary" onClick={cancelDiscard}>{t('Keep editing')}</button>
+                <button className="btn" style={{ background: 'var(--red)' }} onClick={confirmDiscard}>{t('Discard')}</button>
               </div>
             </div>
           </div>
