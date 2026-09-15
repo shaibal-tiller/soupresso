@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS daily_entries (
   -- Step 4: set aside for tomorrow
   next_bazar_advance  NUMERIC(12,2) NOT NULL DEFAULT 0,   -- given to chef today, for tomorrow's shopping
   next_bhangti        NUMERIC(12,2) NOT NULL DEFAULT 0,   -- kept in the box for tomorrow
+  next_bhangti_denominations JSONB,  -- e.g. {"500":{"marked":true,"qty":3},...} or null if entered as a plain total
 
   -- derived, stored for fast reporting (also recomputable from the above via lib/cash-math.js)
   total_sales         NUMERIC(12,2) NOT NULL DEFAULT 0,   -- total_counted - opening_bhangti + salesAdjustment
@@ -82,6 +83,9 @@ ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS closed_by TEXT[] NOT NULL DEF
 -- If your database already has daily_entries without bazar_taken_from_box, run this:
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS bazar_taken_from_box NUMERIC(12,2) NOT NULL DEFAULT 0;
 
+-- If your database already has daily_entries without next_bhangti_denominations, run this:
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS next_bhangti_denominations JSONB;
+
 -- Startup capital / investment expenses (deliverable 5 — data entry only, no
 -- return/ROI analysis yet). category is free text, not an enum; the
 -- Investments page derives its filter options from whatever is actually in
@@ -109,7 +113,9 @@ CREATE TABLE IF NOT EXISTS bazar_items (
   name         TEXT NOT NULL UNIQUE,
   name_bn      TEXT,
   category     TEXT NOT NULL,
-  unit         TEXT NOT NULL,
+  unit         TEXT NOT NULL,        -- default/only unit unless unit_options says otherwise
+  unit_options JSONB,                -- e.g. ["dozen","pc","case30"]; null/empty = just `unit`, no dropdown
+  unit_based   BOOLEAN NOT NULL DEFAULT true, -- false = pure lump-sum item (salary, rent, utility...): no unit, no quantity, one amount field
   icon         TEXT,
   active       BOOLEAN NOT NULL DEFAULT true,
   sort_order   INTEGER NOT NULL DEFAULT 0,
@@ -118,6 +124,10 @@ CREATE TABLE IF NOT EXISTS bazar_items (
 
 -- If your database already has bazar_items without name_bn, run this:
 ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS name_bn TEXT;
+
+-- If your database already has bazar_items without unit_options/unit_based, run this:
+ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS unit_options JSONB;
+ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS unit_based BOOLEAN NOT NULL DEFAULT true;
 
 -- One row per item per day's bazar list. `for_date` is the day the shopping
 -- is FOR (not necessarily the day the row was created — a 'planned' list for
@@ -259,3 +269,65 @@ FROM (VALUES
   ('Chef Breakfast', 'বাবুর্চির নাস্তা'), ('Cold Drink', 'কোল্ড ড্রিংক')
 ) AS v(name, name_bn)
 WHERE bi.name = v.name AND bi.name_bn IS NULL;
+
+-- Usability round 5 (2026-09-15): selectable units + total-price entry
+-- instead of unit-price entry, new masala/financial items, and recurring
+-- bazar-item defaults. Safe to always re-run.
+
+-- New catalog items: two weight-based masalas, and five lump-sum financial
+-- items that have no natural "unit" at all.
+INSERT INTO bazar_items (name, name_bn, category, unit, icon, sort_order) VALUES
+  ('Kabab Masala', 'কাবাব মসলা', 'Raw Spices', '100g', '🧂', 45),
+  ('Chaat Masala', 'চাট মসলা', 'Raw Spices', '100g', '🧂', 46),
+  ('Salary Advance', 'বেতন অগ্রিম', 'Staff & Home', 'person', '💵', 87),
+  ('Loan', 'ঋণ', 'Staff & Home', 'person', '🏦', 88),
+  ('Shop Rent', 'দোকান ভাড়া', 'Staff & Home', 'month', '🏬', 89),
+  ('Chef House Rent', 'বাবুর্চির বাসা ভাড়া', 'Staff & Home', 'month', '🏠', 90),
+  ('Shop Utility', 'দোকানের ইউটিলিটি বিল', 'Staff & Home', 'month', '💡', 91)
+ON CONFLICT (name) DO NOTHING;
+
+-- Items that can be bought in more than one unit — the basket shows a
+-- dropdown beside the name for these; everything else keeps its single
+-- `unit` as fixed text. Oil is deliberately narrowed to litre-only (it
+-- previously had 1L/2L/5L "pack" sub-units, which is more precision than
+-- wanted).
+UPDATE bazar_items SET unit_options = '["dozen","pc","case30"]'::jsonb WHERE name = 'Egg';
+UPDATE bazar_items SET unit_options = '["kg","gm"]'::jsonb WHERE name = 'Mushroom';
+UPDATE bazar_items SET unit = 'litre', unit_options = '["litre"]'::jsonb WHERE name = 'Cooking Oil';
+UPDATE bazar_items SET unit_options = '["hali","pc"]'::jsonb WHERE name = 'Lemon';
+UPDATE bazar_items SET unit = '100g', unit_options = '["100g","250g","kg"]'::jsonb
+  WHERE category = 'Raw Spices' AND name != 'Bay Leaf';
+UPDATE bazar_items SET unit = '250g', unit_options = '["100g","250g","500g"]'::jsonb
+  WHERE name IN ('Coriander Leaves', 'Thai Leaves');
+
+-- Pure lump-sum items: no unit, no quantity, just one amount.
+UPDATE bazar_items SET unit_based = false, unit_options = NULL
+  WHERE name IN ('Salary', 'Salary Advance', 'Loan', 'Shop Rent', 'Chef House Rent', 'Home Utility', 'Shop Utility');
+
+-- Recurring bazar items — preload defaults for "Tomorrow's bazar advance"
+-- when no plan has been saved yet for that date (see bazar_recurring_items
+-- below). Freely edited/removed per day; this only supplies the starting
+-- basket.
+CREATE TABLE IF NOT EXISTS bazar_recurring_items (
+  id           SERIAL PRIMARY KEY,
+  item_id      INTEGER NOT NULL REFERENCES bazar_items(id) ON DELETE CASCADE,
+  quantity     NUMERIC(10,2) NOT NULL DEFAULT 1,
+  unit         TEXT,
+  total_price  NUMERIC(12,2) NOT NULL DEFAULT 0,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  active       BOOLEAN NOT NULL DEFAULT true,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO bazar_recurring_items (item_id, quantity, unit, total_price, sort_order)
+SELECT bi.id, v.quantity, v.unit, v.total_price, v.sort_order
+FROM bazar_items bi
+JOIN (VALUES
+  ('Auto Fare', 1::numeric, 'trip', 50::numeric, 1),
+  ('Nasta (Snack)', 1, 'day', 50, 2),
+  ('Coriander Leaves', 1, '100g', 50, 3),
+  ('Green Chili', 1, '250g', 30, 4),
+  ('Egg', 1, 'dozen', 150, 5),
+  ('Potato', 2, 'kg', 50, 6)
+) AS v(name, quantity, unit, total_price, sort_order) ON v.name = bi.name
+WHERE NOT EXISTS (SELECT 1 FROM bazar_recurring_items r WHERE r.item_id = bi.id);

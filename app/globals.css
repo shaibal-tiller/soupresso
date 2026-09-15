@@ -190,10 +190,36 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 }
 .date-picker-btn:active { opacity: .7; }
 .cal-icon { font-size: 15px; }
-.date-hidden-input {
-  position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer;
-  /* On mobile, tapping the button triggers showPicker; this hidden input is the fallback */
+
+/* ---- Custom calendar popup (replaces native <input type="date">) ---- */
+.date-calendar-modal { max-width: 320px; padding: 20px 18px; }
+.date-calendar-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--text);
 }
+.date-calendar-header button {
+  background: var(--bg3); border: none; border-radius: 8px; width: 30px; height: 30px;
+  font-size: 16px; color: var(--text); cursor: pointer;
+}
+.date-calendar-header button:disabled { opacity: .3; cursor: default; }
+.date-calendar-weekdays, .date-calendar-row { display: grid; grid-template-columns: repeat(7, 1fr); }
+.date-calendar-weekdays span { font-size: 10.5px; color: var(--text3); text-align: center; padding-bottom: 4px; font-weight: 600; }
+.date-calendar-cell {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: 8px; font-size: 12.5px; font-family: var(--mono);
+  color: var(--text); cursor: pointer; margin: 1px 0;
+}
+.date-calendar-cell.empty { cursor: default; }
+.date-calendar-cell.disabled { color: var(--text3); opacity: .35; cursor: default; }
+.date-calendar-cell.on-day { background: rgba(31,140,90,0.14); color: var(--green); font-weight: 700; }
+.date-calendar-cell.off-day { background: rgba(209,67,67,0.12); color: var(--red); font-weight: 700; }
+.date-calendar-cell.today { box-shadow: inset 0 0 0 1.5px var(--brand-gold); }
+.date-calendar-cell.selected { background: var(--brand-green); color: #fff; }
+.date-calendar-legend { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 11px; color: var(--text2); }
+.date-calendar-legend span { display: flex; align-items: center; gap: 5px; }
+.date-calendar-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.date-calendar-dot.on-day { background: var(--green); }
+.date-calendar-dot.off-day { background: var(--red); }
 
 /* ---- WIZARD (Daily Entry) ---- */
 .wizard-shell {
@@ -342,22 +368,19 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
   width: auto; margin-left: 4px; font-size: 10.5px; font-weight: 500; color: var(--text3);
   background: none; border: none; padding: 0; border-radius: 0; font-family: var(--sans);
 }
-.bazar-basket-inputs { display: flex; align-items: baseline; gap: 5px; }
+.bazar-basket-inputs { display: flex; align-items: center; gap: 6px; }
 .bazar-picker .bazar-basket-qty { width: 52px; flex: 0 0 52px; padding: 4px 3px; font-size: 12px; text-align: center;
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
   font-family: var(--mono); color: var(--text2);
 }
-.bazar-picker .bazar-basket-price {
-  width: 68px; flex: 0 0 68px; padding: 4px 3px; font-size: 12px; text-align: center;
-  background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
-  font-family: var(--mono); color: var(--text2);
-}
-.bazar-basket-sign { font-size: 11px; color: var(--text3); flex-shrink: 0; }
+.bazar-basket-sign { font-size: 12px; color: var(--text3); flex-shrink: 0; }
 .bazar-picker .bazar-basket-total-input {
-  width: auto; flex: 1 1 auto; min-width: 0; padding: 0; text-align: right; font-size: 15px; font-weight: 700;
-  background: none; border: none; border-radius: 0; font-family: var(--mono); color: var(--text);
+  width: 92px; flex: 0 0 92px; padding: 4px 6px; text-align: right; font-size: 14px; font-weight: 700;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
+  font-family: var(--mono); color: var(--text);
 }
-.bazar-basket-total-input:focus { outline: none; }
+.bazar-basket-total-input:focus { outline: none; border-color: var(--brand-green); }
+.bazar-basket-unitprice { font-size: 10.5px; color: var(--text3); text-align: left; font-family: var(--mono); }
 .bazar-basket-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 4px; flex-shrink: 0; }
 
 /* ---- Bazar category-browse popup ---- */

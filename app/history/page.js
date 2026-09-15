@@ -3,17 +3,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
-import { todayStr, shiftDateStr } from '@/lib/dates';
+import DatePicker from '../DatePicker';
+import { todayStr, shiftDateStr, startOfWeekStr, endOfWeekStr, startOfMonthStr, endOfMonthStr } from '@/lib/dates';
 
 export default function HistoryPage() {
-  const { t, taka, dateLong, dateDisplay } = useLang();
+  const { t, taka, dateLong, dateNice } = useLang();
   const [date, setDate] = useState(todayStr());
   const [entry, setEntry] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const dateRef = useRef(null);
   const receiptRef = useRef(null);
+
+  const [showReport, setShowReport] = useState(false);
+  const [reportRange, setReportRange] = useState('month');
+  const [reportFrom, setReportFrom] = useState(() => startOfMonthStr(todayStr()));
+  const [reportTo, setReportTo] = useState(() => endOfMonthStr(todayStr()));
+  const [reportDownloading, setReportDownloading] = useState(false);
+  const [reportError, setReportError] = useState(null);
 
   const load = useCallback(async (d) => {
     setLoading(true); setNotFound(false);
@@ -54,22 +61,60 @@ export default function HistoryPage() {
     }
   }
 
+  function openReportModal() {
+    setReportError(null);
+    selectRange('month');
+    setShowReport(true);
+  }
+
+  function selectRange(range) {
+    setReportRange(range);
+    if (range === 'week') {
+      setReportFrom(startOfWeekStr(date));
+      setReportTo(endOfWeekStr(date));
+    } else if (range === 'month') {
+      setReportFrom(startOfMonthStr(date));
+      setReportTo(endOfMonthStr(date));
+    }
+  }
+
+  async function handleReportDownload() {
+    setReportDownloading(true);
+    setReportError(null);
+    try {
+      const res = await fetch(`/api/reports/excel?from=${reportFrom}&to=${reportTo}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || t('Failed to generate report.'));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Soupresso-Sales-Report_${reportFrom}_to_${reportTo}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowReport(false);
+    } catch (e) {
+      setReportError(e.message || t('Failed to generate report.'));
+    } finally {
+      setReportDownloading(false);
+    }
+  }
+
   return (
     <AppShell>
       <div className="day-nav no-print">
         <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
-        <button className="date-picker-btn" onClick={() => dateRef.current?.showPicker?.()}>
-          <span className="cal-icon">📅</span>
-          <span>{dateDisplay(date)}</span>
-          <input
-            ref={dateRef}
-            type="date" value={date}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="date-hidden-input"
-          />
-        </button>
+        <DatePicker value={date} onChange={setDate} />
         <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
       </div>
+
+      <button type="button" className="btn secondary block no-print" style={{ marginBottom: 14 }} onClick={openReportModal}>
+        ⬇ {t('Download Sales Report (Excel)')}
+      </button>
 
       {loading ? (
         <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div>
@@ -171,6 +216,41 @@ export default function HistoryPage() {
               {downloading ? t('Preparing…') : `⬇ ${t('Download')}`}
             </button>
             <a href="/entry" className="btn no-print" style={{ flex: 1, justifyContent: 'center' }}>✎ {t('Edit')}</a>
+          </div>
+        </div>
+      )}
+
+      {showReport && (
+        <div className="modal-overlay no-print" onClick={() => setShowReport(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('Download Sales Report')}</h3>
+            <div className="toggle-row" style={{ marginBottom: 14 }}>
+              <button className={reportRange === 'week' ? 'on' : ''} onClick={() => selectRange('week')}>{t('This Week')}</button>
+              <button className={reportRange === 'month' ? 'on' : ''} onClick={() => selectRange('month')}>{t('This Month')}</button>
+              <button className={reportRange === 'custom' ? 'on' : ''} onClick={() => setReportRange('custom')}>{t('Custom')}</button>
+            </div>
+            {reportRange === 'custom' && (
+              <div style={{ display: 'flex', gap: 14, marginBottom: 14, justifyContent: 'center' }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>{t('From')}</label>
+                  <DatePicker value={reportFrom} onChange={setReportFrom} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>{t('To')}</label>
+                  <DatePicker value={reportTo} onChange={setReportTo} />
+                </div>
+              </div>
+            )}
+            <p style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 16 }}>
+              {dateNice(reportFrom)} – {dateNice(reportTo)}
+            </p>
+            {reportError && <div className="status-msg err" style={{ marginBottom: 12 }}>{reportError}</div>}
+            <div className="modal-actions">
+              <button className="btn secondary" onClick={() => setShowReport(false)}>{t('Cancel')}</button>
+              <button className="btn" onClick={handleReportDownload} disabled={reportDownloading || reportFrom > reportTo}>
+                {reportDownloading ? t('Preparing…') : `⬇ ${t('Download Excel')}`}
+              </button>
+            </div>
           </div>
         </div>
       )}
