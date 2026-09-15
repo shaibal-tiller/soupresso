@@ -82,6 +82,7 @@ export async function POST(request) {
     bazarTakenFromBox,
     nextBazarAdvance,
     nextBhangti,
+    nextBhangtiDenominations,
     notes,
     isOffDay,
     closedBy,
@@ -128,8 +129,9 @@ export async function POST(request) {
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
          bazar_advance_received, bazar_actual_cost, bazar_taken_from_box, next_bazar_advance, next_bhangti,
+         next_bhangti_denominations,
          total_sales, bazar_variance, cash_taken_home, is_off_day, notes, closed_by, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now())
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -139,6 +141,7 @@ export async function POST(request) {
          bazar_taken_from_box = EXCLUDED.bazar_taken_from_box,
          next_bazar_advance = EXCLUDED.next_bazar_advance,
          next_bhangti = EXCLUDED.next_bhangti,
+         next_bhangti_denominations = EXCLUDED.next_bhangti_denominations,
          total_sales = EXCLUDED.total_sales,
          bazar_variance = EXCLUDED.bazar_variance,
          cash_taken_home = EXCLUDED.cash_taken_home,
@@ -157,6 +160,7 @@ export async function POST(request) {
         coerceLocaleNumber(bazarTakenFromBox) ?? 0,
         coerceLocaleNumber(nextBazarAdvance) ?? 0,
         coerceLocaleNumber(nextBhangti) ?? 0,
+        nextBhangtiDenominations ? JSON.stringify(nextBhangtiDenominations) : null,
         summary.totalSales,
         summary.bazarVariance,
         summary.cashTakenHome,

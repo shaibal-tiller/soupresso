@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import NumberInput from './NumberInput';
 import { useLang } from './LangProvider';
+import { unitLabel, normalizedUnitPrice } from '@/lib/units';
 
 function itemLabel(lang, name, nameBn) {
   return lang === 'bn' && nameBn ? nameBn : name;
@@ -23,13 +24,13 @@ const CATEGORY_ICONS = {
   'Other': '🗂️',
 };
 
-// A small, precise set of alternate units for the handful of items that are
-// genuinely bought either way — everything else uses its catalog default
-// unit as fixed text, not a free-text field.
-const UNIT_OPTIONS = {
-  'Mushroom': ['kg', 'gm'],
-  'Cooking Oil': ['litre', '1L pack', '2L pack', '5L pack'],
-};
+// Which units an item can be bought in, and whether it's unit-priced at
+// all — falls back to the catalog's single `unit` (as its only option)
+// when a catalog item has no `unit_options` of its own.
+function unitOptionsFor(item) {
+  if (Array.isArray(item.unit_options) && item.unit_options.length > 0) return item.unit_options;
+  return item.unit ? [item.unit] : [];
+}
 
 // A tappable, category-filtered card picker for building one day's bazar
 // list — used both for tomorrow's planned shopping and for correcting
@@ -69,6 +70,7 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
 
   function addItem(item) {
     if (addedItemIds.has(item.id)) return;
+    const unitBased = item.unit_based !== false;
     onLinesChange([
       ...lines,
       {
@@ -77,8 +79,10 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
         name: item.name,
         nameBn: item.name_bn || null,
         unit: item.unit,
+        unitOptions: unitOptionsFor(item),
+        unitBased,
         icon: item.icon,
-        quantity: '',
+        quantity: unitBased ? '' : '1',
         unitPrice: item.recent_price != null ? String(Number(item.recent_price)) : '',
       },
     ]);
@@ -89,27 +93,23 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     if (!name) return;
     onLinesChange([
       ...lines,
-      { key: `custom-${Date.now()}-${Math.round(Math.random() * 1e6)}`, itemId: null, name, nameBn: null, unit: null, icon: '🛒', quantity: '', unitPrice: '' },
+      { key: `custom-${Date.now()}-${Math.round(Math.random() * 1e6)}`, itemId: null, name, nameBn: null, unit: null, unitOptions: [], unitBased: true, icon: '🛒', quantity: '', unitPrice: '' },
     ]);
     setCustomName('');
   }
 
-  function updateLine(key, field, value) {
-    onLinesChange(lines.map((l) => (l.key === key ? { ...l, [field]: value } : l)));
-  }
-
-  // Quantity and unit price are the two stored fields; total is a derived
-  // convenience the user can also type directly — whichever of unit price
-  // or total wasn't just edited gets recomputed so qty × price always
-  // equals the shown total.
+  // Quantity and unit price are the two stored fields; the basket shows
+  // Quantity and Total as the two things the user directly edits, and
+  // unit price is derived to keep qty × price == total:
+  //  - editing Quantity keeps the current Total fixed and recomputes price
+  //  - editing Total keeps the current Quantity fixed and recomputes price
   function updateQuantity(line, n) {
-    const qty = n == null ? '' : n;
-    onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: qty === '' ? '' : String(qty) } : l)));
-  }
-
-  function updateUnitPrice(line, n) {
-    const unitPrice = n == null ? '' : n;
-    onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unitPrice: unitPrice === '' ? '' : String(unitPrice) } : l)));
+    const qtyRaw = n == null ? '' : n;
+    const newQty = Number(qtyRaw) || 0;
+    const prevTotal = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0);
+    onLinesChange(lines.map((l) => (l.key === line.key
+      ? { ...l, quantity: qtyRaw === '' ? '' : String(qtyRaw), unitPrice: newQty > 0 && prevTotal > 0 ? String(round2(prevTotal / newQty)) : l.unitPrice }
+      : l)));
   }
 
   function updateTotal(line, n) {
@@ -118,9 +118,17 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     if (qty > 0) {
       onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unitPrice: String(round2(total / qty)) } : l)));
     } else {
-      // No quantity yet — default to 1 so unit price stays meaningful.
+      // No quantity yet — default to 1 so the total stays meaningful.
       onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: '1', unitPrice: String(round2(total)) } : l)));
     }
+  }
+
+  // Lump-sum items (unitBased === false) skip quantity/unit entirely — the
+  // single Amount field IS the total, with quantity pinned to 1 so the
+  // shared lineTotal() math (qty × price) still holds.
+  function updateAmount(line, n) {
+    const amount = n == null ? '' : n;
+    onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: '1', unitPrice: amount === '' ? '' : String(amount) } : l)));
   }
 
   function updateUnit(line, unit) {
@@ -175,7 +183,7 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                 >
                   <span className="bazar-search-icon">{item.icon || '🛒'}</span>
                   <span className="bazar-search-name">{itemLabel(lang, item.name, item.name_bn)}</span>
-                  <span className="bazar-search-unit">{item.unit}</span>
+                  <span className="bazar-search-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
                 </button>
               );
             })
@@ -195,55 +203,71 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
 
       {lines.length > 0 && (
         <div className="bazar-basket">
-          {lines.map((line) => (
-            <div key={line.key} className="bazar-basket-row">
-              <div className="bazar-basket-icon">{line.icon || '🛒'}</div>
-              <div className="bazar-basket-main">
-                <div className="bazar-basket-name">
-                  {itemLabel(lang, line.name, line.nameBn)}
-                  {UNIT_OPTIONS[line.name] ? (
-                    <select
-                      className="bazar-basket-unit-select"
-                      value={line.unit || UNIT_OPTIONS[line.name][0]}
-                      onChange={(e) => updateUnit(line, e.target.value)}
-                    >
-                      {UNIT_OPTIONS[line.name].map((u) => <option key={u} value={u}>{u}</option>)}
-                    </select>
+          {lines.map((line) => {
+            const unitOptions = line.unitOptions && line.unitOptions.length > 0 ? line.unitOptions : (line.unit ? [line.unit] : []);
+            const lineTotalVal = round2((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0));
+            const norm = line.unitBased ? normalizedUnitPrice(line.quantity, line.unit, lineTotalVal) : null;
+            return (
+              <div key={line.key} className="bazar-basket-row">
+                <div className="bazar-basket-icon">{line.icon || '🛒'}</div>
+                <div className="bazar-basket-main">
+                  <div className="bazar-basket-name">
+                    {itemLabel(lang, line.name, line.nameBn)}
+                    {line.unitBased && unitOptions.length > 1 ? (
+                      <select
+                        className="bazar-basket-unit-select"
+                        value={line.unit || unitOptions[0]}
+                        onChange={(e) => updateUnit(line, e.target.value)}
+                      >
+                        {unitOptions.map((u) => <option key={u} value={u}>{unitLabel(u)}</option>)}
+                      </select>
+                    ) : (
+                      line.unitBased && line.unit && <span className="bazar-basket-unit">({unitLabel(line.unit)})</span>
+                    )}
+                  </div>
+                  {line.unitBased ? (
+                    <>
+                      <div className="bazar-basket-inputs">
+                        <NumberInput
+                          className="bazar-basket-qty"
+                          value={line.quantity}
+                          min={0}
+                          placeholder={t('Qty')}
+                          onValueChange={(n) => updateQuantity(line, n)}
+                        />
+                        <span className="bazar-basket-sign">→</span>
+                        <NumberInput
+                          className="bazar-basket-total-input"
+                          value={String(lineTotalVal)}
+                          min={0}
+                          placeholder={t('Total')}
+                          onValueChange={(n) => updateTotal(line, n)}
+                        />
+                      </div>
+                      {norm && (
+                        <div className="bazar-basket-unitprice">
+                          {'≈ '}{taka(norm.value)}/{unitLabel(norm.baseUnit)}
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    line.unit && <span className="bazar-basket-unit">({line.unit})</span>
+                    <div className="bazar-basket-inputs">
+                      <NumberInput
+                        className="bazar-basket-total-input"
+                        value={line.unitPrice}
+                        min={0}
+                        placeholder={t('Amount')}
+                        onValueChange={(n) => updateAmount(line, n)}
+                      />
+                    </div>
                   )}
                 </div>
-                <div className="bazar-basket-inputs">
-                  <NumberInput
-                    className="bazar-basket-qty"
-                    value={line.quantity}
-                    min={0}
-                    placeholder={t('Qty')}
-                    onValueChange={(n) => updateQuantity(line, n)}
-                  />
-                  <span className="bazar-basket-sign">×</span>
-                  <NumberInput
-                    className="bazar-basket-price"
-                    value={line.unitPrice}
-                    min={0}
-                    placeholder={t('Price')}
-                    onValueChange={(n) => updateUnitPrice(line, n)}
-                  />
-                  <span className="bazar-basket-sign">=</span>
-                  <NumberInput
-                    className="bazar-basket-total-input"
-                    value={String(round2((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)))}
-                    min={0}
-                    placeholder={t('Total')}
-                    onValueChange={(n) => updateTotal(line, n)}
-                  />
-                </div>
+                <button type="button" className="bazar-basket-remove" onClick={() => removeLine(line.key)} aria-label={t('Remove')}>
+                  ✕
+                </button>
               </div>
-              <button type="button" className="bazar-basket-remove" onClick={() => removeLine(line.key)} aria-label={t('Remove')}>
-                ✕
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -290,7 +314,7 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                       >
                         <span className="bazar-item-icon">{item.icon || '🛒'}</span>
                         <span className="bazar-item-name">{itemLabel(lang, item.name, item.name_bn)}</span>
-                        <span className="bazar-item-unit">{item.unit}</span>
+                        <span className="bazar-item-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
                       </button>
                     );
                   })}

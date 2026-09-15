@@ -5,6 +5,7 @@ import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
 import BazarItemPicker from '../BazarItemPicker';
+import DatePicker from '../DatePicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
 import { todayStr, shiftDateStr } from '@/lib/dates';
 
@@ -12,10 +13,20 @@ function lineTotal(l) {
   return (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
 }
 
-// `catalog` enriches a saved row with its current Bangla name/icon (looked up
-// by item_id) for display; the row's own snapshotted name/unit is always
-// what's shown for an ad-hoc item (item_id null) or if the catalog entry was
-// since removed.
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function unitOptionsFor(cat) {
+  if (!cat) return [];
+  if (Array.isArray(cat.unit_options) && cat.unit_options.length > 0) return cat.unit_options;
+  return cat.unit ? [cat.unit] : [];
+}
+
+// `catalog` enriches a saved row with its current Bangla name/icon/unit
+// options (looked up by item_id) for display; the row's own snapshotted
+// name/unit is always what's shown for an ad-hoc item (item_id null) or if
+// the catalog entry was since removed.
 function rowsToLines(rows, catalog) {
   const byId = new Map((catalog || []).map((c) => [c.id, c]));
   return (rows || []).map((r) => {
@@ -26,11 +37,37 @@ function rowsToLines(rows, catalog) {
       name: r.name,
       nameBn: cat ? cat.name_bn : null,
       unit: r.unit,
+      unitOptions: unitOptionsFor(cat),
+      unitBased: cat ? cat.unit_based !== false : true,
       icon: cat ? cat.icon : null,
       quantity: String(Number(r.quantity)),
       unitPrice: String(Number(r.unit_price)),
     };
   });
+}
+
+// Recurring-item rows preload "Tomorrow's bazar advance" when no plan has
+// been saved yet for that date — same catalog enrichment as a saved row,
+// but the source values are quantity + total_price (not unit_price).
+function recurringRowsToLines(rows, catalog) {
+  const byId = new Map((catalog || []).map((c) => [c.id, c]));
+  return (rows || []).map((r) => {
+    const cat = byId.get(r.item_id);
+    const qty = Number(r.quantity) || 0;
+    const total = Number(r.total_price) || 0;
+    return {
+      key: `recurring-${r.id}`,
+      itemId: r.item_id,
+      name: cat ? cat.name : '',
+      nameBn: cat ? cat.name_bn : null,
+      unit: r.unit || (cat ? cat.unit : null),
+      unitOptions: unitOptionsFor(cat),
+      unitBased: cat ? cat.unit_based !== false : true,
+      icon: cat ? cat.icon : null,
+      quantity: String(qty),
+      unitPrice: String(qty > 0 ? round2(total / qty) : total),
+    };
+  }).filter((l) => l.name);
 }
 
 function emptyDenoms() {
@@ -78,7 +115,6 @@ export default function EntryPage() {
   const [hadExistingEntry, setHadExistingEntry] = useState(false);
   const [existingEntry, setExistingEntry] = useState(null); // raw entry for the summary card
   const [showConfirm, setShowConfirm] = useState(false);
-  const dateRef = useRef(null);
 
   const load = useCallback(async (d) => {
     setLoading(true);
@@ -90,18 +126,20 @@ export default function EntryPage() {
     setExistingEntry(null);
     try {
       const tomorrow = shiftDateStr(d, 1);
-      const [entryRes, actualRes, plannedForTodayRes, plannedForTomorrowRes, catalogRes] = await Promise.all([
+      const [entryRes, actualRes, plannedForTodayRes, plannedForTomorrowRes, catalogRes, recurringRes] = await Promise.all([
         fetch(`/api/entries?date=${d}`),
         fetch(`/api/bazar-plan?date=${d}&kind=actual`),
         fetch(`/api/bazar-plan?date=${d}&kind=planned`),
         fetch(`/api/bazar-plan?date=${tomorrow}&kind=planned`),
         fetch('/api/bazar-items'),
+        fetch('/api/bazar-recurring-items'),
       ]);
       const data = await entryRes.json();
       const actualData = await actualRes.json();
       const plannedForTodayData = await plannedForTodayRes.json();
       const plannedForTomorrowData = await plannedForTomorrowRes.json();
       const catalogData = await catalogRes.json();
+      const recurringData = await recurringRes.json();
       const catalog = catalogData.items || [];
       setBazarCatalog(catalog);
 
@@ -115,7 +153,13 @@ export default function EntryPage() {
       setActualLines(actualStartLines);
       setActualEntryMode(actualStartLines.length > 0 ? 'items' : 'simple');
 
-      const plannedTomorrowLines = rowsToLines(plannedForTomorrowData.items, catalog);
+      // Tomorrow's plan: if nothing's been saved yet, start from the recurring
+      // defaults (auto fare, nasta, etc.) instead of a blank list — still
+      // freely editable/removable before saving.
+      const plannedTomorrowSavedLines = rowsToLines(plannedForTomorrowData.items, catalog);
+      const plannedTomorrowLines = plannedTomorrowSavedLines.length > 0
+        ? plannedTomorrowSavedLines
+        : recurringRowsToLines(recurringData.items, catalog);
       setPlannedLines(plannedTomorrowLines);
       setPlannedEntryMode(plannedTomorrowLines.length > 0 ? 'items' : 'simple');
 
@@ -137,6 +181,22 @@ export default function EntryPage() {
         setBazarAdvanceReceived(Number(e.bazar_advance_received));
         setBazarTakenFromBox(Number(e.bazar_taken_from_box) || 0);
         setNextBhangti(Number(e.next_bhangti));
+        if (e.next_bhangti_denominations) {
+          const qtyOverride = {};
+          const markOverride = {};
+          for (const denom of STANDARD_DENOMINATIONS) {
+            const saved = e.next_bhangti_denominations[denom];
+            if (saved) {
+              qtyOverride[denom] = Number(saved.qty) || 0;
+              markOverride[denom] = !!saved.marked;
+            }
+          }
+          setNextBhangtiQtyOverride(qtyOverride);
+          setNextBhangtiMarkOverride(markOverride);
+        } else {
+          setNextBhangtiQtyOverride({});
+          setNextBhangtiMarkOverride({});
+        }
         setNotes(e.notes || '');
         setClosedBy(e.closed_by || []);
         // Reconstruct each manual adjustment so re-opening a saved day shows
@@ -155,6 +215,8 @@ export default function EntryPage() {
         setTotalDirect('');
         setBazarTakenFromBox(0);
         setNextBhangti(0);
+        setNextBhangtiQtyOverride({});
+        setNextBhangtiMarkOverride({});
         setNotes('');
         setClosedBy([]);
         setActualBazarAdjustment(0);
@@ -202,6 +264,9 @@ export default function EntryPage() {
     0
   );
   const effectiveNextBhangti = nextBhangtiMode === 'denom' ? nextBhangtiFromDenoms : (Number(nextBhangti) || 0);
+  const nextBhangtiDenominationsPayload = nextBhangtiMode === 'denom'
+    ? Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, { marked: bhangtiMarkedFor(d), qty: bhangtiQtyFor(d) }]))
+    : null;
 
   // Bazar actual cost / next-day advance are each: sum of the item-card list
   // (see BazarItemPicker) plus a manual adjustment (can be negative) — the
@@ -258,6 +323,7 @@ export default function EntryPage() {
             bazarTakenFromBox: isOffDay ? 0 : (Number(bazarTakenFromBox) || 0),
             nextBazarAdvance: isOffDay ? 0 : effectiveNextBazarAdvance,
             nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
+            nextBhangtiDenominations: isOffDay ? null : nextBhangtiDenominationsPayload,
             notes: isOffDay ? (notes || 'Shop closed') : notes,
             closedBy: isOffDay ? [] : closedBy,
           }),
@@ -346,16 +412,7 @@ export default function EntryPage() {
         <div className="wizard-header">
           <div className="day-nav" style={{ marginBottom: 6 }}>
             <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
-            <button className="date-picker-btn" onClick={() => dateRef.current?.showPicker?.()}>
-              <span className="cal-icon">📅</span>
-              <span>{dateDisplay(date)}</span>
-              <input
-                ref={dateRef}
-                type="date" value={date}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
-                className="date-hidden-input"
-              />
-            </button>
+            <DatePicker value={date} onChange={setDate} />
             <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
           </div>
         </div>

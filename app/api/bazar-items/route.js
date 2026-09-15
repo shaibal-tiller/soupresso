@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
 // active items only, each with `recent_price` — the unit price it was
 // actually bought at most recently, within the last 10 days (null if none),
 // so the picker can suggest a starting price instead of a blank field.
+// Matched on the item's current default unit too, so a suggestion never
+// mixes e.g. a per-dozen price into a per-piece default.
 export async function GET() {
   try {
     const { rows } = await query(
@@ -15,6 +17,7 @@ export async function GET() {
                  FROM bazar_plan_items bpi
                 WHERE bpi.item_id = bi.id
                   AND bpi.kind = 'actual'
+                  AND bpi.unit = bi.unit
                   AND bpi.for_date >= CURRENT_DATE - INTERVAL '10 days'
                 ORDER BY bpi.for_date DESC, bpi.id DESC
                 LIMIT 1) AS recent_price
