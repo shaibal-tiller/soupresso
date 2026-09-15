@@ -1,10 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
 import { todayStr, shiftDateStr } from '@/lib/dates';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
+import { cachedFetchJson, peekCache, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
+
+function dailySalesUrl(d) {
+  return `/api/daily-sales?date=${d}`;
+}
+const MENU_URL = '/api/products';
 
 export default function ProductsPage() {
   const { t, num, digits, dateDisplay } = useLang();
@@ -19,26 +25,56 @@ export default function ProductsPage() {
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
 
+  const requestRef = useRef(0);
+
   const loadSales = useCallback(async (d) => {
-    setLoading(true);
-    const res = await fetch(`/api/daily-sales?date=${d}`);
-    const data = await res.json();
-    setItems(data.items || []);
-    setLoading(false);
+    const url = dailySalesUrl(d);
+    const requestId = ++requestRef.current;
+    const cached = peekCache(url);
+    if (cached) {
+      setItems(cached.items || []);
+    } else {
+      setLoading(true);
+    }
+    try {
+      const data = await cachedFetchJson(url);
+      if (requestRef.current !== requestId) return; // a newer date/tab was picked meanwhile
+      setItems(data.items || []);
+    } finally {
+      if (requestRef.current === requestId) setLoading(false);
+    }
   }, []);
 
   const loadMenu = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch('/api/products');
-    const data = await res.json();
-    setItems(data.items || []);
-    setLoading(false);
+    const requestId = ++requestRef.current;
+    const cached = peekCache(MENU_URL);
+    if (cached) {
+      setItems(cached.items || []);
+    } else {
+      setLoading(true);
+    }
+    try {
+      const data = await cachedFetchJson(MENU_URL);
+      if (requestRef.current !== requestId) return;
+      setItems(data.items || []);
+    } finally {
+      if (requestRef.current === requestId) setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     if (tab === 'sales') loadSales(date);
     else loadMenu();
   }, [tab, date, loadSales, loadMenu]);
+
+  // Idle-prefetch neighboring days on the sales tab so ‹ / › feel instant.
+  useEffect(() => {
+    if (tab !== 'sales' || loading) return;
+    runWhenIdle(() => {
+      prefetchJson(dailySalesUrl(shiftDateStr(date, -1)));
+      prefetchJson(dailySalesUrl(shiftDateStr(date, 1)));
+    });
+  }, [tab, date, loading]);
 
   async function saveSales() {
     setSaving(true);
@@ -52,6 +88,7 @@ export default function ProductsPage() {
       }),
     });
     setSaving(false);
+    invalidateCache(dailySalesUrl(date));
     setMsg(res.ok ? { type: 'ok', text: t('Saved.') } : { type: 'err', text: t('Save failed.') });
   }
 
@@ -66,6 +103,7 @@ export default function ProductsPage() {
     setNewName('');
     setNewPrice('');
     setSaving(false);
+    invalidateCache(MENU_URL);
     loadMenu();
   }
 
@@ -78,6 +116,7 @@ export default function ProductsPage() {
       body: JSON.stringify({ id: item.id, name: item.name, price: Number(newPrice), active: item.active, sortOrder: item.sort_order }),
     });
     setSaving(false);
+    invalidateCache(MENU_URL);
     loadMenu();
   }
 
@@ -87,6 +126,7 @@ export default function ProductsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: item.id, name: item.name, price: item.price, active: !item.active, sortOrder: item.sort_order }),
     });
+    invalidateCache(MENU_URL);
     loadMenu();
   }
 

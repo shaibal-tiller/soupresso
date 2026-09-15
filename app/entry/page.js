@@ -8,6 +8,18 @@ import BazarItemPicker from '../BazarItemPicker';
 import DatePicker from '../DatePicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
 import { todayStr, shiftDateStr } from '@/lib/dates';
+import { cachedFetchJson, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
+
+const BAZAR_ITEMS_URL = '/api/bazar-items';
+const BAZAR_RECURRING_URL = '/api/bazar-recurring-items';
+
+function entryUrl(d) {
+  return `/api/entries?date=${d}`;
+}
+
+function bazarPlanUrl(d, kind) {
+  return `/api/bazar-plan?date=${d}&kind=${kind}`;
+}
 
 function lineTotal(l) {
   return (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
@@ -122,8 +134,10 @@ export default function EntryPage() {
   const [pendingDraft, setPendingDraft] = useState(null); // draft found in localStorage for the loaded date, awaiting restore/discard
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const pendingActionRef = useRef(null); // navigation/reset to run if the user confirms discarding unsaved edits
+  const requestRef = useRef(0); // guards against an older date's slow response clobbering a newer one
 
   const load = useCallback(async (d) => {
+    const requestId = ++requestRef.current;
     setLoading(true);
     setMsg(null);
     setCarryForwardFrom(null);
@@ -134,20 +148,20 @@ export default function EntryPage() {
     setExistingEntry(null);
     try {
       const tomorrow = shiftDateStr(d, 1);
-      const [entryRes, actualRes, plannedForTodayRes, plannedForTomorrowRes, catalogRes, recurringRes] = await Promise.all([
-        fetch(`/api/entries?date=${d}`),
-        fetch(`/api/bazar-plan?date=${d}&kind=actual`),
-        fetch(`/api/bazar-plan?date=${d}&kind=planned`),
-        fetch(`/api/bazar-plan?date=${tomorrow}&kind=planned`),
-        fetch('/api/bazar-items'),
-        fetch('/api/bazar-recurring-items'),
+      // Catalog and recurring-items are the same URL on every call, so the
+      // shared cache serves them instantly after the first load of the
+      // session instead of refetching on every date change; the four
+      // date-scoped requests get the same cache-then-revalidate treatment,
+      // which also means a prefetched adjacent day resolves instantly here.
+      const [data, actualData, plannedForTodayData, plannedForTomorrowData, catalogData, recurringData] = await Promise.all([
+        cachedFetchJson(entryUrl(d)),
+        cachedFetchJson(bazarPlanUrl(d, 'actual')),
+        cachedFetchJson(bazarPlanUrl(d, 'planned')),
+        cachedFetchJson(bazarPlanUrl(tomorrow, 'planned')),
+        cachedFetchJson(BAZAR_ITEMS_URL),
+        cachedFetchJson(BAZAR_RECURRING_URL),
       ]);
-      const data = await entryRes.json();
-      const actualData = await actualRes.json();
-      const plannedForTodayData = await plannedForTodayRes.json();
-      const plannedForTomorrowData = await plannedForTomorrowRes.json();
-      const catalogData = await catalogRes.json();
-      const recurringData = await recurringRes.json();
+      if (requestRef.current !== requestId) return; // a newer date was picked meanwhile — discard this whole response
       const catalog = catalogData.items || [];
       setBazarCatalog(catalog);
 
@@ -247,9 +261,9 @@ export default function EntryPage() {
         setPendingDraft(null);
       }
     } catch {
-      setMsg({ type: 'err', text: t('Could not load this day.') });
+      if (requestRef.current === requestId) setMsg({ type: 'err', text: t('Could not load this day.') });
     } finally {
-      setLoading(false);
+      if (requestRef.current === requestId) setLoading(false);
     }
     // t intentionally omitted from deps: including it would recreate load on every
     // language toggle and reset an in-progress wizard. Error toasts from load may
@@ -258,6 +272,22 @@ export default function EntryPage() {
   }, []);
 
   useEffect(() => { load(date); }, [date, load]);
+
+  // Idle-prefetch yesterday/tomorrow's bundle so the ‹ / › arrows feel
+  // instant after the first load — catalog/recurring-items are already
+  // cached globally, so this only needs to warm the four date-scoped URLs.
+  useEffect(() => {
+    if (loading) return;
+    runWhenIdle(() => {
+      for (const d of [shiftDateStr(date, -1), shiftDateStr(date, 1)]) {
+        const tomorrow = shiftDateStr(d, 1);
+        prefetchJson(entryUrl(d));
+        prefetchJson(bazarPlanUrl(d, 'actual'));
+        prefetchJson(bazarPlanUrl(d, 'planned'));
+        prefetchJson(bazarPlanUrl(tomorrow, 'planned'));
+      }
+    });
+  }, [date, loading]);
 
   const totalCounted = mode === 'denom' ? denominationTotal(denoms) : Number(totalDirect) || 0;
 
@@ -353,6 +383,11 @@ export default function EntryPage() {
         setHadExistingEntry(true);
         setEditing(false);
         try { localStorage.removeItem(draftKey(date)); } catch {}
+        // These three URLs were just overwritten by the saves above — drop
+        // them from the cache so the reload below can't show pre-save data.
+        invalidateCache(entryUrl(date));
+        invalidateCache(bazarPlanUrl(date, 'actual'));
+        invalidateCache(bazarPlanUrl(tomorrow, 'planned'));
         load(date); // reload to show the updated summary
       }
     } catch {

@@ -5,6 +5,9 @@ import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
 import { todayStr } from '@/lib/dates';
+import { cachedFetchJson, peekCache, invalidateCache } from '@/lib/clientCache';
+
+const INVESTMENTS_URL = '/api/investments';
 
 const KNOWN_CATEGORIES = [
   'Food Cart', 'Chef Home Development', 'Gas', 'Convayance & Misc',
@@ -17,8 +20,8 @@ function emptyForm() {
 
 export default function InvestmentsPage() {
   const { t, taka, dateNice } = useLang();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState(() => peekCache(INVESTMENTS_URL)?.items || []);
+  const [loading, setLoading] = useState(() => peekCache(INVESTMENTS_URL) === undefined);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -26,11 +29,14 @@ export default function InvestmentsPage() {
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch('/api/investments');
-    const data = await res.json();
-    setItems(data.items || []);
-    setLoading(false);
+    const cached = peekCache(INVESTMENTS_URL);
+    if (!cached) setLoading(true);
+    try {
+      const data = await cachedFetchJson(INVESTMENTS_URL);
+      setItems(data.items || []);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -88,6 +94,7 @@ export default function InvestmentsPage() {
         setMsg({ type: 'err', text: data.error || t('Save failed.') });
       } else {
         setShowForm(false);
+        invalidateCache(INVESTMENTS_URL);
         load();
       }
     } catch {

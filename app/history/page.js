@@ -5,6 +5,11 @@ import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import DatePicker from '../DatePicker';
 import { todayStr, shiftDateStr, startOfWeekStr, endOfWeekStr, startOfMonthStr, endOfMonthStr } from '@/lib/dates';
+import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
+
+function entryUrl(d) {
+  return `/api/entries?date=${d}`;
+}
 
 export default function HistoryPage() {
   const { t, taka, dateLong, dateNice } = useLang();
@@ -22,16 +27,40 @@ export default function HistoryPage() {
   const [reportDownloading, setReportDownloading] = useState(false);
   const [reportError, setReportError] = useState(null);
 
+  const requestRef = useRef(0);
+
   const load = useCallback(async (d) => {
-    setLoading(true); setNotFound(false);
+    const url = entryUrl(d);
+    const requestId = ++requestRef.current;
+    const cached = peekCache(url);
+    if (cached) {
+      // Instant paint from cache while we quietly confirm it's still current.
+      if (cached.entry) { setEntry(cached.entry); setNotFound(false); } else { setEntry(null); setNotFound(true); }
+    } else {
+      setLoading(true);
+    }
     try {
-      const res = await fetch(`/api/entries?date=${d}`);
-      const data = await res.json();
-      if (data.entry) { setEntry(data.entry); } else { setEntry(null); setNotFound(true); }
-    } finally { setLoading(false); }
+      const data = await cachedFetchJson(url);
+      if (requestRef.current !== requestId) return; // a newer date was picked meanwhile
+      if (data.entry) { setEntry(data.entry); setNotFound(false); } else { setEntry(null); setNotFound(true); }
+    } catch {
+      if (requestRef.current !== requestId) return;
+      setEntry(null); setNotFound(true);
+    } finally {
+      if (requestRef.current === requestId) setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(date); }, [date, load]);
+
+  // Idle-prefetch neighboring days so ‹ / › feel instant after the first visit.
+  useEffect(() => {
+    if (loading) return;
+    runWhenIdle(() => {
+      prefetchJson(entryUrl(shiftDateStr(date, -1)));
+      prefetchJson(entryUrl(shiftDateStr(date, 1)));
+    });
+  }, [date, loading]);
 
   async function handleDownload() {
     if (!receiptRef.current) return;

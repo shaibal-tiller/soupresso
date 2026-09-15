@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
+import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 
 const RANGES = [
   { key: '7d', label: '7 days' },
@@ -22,16 +23,43 @@ export default function DashboardPage() {
   const { t, taka, num, digits, dateShort } = useLang();
   const [range, setRange] = useState('month');
   const [view, setView] = useState('daily');
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(() => peekCache(`/api/dashboard?range=month`) ?? null);
+  const [loading, setLoading] = useState(() => peekCache(`/api/dashboard?range=month`) === undefined);
+  const requestRef = useRef(0);
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`/api/dashboard?range=${range}`)
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
+    const url = `/api/dashboard?range=${range}`;
+    const requestId = ++requestRef.current;
+    const cached = peekCache(url);
+    if (cached) {
+      // Instant paint from cache; still revalidate below in case it's stale.
+      setData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    cachedFetchJson(url)
+      .then((fresh) => {
+        if (requestRef.current !== requestId) return; // a newer range was picked meanwhile
+        setData(fresh);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (requestRef.current !== requestId) return;
+        setLoading(false);
+      });
   }, [range]);
+
+  // Once the selected range has loaded, warm the other range pills in the
+  // background so clicking between them feels instant after the first visit.
+  useEffect(() => {
+    if (loading) return;
+    runWhenIdle(() => {
+      for (const r of RANGES) {
+        if (r.key !== range) prefetchJson(`/api/dashboard?range=${r.key}`);
+      }
+    });
+  }, [range, loading]);
 
   if (loading) return <AppShell><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div></AppShell>;
 

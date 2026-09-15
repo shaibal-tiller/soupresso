@@ -9,10 +9,6 @@ export async function GET(request) {
   const range = searchParams.get('range') || '14d';
 
   try {
-    const mostRecent = await query(
-      `SELECT * FROM daily_entries ORDER BY entry_date DESC LIMIT 1`
-    );
-
     let dateFilter, label;
     switch (range) {
       case '7d':
@@ -36,33 +32,37 @@ export async function GET(request) {
         label = 'Last 14 days';
     }
 
-    const rangeRows = await query(
-      `SELECT entry_date, total_sales, cash_taken_home, bazar_actual_cost, bazar_variance
-       FROM daily_entries WHERE ${dateFilter} ORDER BY entry_date ASC`
-    );
-
-    // Weekly aggregates (Mon-Sun weeks)
-    const weeklyRows = await query(
-      `SELECT date_trunc('week', entry_date)::date AS week_start,
-              SUM(total_sales) AS total_sales,
-              SUM(cash_taken_home) AS total_take_home,
-              SUM(bazar_actual_cost) AS total_expense,
-              COUNT(*) AS days_count
-       FROM daily_entries WHERE ${dateFilter}
-       GROUP BY week_start ORDER BY week_start ASC`
-    );
-
-    // Monthly aggregates
-    const monthlyRows = await query(
-      `SELECT to_char(entry_date, 'YYYY-MM') AS month,
-              SUM(total_sales) AS total_sales,
-              SUM(cash_taken_home) AS total_take_home,
-              SUM(bazar_actual_cost) AS total_expense,
-              COUNT(*) AS days_count,
-              ROUND(AVG(total_sales), 0) AS avg_daily_sales
-       FROM daily_entries WHERE ${dateFilter}
-       GROUP BY month ORDER BY month ASC`
-    );
+    // These four queries don't depend on each other's results, so run them
+    // concurrently instead of paying for four sequential round-trips to the
+    // database — the slowest one, not the sum, becomes the wait time.
+    const [mostRecent, rangeRows, weeklyRows, monthlyRows] = await Promise.all([
+      query(`SELECT * FROM daily_entries ORDER BY entry_date DESC LIMIT 1`),
+      query(
+        `SELECT entry_date, total_sales, cash_taken_home, bazar_actual_cost, bazar_variance
+         FROM daily_entries WHERE ${dateFilter} ORDER BY entry_date ASC`
+      ),
+      // Weekly aggregates (Mon-Sun weeks)
+      query(
+        `SELECT date_trunc('week', entry_date)::date AS week_start,
+                SUM(total_sales) AS total_sales,
+                SUM(cash_taken_home) AS total_take_home,
+                SUM(bazar_actual_cost) AS total_expense,
+                COUNT(*) AS days_count
+         FROM daily_entries WHERE ${dateFilter}
+         GROUP BY week_start ORDER BY week_start ASC`
+      ),
+      // Monthly aggregates
+      query(
+        `SELECT to_char(entry_date, 'YYYY-MM') AS month,
+                SUM(total_sales) AS total_sales,
+                SUM(cash_taken_home) AS total_take_home,
+                SUM(bazar_actual_cost) AS total_expense,
+                COUNT(*) AS days_count,
+                ROUND(AVG(total_sales), 0) AS avg_daily_sales
+         FROM daily_entries WHERE ${dateFilter}
+         GROUP BY month ORDER BY month ASC`
+      ),
+    ]);
 
     const rows = rangeRows.rows;
     const totalSales = rows.reduce((s, r) => s + Number(r.total_sales), 0);
