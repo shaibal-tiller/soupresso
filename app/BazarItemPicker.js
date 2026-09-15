@@ -72,7 +72,6 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     if (addedItemIds.has(item.id)) return;
     const unitBased = item.unit_based !== false;
     onLinesChange([
-      ...lines,
       {
         key: `item-${item.id}`,
         itemId: item.id,
@@ -85,6 +84,7 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
         quantity: unitBased ? '' : '1',
         unitPrice: item.recent_price != null ? String(Number(item.recent_price)) : '',
       },
+      ...lines,
     ]);
   }
 
@@ -92,8 +92,8 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     const name = customName.trim();
     if (!name) return;
     onLinesChange([
-      ...lines,
       { key: `custom-${Date.now()}-${Math.round(Math.random() * 1e6)}`, itemId: null, name, nameBn: null, unit: null, unitOptions: [], unitBased: true, icon: '🛒', quantity: '', unitPrice: '' },
+      ...lines,
     ]);
     setCustomName('');
   }
@@ -103,12 +103,21 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
   // unit price is derived to keep qty × price == total:
   //  - editing Quantity keeps the current Total fixed and recomputes price
   //  - editing Total keeps the current Quantity fixed and recomputes price
+  //
+  // The derived unit price is kept at full precision (not rounded to 2dp)
+  // here — the Total field redisplays as round2(qty × unitPrice), and
+  // rounding unitPrice first would make that redisplay drift from what was
+  // just typed (e.g. qty=12, typed "150" -> price round2(150/12)=12.5 is
+  // fine, but qty=12, typed "1" -> round2(1/12)=0.08 redisplays as 0.96,
+  // which NumberInput then reads back as an external change and overwrites
+  // the field mid-keystroke). Postgres rounds unit_price to 2dp on save
+  // regardless, so no precision is lost where it matters.
   function updateQuantity(line, n) {
     const qtyRaw = n == null ? '' : n;
     const newQty = Number(qtyRaw) || 0;
     const prevTotal = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0);
     onLinesChange(lines.map((l) => (l.key === line.key
-      ? { ...l, quantity: qtyRaw === '' ? '' : String(qtyRaw), unitPrice: newQty > 0 && prevTotal > 0 ? String(round2(prevTotal / newQty)) : l.unitPrice }
+      ? { ...l, quantity: qtyRaw === '' ? '' : String(qtyRaw), unitPrice: newQty > 0 && prevTotal > 0 ? String(prevTotal / newQty) : l.unitPrice }
       : l)));
   }
 
@@ -116,10 +125,10 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     const total = n == null ? 0 : n;
     const qty = Number(line.quantity) || 0;
     if (qty > 0) {
-      onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unitPrice: String(round2(total / qty)) } : l)));
+      onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, unitPrice: String(total / qty) } : l)));
     } else {
       // No quantity yet — default to 1 so the total stays meaningful.
-      onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: '1', unitPrice: String(round2(total)) } : l)));
+      onLinesChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: '1', unitPrice: String(total) } : l)));
     }
   }
 

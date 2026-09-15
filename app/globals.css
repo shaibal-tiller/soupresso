@@ -351,7 +351,7 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .bazar-item-name { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.2; }
 .bazar-item-unit { font-size: 9.5px; color: var(--text3); }
 
-.bazar-basket { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.bazar-basket { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 10px; margin-bottom: 10px; }
 .bazar-basket-row {
   display: flex; align-items: center; gap: 8px;
   background: var(--bg); border-radius: 10px; padding: 8px 10px;
