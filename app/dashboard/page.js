@@ -125,57 +125,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Expense breakdown: cost of products vs. overhead vs. other */}
-      {data?.expenseByGroup?.length > 0 && (
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: 12 }}>{t('Expense breakdown')} — {t(data?.range || '')}</div>
-          <div className="kpi-row">
-            {data.expenseByGroup.map((g) => (
-              <div className="kpi" key={g.group}>
-                <div className="kpi-label">{t(g.group)}</div>
-                <div className="kpi-value r">{taka(g.total)}</div>
-                <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
-                  {data.summary.totalExpense ? num(Math.round((g.total / data.summary.totalExpense) * 100)) : 0}%
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Expense breakdown by category */}
-      {data?.expenseByCategory?.length > 0 && (
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: 12 }}>{t('Expense by category')} — {t(data?.range || '')}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(() => {
-              const maxCat = Math.max(...data.expenseByCategory.map((r) => r.total), 1);
-              return data.expenseByCategory.map((r) => (
-                <div key={r.category}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                    <span style={{ color: r.category === 'Unitemized' ? 'var(--text3)' : 'var(--text)', fontWeight: 500, fontStyle: r.category === 'Unitemized' ? 'italic' : 'normal' }}>
-                      {t(r.category)}
-                    </span>
-                    <span style={{ color: 'var(--brand-paprika)', fontFamily: 'var(--mono)' }}>{taka(r.total)}</span>
-                  </div>
-                  <div style={{ height: 7, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${Math.max(2, (r.total / maxCat) * 100)}%`, borderRadius: 4,
-                      background: r.category === 'Unitemized' ? 'var(--border2)' : 'var(--brand-paprika)',
-                    }} />
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
-          {data.expenseByCategory.some((r) => r.category === 'Unitemized') && (
-            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>
-              {t('"Unitemized" is expense from days saved with a single total instead of a bazar item list.')}
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Chart with view toggle */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

@@ -13,5 +13,7 @@ node_modules/
 daily-backfill.html
 soupresso-backfill-*.json
 *.pdf
+*.xlsx
+*.csv
 Dockerfile
 docker-compose.dev.yml
