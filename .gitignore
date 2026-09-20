@@ -6,5 +6,12 @@ node_modules/
 *.log
 .DS_Store
 .superpowers/
+/backups/
+
+# Contains real business sales/expense figures or is a scratch data-entry
+# tool built for one-time backfill — not app code, keep local-only.
+daily-backfill.html
+soupresso-backfill-*.json
+*.pdf
 Dockerfile
 docker-compose.dev.yml

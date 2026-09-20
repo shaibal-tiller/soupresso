@@ -16,11 +16,14 @@ function round2(n) {
 const CATEGORY_ICONS = {
   'Meat & Egg': '🍗',
   'Vegetables': '🥬',
+  'Herbs & Leaves': '🌿',
   'Raw Spices': '🌶️',
   'Processed Spices & Sauces': '🍶',
   'Cooking Essentials': '🛢️',
+  'Serving & Seating': '🍽️',
   'Packaging': '📦',
   'Staff & Home': '🧑‍🍳',
+  'Shop Operations & Repairs': '🔧',
   'Other': '🗂️',
 };
 
