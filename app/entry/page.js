@@ -733,7 +733,7 @@ function EntryPageInner() {
                 ) : (
                   <div className="field">
                     <label>{t('Total amount in box (৳)')}</label>
-                    <NumberInput value={totalDirect} min={0} onValueChange={(n) => setTotalDirect(n == null ? '' : String(n))} placeholder={t('e.g. 10000')} autoFocus />
+                    <NumberInput value={totalDirect} min={0} onValueChange={(n) => setTotalDirect(n == null ? '' : String(n))} placeholder={t('e.g. 10000')} />
                   </div>
                 )}
                 <div className="step-result"><span>{t('Total counted')}</span><strong>{taka(totalCounted)}</strong></div>
@@ -746,7 +746,7 @@ function EntryPageInner() {
                 <p className="step-hint">{t('How much bhangti (loose change) was already in the box from yesterday?')}</p>
                 <div className="field">
                   <label>{t('Opening bhangti (৳)')}</label>
-                  <NumberInput value={openingBhangti} min={0} onValueChange={(n) => setOpeningBhangti(n ?? '')} autoFocus />
+                  <NumberInput value={openingBhangti} min={0} onValueChange={(n) => setOpeningBhangti(n ?? '')} />
                 </div>
 
                 <div className="field">
@@ -794,7 +794,7 @@ function EntryPageInner() {
                 <div className="card-title">{t("Settle yesterday's bazar")}</div>
                 <div className="field">
                   <label>{t("Bazar advance received (for today's shopping)")}</label>
-                  <NumberInput value={bazarAdvanceReceived} min={0} onValueChange={(n) => setBazarAdvanceReceived(n ?? '')} autoFocus />
+                  <NumberInput value={bazarAdvanceReceived} min={0} onValueChange={(n) => setBazarAdvanceReceived(n ?? '')} />
                 </div>
                 <div className="field">
                   <label>{t('Actual bazar cost today')}</label>

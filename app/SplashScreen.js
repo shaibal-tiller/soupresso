@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 // full-window "photo" experience: logo, name and a little steam doodle on a
 // warm thematic gradient, self-dismissing once the app has had a moment to
 // settle in.
+const SESSION_FLAG = 'soupresso_splash_shown';
+
 export default function SplashScreen() {
   // null = not yet determined (nothing renders, avoids a flash on browser
   // tabs/desktop); true = installed PWA cold start, show + auto-dismiss.
@@ -19,8 +21,19 @@ export default function SplashScreen() {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
-    setShow(isStandalone);
-    if (!isStandalone) return;
+    if (!isStandalone) { setShow(false); return; }
+
+    // Nav links in this app are plain <a> tags (full document reloads, not
+    // client-side routing), so every in-app page change re-mounts this
+    // component. Only show the splash once per app session — real cold
+    // starts get a fresh sessionStorage each time the installed app is
+    // fully closed and reopened.
+    let alreadyShown = false;
+    try { alreadyShown = sessionStorage.getItem(SESSION_FLAG) === '1'; } catch {}
+    if (alreadyShown) { setShow(false); return; }
+    try { sessionStorage.setItem(SESSION_FLAG, '1'); } catch {}
+
+    setShow(true);
     const timer = setTimeout(() => setHidden(true), 1100);
     return () => clearTimeout(timer);
   }, []);
