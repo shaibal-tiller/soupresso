@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
@@ -99,8 +100,20 @@ const HISHAB_CLOSERS = [
 ];
 
 export default function EntryPage() {
+  return (
+    <Suspense fallback={<AppShell><div className="wizard-shell"><div className="wizard-body"><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>Loading…</div></div></div></AppShell>}>
+      <EntryPageInner />
+    </Suspense>
+  );
+}
+
+function EntryPageInner() {
   const { t, taka, num, digits, dateNice, dateDisplay } = useLang();
-  const [date, setDate] = useState(todayStr());
+  const searchParams = useSearchParams();
+  const [date, setDate] = useState(() => {
+    const fromUrl = searchParams.get('date');
+    return fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : todayStr();
+  });
   const [editing, setEditing] = useState(false); // locked until user explicitly starts
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState('denom');

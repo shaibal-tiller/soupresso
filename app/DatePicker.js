@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useLang } from './LangProvider';
-import { todayStr, shiftDateStr } from '@/lib/dates';
+import { todayStr, shiftDateStr, toDateStr } from '@/lib/dates';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -33,7 +33,12 @@ export default function DatePicker({ value, onChange, minDate = '2026-08-01' }) 
         if (cancelled) return;
         const map = {};
         for (const e of data.entries || []) {
-          map[String(e.entry_date).slice(0, 10)] = !!e.is_off_day;
+          // entry_date is a full ISO timestamp (API doesn't cast to text) —
+          // slicing the raw string can land on the wrong calendar day (pg
+          // parses DATE as server-local midnight); going through a real
+          // Date object resolves it via the browser's local getters instead,
+          // which is correct (see lib/dates.js's toLocalDate comment).
+          map[toDateStr(new Date(e.entry_date))] = !!e.is_off_day;
         }
         setMonthEntries(map);
       })

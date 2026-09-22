@@ -487,3 +487,39 @@ ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS is_frequent BOOLEAN NOT NULL DE
 -- subtracted back out of total_sales so it isn't double-counted as revenue).
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS baki_given NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS baki_received NUMERIC(12,2) NOT NULL DEFAULT 0;
+-- Usability round 10 (2026-09-22): weekly closing roster + task tracker.
+
+-- Default team for each day of the week (0=Sunday .. 6=Saturday) — who's
+-- *supposed* to close that weekday, separate from `daily_entries.closed_by`
+-- which is who *actually* closed (whoever was available that specific day).
+CREATE TABLE IF NOT EXISTS roster (
+  day_of_week SMALLINT PRIMARY KEY CHECK (day_of_week BETWEEN 0 AND 6),
+  people      TEXT[] NOT NULL DEFAULT '{}'
+);
+INSERT INTO roster (day_of_week, people)
+SELECT d, '{}' FROM generate_series(0, 6) AS d
+ON CONFLICT (day_of_week) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id           SERIAL PRIMARY KEY,
+  title        TEXT NOT NULL,
+  description  TEXT,
+  assigned_to  TEXT,
+  due_date     DATE,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'cancelled')),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks (due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
+
+-- One row per status change / note — the audit trail for a task, shown as a
+-- comment thread (mirrors entry_edit_log's audit-trail pattern elsewhere).
+CREATE TABLE IF NOT EXISTS task_comments (
+  id         SERIAL PRIMARY KEY,
+  task_id    INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  comment    TEXT NOT NULL,
+  status_at  TEXT,  -- the task's status at the time of this comment, if it was a status change
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments (task_id, created_at);
