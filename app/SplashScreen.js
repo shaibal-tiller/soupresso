@@ -10,12 +10,22 @@ import { useEffect, useState } from 'react';
 // warm thematic gradient, self-dismissing once the app has had a moment to
 // settle in.
 export default function SplashScreen() {
+  // null = not yet determined (nothing renders, avoids a flash on browser
+  // tabs/desktop); true = installed PWA cold start, show + auto-dismiss.
+  const [show, setShow] = useState(null);
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+    setShow(isStandalone);
+    if (!isStandalone) return;
     const timer = setTimeout(() => setHidden(true), 1100);
     return () => clearTimeout(timer);
   }, []);
+
+  if (!show) return null;
 
   return (
     <div className={`splash-screen${hidden ? ' hidden' : ''}`} aria-hidden={hidden}>

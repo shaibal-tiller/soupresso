@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import LangToggle from './LangToggle';
 import { useLang } from './LangProvider';
@@ -19,6 +20,18 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useLang();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [drawerOpen]);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -28,7 +41,7 @@ export default function AppShell({ children }) {
 
   return (
     <div className="shell-layout">
-      {/* Desktop-only sidenav (CSS hides it below 900px; the tabbar below takes over) */}
+      {/* Desktop-only sidenav (CSS hides it below 900px; the drawer below takes over) */}
       <nav className="sidenav no-print">
         <div className="sidenav-brand">
           <div className="brand-logo"><img src="/logo.jpg" alt="Soupresso" /></div>
@@ -52,9 +65,19 @@ export default function AppShell({ children }) {
       <div className="shell-main">
         <div className="topbar no-print">
           <div className="topbar-inner">
-            <div className="brand">
-              <div className="brand-logo"><img src="/logo.jpg" alt="Soupresso" /></div>
-              <div className="brand-name">Soupresso</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                className="menu-btn"
+                aria-label={t('Menu')}
+                aria-expanded={drawerOpen}
+                onClick={() => setDrawerOpen(true)}
+              >
+                <span /><span /><span />
+              </button>
+              <div className="brand">
+                <div className="brand-logo"><img src="/logo.jpg" alt="Soupresso" /></div>
+                <div className="brand-name">Soupresso</div>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <LangToggle />
@@ -63,17 +86,34 @@ export default function AppShell({ children }) {
               </button>
             </div>
           </div>
-          {/* Phone/tablet menu bar — CSS hides this at desktop widths in favor of the sidenav */}
-          <nav className="tabbar">
-            {TABS.map((tab) => (
-              <a key={tab.href} href={tab.href} className={pathname.startsWith(tab.href) ? 'active' : ''}>
-                {t(tab.label)}
-              </a>
-            ))}
-          </nav>
         </div>
         <main>{children}</main>
       </div>
+
+      {/* Phone/tablet drawer nav — CSS hides this entirely at desktop widths in favor of the sidenav */}
+      <div
+        className={`drawer-overlay no-print${drawerOpen ? ' open' : ''}`}
+        onClick={() => setDrawerOpen(false)}
+        aria-hidden="true"
+      />
+      <nav className={`drawer no-print${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}>
+        <div className="sidenav-brand">
+          <div className="brand-logo"><img src="/logo.jpg" alt="Soupresso" /></div>
+          <div className="brand-name">Soupresso</div>
+        </div>
+        <div className="sidenav-links">
+          {TABS.map((tab) => (
+            <a
+              key={tab.href}
+              href={tab.href}
+              className={pathname.startsWith(tab.href) ? 'active' : ''}
+              onClick={() => setDrawerOpen(false)}
+            >
+              {t(tab.label)}
+            </a>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }

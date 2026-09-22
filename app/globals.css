@@ -38,13 +38,12 @@ input, select, button, textarea { font-family: inherit; font-size: inherit; }
 .brand-logo img { width: 100%; height: 100%; object-fit: cover; }
 .brand-name { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--brand-green); }
 
-.tabbar { display: flex; gap: 4px; overflow-x: auto; padding: 6px 20px 0; max-width: 640px; margin: 0 auto; scrollbar-width: none; }
-.tabbar::-webkit-scrollbar { display: none; }
-.tabbar a {
-  flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--text3);
-  padding: 8px 12px; border-bottom: 2px solid transparent; white-space: nowrap;
+.menu-btn {
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  width: 34px; height: 34px; flex-shrink: 0; background: none; border: none;
+  padding: 0; cursor: pointer;
 }
-.tabbar a.active { color: var(--brand-green); border-bottom-color: var(--brand-green); }
+.menu-btn span { display: block; width: 20px; height: 2px; background: var(--brand-green); border-radius: 2px; }
 
 main { max-width: 640px; margin: 0 auto; padding: 20px; }
 
@@ -255,8 +254,8 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 /* ---- WIZARD (Daily Entry) ---- */
 .wizard-shell {
   display: flex; flex-direction: column;
-  height: calc(100vh - 90px); /* below topbar+tabbar */
-  max-height: calc(100dvh - 90px);
+  height: calc(100vh - 60px); /* below the single-row topbar */
+  max-height: calc(100dvh - 60px);
   overflow: hidden;
 }
 .wizard-header { flex-shrink: 0; padding: 12px 0 0; }
@@ -467,11 +466,33 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .calc-row .g { color: var(--green) !important; }
 .calc-row .r { color: var(--red) !important; }
 
-/* ---- Sidenav (desktop) / tabbar (phone & tablet) ---- */
+/* ---- Sidenav (desktop) / hamburger + drawer (phone & tablet) ---- */
 .shell-layout { display: flex; align-items: stretch; min-height: 100vh; }
 .shell-main { flex: 1 1 auto; min-width: 0; }
 
 .sidenav { display: none; }
+
+/* Phone/tablet slide-in drawer (below 900px; the sidenav takes over above that) */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 90; background: rgba(43,33,24,0.4);
+  opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
+}
+.drawer-overlay.open { opacity: 1; visibility: visible; }
+.drawer {
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 95;
+  width: 78%; max-width: 280px; background: var(--bg2);
+  padding: 22px 14px; display: flex; flex-direction: column; overflow-y: auto;
+  box-shadow: var(--shadow); transform: translateX(-100%); transition: transform .25s ease;
+}
+.drawer.open { transform: translateX(0); }
+.drawer .sidenav-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; }
+.drawer .sidenav-links { display: flex; flex-direction: column; gap: 2px; }
+.drawer .sidenav-links a {
+  display: flex; align-items: center; padding: 12px 12px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; color: var(--text2);
+}
+.drawer .sidenav-links a:hover { background: var(--bg3); }
+.drawer .sidenav-links a.active { background: var(--brand-green); color: #fff; }
 
 @media (min-width: 900px) {
   .sidenav {
@@ -490,14 +511,14 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
   .sidenav-links a.active { background: var(--brand-green); color: #fff; }
   .sidenav-footer { padding: 14px 8px 0; border-top: 1px solid var(--border); margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
 
-  /* Topbar becomes a slim desktop header — brand/tabs move into the sidenav. */
-  .topbar-inner .brand, .tabbar { display: none; }
+  /* Topbar becomes a slim desktop header — brand/menu move into the sidenav. */
+  .topbar-inner .brand, .menu-btn, .drawer-overlay, .drawer { display: none; }
   .topbar-inner { justify-content: flex-end; }
   main { max-width: 900px; }
 }
 
 @media print {
-  .topbar, .tabbar, .sidenav, .no-print { display: none !important; }
+  .topbar, .drawer-overlay, .drawer, .sidenav, .no-print { display: none !important; }
   body { background: #fff; }
   main { max-width: 100%; padding: 0; }
 }
