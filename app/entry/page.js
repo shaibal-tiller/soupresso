@@ -8,7 +8,7 @@ import NumberInput from '../NumberInput';
 import BazarItemPicker from '../BazarItemPicker';
 import DatePicker from '../DatePicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
-import { todayStr, shiftDateStr } from '@/lib/dates';
+import { todayStr, shiftDateStr, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
 import { cachedFetchJson, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 
 const BAZAR_ITEMS_URL = '/api/bazar-items';
@@ -115,6 +115,7 @@ function EntryPageInner() {
     return fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : todayStr();
   });
   const [editing, setEditing] = useState(false); // locked until user explicitly starts
+  const editable = isEntryEditable(date, todayStr()); // older days are locked — corrections go through SQL
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState('denom');
   const [denoms, setDenoms] = useState(emptyDenoms());
@@ -623,9 +624,15 @@ function EntryPageInner() {
                   <div style={{ fontSize: 36, marginBottom: 8 }}>🚫</div>
                   <h3 style={{ color: 'var(--text)', marginBottom: 4 }}>{t('Shop was closed')}</h3>
                   {existingEntry.notes && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{existingEntry.notes}</p>}
-                  <button className="btn secondary" onClick={() => { setEditing(true); }} style={{ marginTop: 8 }}>
-                    ✎ {t('Edit this day')}
-                  </button>
+                  {editable ? (
+                    <button className="btn secondary" onClick={() => { setEditing(true); }} style={{ marginTop: 8 }}>
+                      ✎ {t('Edit this day')}
+                    </button>
+                  ) : (
+                    <p className="step-hint" style={{ marginTop: 8 }}>
+                      🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
+                    </p>
+                  )}
                 </div>
               ) : (
                 /* Existing entry summary */
@@ -647,9 +654,15 @@ function EntryPageInner() {
                       <span>{existingEntry.notes}</span>
                     </div>
                   )}
-                  <button className="btn secondary block" onClick={() => setEditing(true)} style={{ marginTop: 16 }}>
-                    ✎ {t('Edit this entry')}
-                  </button>
+                  {editable ? (
+                    <button className="btn secondary block" onClick={() => setEditing(true)} style={{ marginTop: 16 }}>
+                      ✎ {t('Edit this entry')}
+                    </button>
+                  ) : (
+                    <p className="step-hint" style={{ marginTop: 16, textAlign: 'center' }}>
+                      🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
+                    </p>
+                  )}
                 </div>
               )
             ) : (
@@ -661,14 +674,20 @@ function EntryPageInner() {
                   {dateDisplay(date)}
                 </p>
                 {carryForwardFrom && <div className="wizard-badge carry" style={{ marginBottom: 16 }}>{t('Carried forward from')} {dateNice(carryForwardFrom)}</div>}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
-                    ＋ {t('Start entry')}
-                  </button>
-                  <button className="btn secondary" onClick={() => { setEditing(true); setIsOffDay(true); }}>
-                    🚫 {t('Mark off day')}
-                  </button>
-                </div>
+                {editable ? (
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
+                      ＋ {t('Start entry')}
+                    </button>
+                    <button className="btn secondary" onClick={() => { setEditing(true); setIsOffDay(true); }}>
+                      🚫 {t('Mark off day')}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="step-hint">
+                    🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
+                  </p>
+                )}
               </div>
             )}
             {msg && <div className={`status-msg ${msg.type}`} style={{ marginTop: 10 }}>{msg.text}</div>}

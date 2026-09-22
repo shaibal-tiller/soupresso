@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { computeCashSummary } from '@/lib/cash-math';
 import { coerceLocaleNumber } from '@/lib/numerals';
+import { todayStrTZ, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic'; // always hits the live database, never statically cached
 
@@ -92,6 +93,13 @@ export async function POST(request) {
 
   if (!entryDate || !/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
     return NextResponse.json({ error: 'entryDate (YYYY-MM-DD) is required' }, { status: 400 });
+  }
+
+  if (!isEntryEditable(entryDate, todayStrTZ())) {
+    return NextResponse.json(
+      { error: `Entries older than ${ENTRY_EDIT_WINDOW_DAYS} days are locked. Older corrections are made directly in the database.` },
+      { status: 403 }
+    );
   }
 
   const closedByArr = Array.isArray(closedBy) ? closedBy.filter((n) => typeof n === 'string') : [];

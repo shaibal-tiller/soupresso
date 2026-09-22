@@ -172,7 +172,7 @@ export default function HistoryPage() {
             <button className="btn secondary no-print" style={{ flex: 1 }} onClick={handleDownload} disabled={downloading}>
               {downloading ? t('Preparing…') : `⬇ ${t('Download')}`}
             </button>
-            <a href="/entry" className="btn no-print" style={{ flex: 1, justifyContent: 'center' }}>✎ {t('Edit')}</a>
+            <a href={`/entry?date=${date}`} className="btn no-print" style={{ flex: 1, justifyContent: 'center' }}>✎ {t('Edit')}</a>
           </div>
         </div>
       ) : (
@@ -244,7 +244,7 @@ export default function HistoryPage() {
             <button className="btn secondary no-print" style={{ flex: 1 }} onClick={handleDownload} disabled={downloading}>
               {downloading ? t('Preparing…') : `⬇ ${t('Download')}`}
             </button>
-            <a href="/entry" className="btn no-print" style={{ flex: 1, justifyContent: 'center' }}>✎ {t('Edit')}</a>
+            <a href={`/entry?date=${date}`} className="btn no-print" style={{ flex: 1, justifyContent: 'center' }}>✎ {t('Edit')}</a>
           </div>
         </div>
       )}
