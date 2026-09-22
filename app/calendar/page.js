@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
+import DatePicker from '../DatePicker';
 import { todayStr, shiftDateStr, toDateStr } from '@/lib/dates';
 import { cachedFetchJson, invalidateCache } from '@/lib/clientCache';
 
@@ -17,11 +18,21 @@ const HISHAB_CLOSERS = [
   'Supto', 'Chef (Sujit)',
 ];
 
+const TASK_FILTERS = [
+  { key: 'pending', label: 'Pending' },
+  { key: 'all', label: 'All' },
+  { key: 'done', label: 'Done' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
+
+const STATUS_COLORS = { pending: 'var(--amber)', done: 'var(--green)', cancelled: 'var(--text3)' };
+
 function pad(n) { return String(n).padStart(2, '0'); }
 function ymd(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
+function emptyTaskForm() { return { title: '', description: '', assignedTo: '', dueDate: '', useDueDate: false }; }
 
 export default function CalendarPage() {
-  const { t, num, digits, dateNice } = useLang();
+  const { t, digits, dateNice } = useLang();
   const [viewYear, setViewYear] = useState(() => Number(todayStr().slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => Number(todayStr().slice(5, 7)) - 1);
   const [entries, setEntries] = useState({}); // date -> entry row
@@ -35,17 +46,34 @@ export default function CalendarPage() {
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
   const [addingTask, setAddingTask] = useState(false);
 
+  // Task detail/expand state — shared between the day panel's task list and
+  // the all-tasks list below, so only one task is expanded at a time.
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
+  const [commentsByTask, setCommentsByTask] = useState({});
+  const [commentDraft, setCommentDraft] = useState('');
+  const [pendingAction, setPendingAction] = useState(null); // { taskId, status }
+  const [savingTask, setSavingTask] = useState(false);
+
+  // All-tasks list (status-filtered, not bound to the visible month).
+  const [taskFilter, setTaskFilter] = useState('pending');
+  const [allTasks, setAllTasks] = useState([]);
+  const [allTasksLoading, setAllTasksLoading] = useState(true);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [taskForm, setTaskForm] = useState(emptyTaskForm());
+
   const monthStart = ymd(viewYear, viewMonth, 1);
   const monthEnd = ymd(viewYear, viewMonth, new Date(viewYear, viewMonth + 1, 0).getDate());
   const fetchFrom = monthStart < MIN_DATE ? MIN_DATE : monthStart;
   const fetchTo = monthEnd > MAX_DATE ? MAX_DATE : monthEnd;
+  const tasksRangeUrl = `/api/tasks?from=${fetchFrom}&to=${fetchTo}`;
+  const tasksFilterUrl = taskFilter === 'all' ? '/api/tasks' : `/api/tasks?status=${taskFilter}`;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [entriesData, tasksData, rosterData] = await Promise.all([
         cachedFetchJson(`/api/entries?from=${fetchFrom}&to=${fetchTo}`),
-        cachedFetchJson(`/api/tasks?from=${fetchFrom}&to=${fetchTo}`),
+        cachedFetchJson(tasksRangeUrl),
         cachedFetchJson('/api/roster'),
       ]);
       const eMap = {};
@@ -71,9 +99,33 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  }, [fetchFrom, fetchTo]);
+  }, [fetchFrom, fetchTo, tasksRangeUrl]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadAllTasks = useCallback(async () => {
+    setAllTasksLoading(true);
+    try {
+      const data = await cachedFetchJson(tasksFilterUrl);
+      setAllTasks(data.tasks || []);
+    } finally {
+      setAllTasksLoading(false);
+    }
+  }, [tasksFilterUrl]);
+
+  useEffect(() => { loadAllTasks(); }, [loadAllTasks]);
+
+  function invalidateAllTaskCaches(taskId) {
+    invalidateCache(tasksRangeUrl);
+    for (const f of TASK_FILTERS) invalidateCache(f.key === 'all' ? '/api/tasks' : `/api/tasks?status=${f.key}`);
+    if (taskId) invalidateCache(`/api/tasks/${taskId}`);
+  }
+
+  async function refreshAfterTaskChange(taskId) {
+    invalidateAllTaskCaches(taskId);
+    await Promise.all([load(), loadAllTasks()]);
+    if (taskId) await loadComments(taskId);
+  }
 
   const rosterFor = (dow) => roster?.find((r) => r.day_of_week === dow)?.people || [];
 
@@ -149,21 +201,98 @@ export default function CalendarPage() {
         body: JSON.stringify({ title, dueDate: selectedDate }),
       });
       setQuickTaskTitle('');
-      invalidateCache(`/api/tasks?from=${fetchFrom}&to=${fetchTo}`);
-      load();
+      await refreshAfterTaskChange();
     } finally {
       setAddingTask(false);
     }
   }
 
+  async function handleAddTask(e) {
+    e.preventDefault();
+    if (!taskForm.title.trim()) return;
+    setSavingTask(true);
+    try {
+      await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskForm.title.trim(),
+          description: taskForm.description.trim() || null,
+          assignedTo: taskForm.assignedTo || null,
+          dueDate: taskForm.useDueDate && taskForm.dueDate ? taskForm.dueDate : null,
+        }),
+      });
+      setTaskForm(emptyTaskForm());
+      setShowAddTask(false);
+      await refreshAfterTaskChange();
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  async function loadComments(taskId) {
+    const data = await cachedFetchJson(`/api/tasks/${taskId}`);
+    setCommentsByTask((prev) => ({ ...prev, [taskId]: data.comments || [] }));
+  }
+
+  function toggleExpand(taskId) {
+    setExpandedTaskId((id) => (id === taskId ? null : taskId));
+    setPendingAction(null);
+    setCommentDraft('');
+    if (expandedTaskId !== taskId && !commentsByTask[taskId]) loadComments(taskId);
+  }
+
+  function startStatusChange(taskId, status) {
+    setPendingAction({ taskId, status });
+    setCommentDraft('');
+  }
+
+  async function confirmStatusChange() {
+    if (!pendingAction) return;
+    const { taskId, status } = pendingAction;
+    setSavingTask(true);
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, comment: commentDraft.trim() || undefined }),
+      });
+      setPendingAction(null);
+      setCommentDraft('');
+      await refreshAfterTaskChange(taskId);
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
   async function toggleTaskDone(task) {
-    await fetch(`/api/tasks/${task.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: task.status === 'done' ? 'pending' : 'done' }),
-    });
-    invalidateCache(`/api/tasks?from=${fetchFrom}&to=${fetchTo}`);
-    load();
+    setSavingTask(true);
+    try {
+      await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: task.status === 'done' ? 'pending' : 'done' }),
+      });
+      await refreshAfterTaskChange(task.id);
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  async function addPlainComment(taskId) {
+    if (!commentDraft.trim()) return;
+    setSavingTask(true);
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: commentDraft.trim() }),
+      });
+      setCommentDraft('');
+      await refreshAfterTaskChange(taskId);
+    } finally {
+      setSavingTask(false);
+    }
   }
 
   const selected = selectedDate ? {
@@ -172,6 +301,89 @@ export default function CalendarPage() {
     entry: entries[selectedDate],
     tasks: tasksByDate[selectedDate] || [],
   } : null;
+
+  // Shared row renderer: a task's summary line, and — when expanded — its
+  // description, status controls and full comment history. Used both by the
+  // selected day's "Tasks due this day" list and the all-tasks list below.
+  function renderTaskItem(task) {
+    const expanded = expandedTaskId === task.id;
+    return (
+      <div key={task.id} style={{ borderBottom: '1px solid var(--border)' }}>
+        <div
+          onClick={() => toggleExpand(task.id)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', cursor: 'pointer' }}
+        >
+          <input
+            type="checkbox"
+            checked={task.status === 'done'}
+            onChange={(e) => { e.stopPropagation(); toggleTaskDone(task); }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 13, textDecoration: task.status === 'done' ? 'line-through' : 'none', color: task.status === 'cancelled' ? 'var(--text3)' : 'var(--text)' }}>
+              {task.title}
+            </span>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>
+              {task.assigned_to && <span>{task.assigned_to}</span>}
+              {task.due_date && <span>{task.assigned_to ? ' · ' : ''}{dateNice(toDateStr(new Date(task.due_date)))}</span>}
+            </div>
+          </div>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: STATUS_COLORS[task.status], textTransform: 'uppercase', flexShrink: 0 }}>
+            {t(task.status)}
+          </span>
+        </div>
+
+        {expanded && (
+          <div style={{ paddingBottom: 12 }} onClick={(e) => e.stopPropagation()}>
+            {task.description && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10 }}>{task.description}</p>}
+
+            <div className="btn-row" style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+              {task.status !== 'pending' && (
+                <button className="btn secondary btn-small" onClick={() => startStatusChange(task.id, 'pending')}>{t('Reopen')}</button>
+              )}
+              {task.status !== 'done' && (
+                <button className="btn btn-small" style={{ background: 'var(--green)' }} onClick={() => startStatusChange(task.id, 'done')}>{t('✓ Mark done')}</button>
+              )}
+              {task.status !== 'cancelled' && (
+                <button className="btn secondary btn-small" onClick={() => startStatusChange(task.id, 'cancelled')}>{t('✕ Cancel')}</button>
+              )}
+            </div>
+
+            {pendingAction?.taskId === task.id && (
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                <label style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                  {t('Optional comment for this change')}
+                </label>
+                <input type="text" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder={t('e.g. reason, notes...')} style={{ marginBottom: 8 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn secondary btn-small" onClick={() => setPendingAction(null)}>{t('Cancel')}</button>
+                  <button className="btn btn-small" onClick={confirmStatusChange} disabled={savingTask}>{t('Confirm')}</button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 6 }}>{t('History')}</div>
+            {(commentsByTask[task.id] || []).length === 0 ? (
+              <p style={{ fontSize: 12.5, color: 'var(--text3)' }}>{t('No comments yet.')}</p>
+            ) : (
+              commentsByTask[task.id].map((c) => (
+                <div key={c.id} style={{ fontSize: 12.5, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text)' }}>{c.comment}</span>
+                  <div style={{ color: 'var(--text3)', fontSize: 10.5, marginTop: 2 }}>{dateNice(c.created_at)}</div>
+                </div>
+              ))
+            )}
+            {!pendingAction && (
+              <div className="bazar-custom-add" style={{ marginTop: 10, marginBottom: 0 }}>
+                <input type="text" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder={t('Add a comment...')} />
+                <button type="button" className="btn secondary" onClick={() => addPlainComment(task.id)} disabled={savingTask || !commentDraft.trim()}>{t('Add')}</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <AppShell>
@@ -263,22 +475,73 @@ export default function CalendarPage() {
           <div>
             <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>{t('Tasks due this day')}</div>
             {selected.tasks.length === 0 && <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8 }}>{t('None yet.')}</p>}
-            {selected.tasks.map((task) => (
-              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                <input type="checkbox" checked={task.status === 'done'} onChange={() => toggleTaskDone(task)} />
-                <span style={{ flex: 1, fontSize: 13, textDecoration: task.status === 'done' ? 'line-through' : 'none', color: task.status === 'cancelled' ? 'var(--text3)' : 'var(--text)' }}>
-                  {task.title}{task.assigned_to ? ` — ${task.assigned_to}` : ''}
-                </span>
-              </div>
-            ))}
+            {selected.tasks.map(renderTaskItem)}
             <div className="bazar-custom-add" style={{ marginTop: 10, marginBottom: 0 }}>
               <input type="text" value={quickTaskTitle} onChange={(e) => setQuickTaskTitle(e.target.value)} placeholder={t('Add a task for this day...')} />
               <button type="button" className="btn secondary" onClick={addQuickTask} disabled={addingTask || !quickTaskTitle.trim()}>{t('Add')}</button>
             </div>
-            <a className="btn secondary btn-small" href="/tasks" style={{ marginTop: 10, display: 'inline-block' }}>{t('Manage all tasks →')}</a>
           </div>
         </div>
       )}
+
+      <div className="card">
+        <div className="card-title">{t('All tasks')}</div>
+        <div className="toggle-row">
+          {TASK_FILTERS.map((f) => (
+            <button key={f.key} className={taskFilter === f.key ? 'on' : ''} onClick={() => setTaskFilter(f.key)}>
+              {t(f.label)}
+            </button>
+          ))}
+        </div>
+
+        <button className="btn block" onClick={() => setShowAddTask((v) => !v)} style={{ marginBottom: 16 }}>
+          {showAddTask ? t('Cancel') : t('+ Add task')}
+        </button>
+
+        {showAddTask && (
+          <form onSubmit={handleAddTask} style={{ marginBottom: 16 }}>
+            <div className="field">
+              <label>{t('Title')}</label>
+              <input type="text" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} placeholder={t('e.g. Fix the burner')} required autoFocus />
+            </div>
+            <div className="field">
+              <label>{t('Description (optional)')}</label>
+              <input type="text" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} placeholder={t('Details')} />
+            </div>
+            <div className="field">
+              <label>{t('Assign to (optional)')}</label>
+              <div className="chip-select" style={{ marginBottom: 0 }}>
+                <button type="button" className={!taskForm.assignedTo ? 'on' : ''} onClick={() => setTaskForm({ ...taskForm, assignedTo: '' })}>{t('Unassigned')}</button>
+                {HISHAB_CLOSERS.map((n) => (
+                  <button key={n} type="button" className={taskForm.assignedTo === n ? 'on' : ''} onClick={() => setTaskForm({ ...taskForm, assignedTo: n })}>{n}</button>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none' }}>
+                <input type="checkbox" checked={taskForm.useDueDate} onChange={(e) => setTaskForm({ ...taskForm, useDueDate: e.target.checked, dueDate: e.target.checked ? (taskForm.dueDate || todayStr()) : '' })} style={{ width: 'auto' }} />
+                {t('Set a due date')}
+              </label>
+              {taskForm.useDueDate && (
+                <div style={{ marginTop: 8 }}>
+                  <DatePicker value={taskForm.dueDate || todayStr()} onChange={(d) => setTaskForm({ ...taskForm, dueDate: d })} minDate={MIN_DATE} />
+                </div>
+              )}
+            </div>
+            <button type="submit" className="btn block" disabled={savingTask || !taskForm.title.trim()}>
+              {savingTask ? t('Saving…') : t('Add task')}
+            </button>
+          </form>
+        )}
+
+        {allTasksLoading ? (
+          <p style={{ color: 'var(--text2)' }}>{t('Loading…')}</p>
+        ) : allTasks.length === 0 ? (
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No tasks here.')}</p>
+        ) : (
+          allTasks.map(renderTaskItem)
+        )}
+      </div>
 
       {showRoster && (
         <div className="modal-overlay" onClick={() => setShowRoster(false)}>
