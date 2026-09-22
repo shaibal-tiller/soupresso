@@ -4,9 +4,11 @@
   "description": "Daily cash reconciliation & sales tracking",
   "start_url": "/entry",
   "display": "standalone",
-  "background_color": "#FBF6EC",
-  "theme_color": "#1F5C42",
+  "background_color": "#F0AE04",
+  "theme_color": "#F0AE04",
   "icons": [
-    { "src": "/logo.jpg", "sizes": "200x200", "type": "image/jpeg" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

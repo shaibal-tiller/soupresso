@@ -1,10 +1,11 @@
 import './globals.css';
 import LangProvider from './LangProvider';
+import SplashScreen from './SplashScreen';
 
 export const metadata = {
   title: 'Soupresso — Daily Cash Register',
   description: 'Daily cash reconciliation, receipts, and sales dashboard for Soupresso — Soup, Momo & Fried Snacks at ECB Chattar, Dhaka Cantonment.',
-  icons: { icon: '/logo.jpg', apple: '/logo.jpg' },
+  icons: { icon: '/icon-512.png', apple: '/icon-512.png' },
   openGraph: {
     title: 'Soupresso — Cash Register',
     description: 'Daily cash reconciliation & sales tracking for Soupresso',
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        <SplashScreen />
         <LangProvider>{children}</LangProvider>
       </body>
     </html>

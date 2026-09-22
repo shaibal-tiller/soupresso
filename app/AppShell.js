@@ -11,6 +11,7 @@ const TABS = [
   { href: '/expenses', label: 'Expenses' },
   { href: '/calendar', label: 'Calendar' },
   { href: '/products', label: 'Products' },
+  { href: '/bazar-items', label: 'Bazar Catalog' },
   { href: '/investments', label: 'Investments' },
 ];
 

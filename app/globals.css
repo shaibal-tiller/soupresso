@@ -520,3 +520,31 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
   background: var(--bg2); color: var(--text2); font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
 .chip-select button.on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+
+/* ---- SPLASH SCREEN (full-viewport cold-load branding) ---- */
+.splash-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #F7C948 0%, #F0AE04 45%, #DD8B12 100%);
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+  overflow: hidden;
+}
+.splash-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.splash-dot { position: absolute; border-radius: 50%; opacity: 0.32; }
+.splash-logo {
+  width: 132px; height: 132px; border-radius: 30px;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.2); object-fit: cover;
+}
+.splash-name {
+  margin-top: 18px; font-size: 27px; font-weight: 800; color: #1F5C42; letter-spacing: 0.4px;
+  font-family: var(--sans);
+}
+.splash-tag {
+  margin-top: 4px; font-size: 12px; color: rgba(31,92,66,0.75); text-transform: uppercase; letter-spacing: 2px;
+}
+.splash-steam-line { animation: splash-rise 2.4s ease-in-out infinite; }
+@keyframes splash-rise {
+  0% { transform: translateY(0) scaleX(1); opacity: 0.5; }
+  50% { transform: translateY(-12px) scaleX(1.12); opacity: 0.9; }
+  100% { transform: translateY(0) scaleX(1); opacity: 0.5; }
+}
