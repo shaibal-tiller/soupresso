@@ -53,7 +53,6 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
   const [search, setSearch] = useState('');
   const [showBrowse, setShowBrowse] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
-  const [customName, setCustomName] = useState('');
   const [showFrequent, setShowFrequent] = useState(false);
   // Optimistic local overlay for is_frequent — the parent page loads
   // `catalog` once and shares it across both the actual/planned pickers on
@@ -122,14 +121,32 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
     ]);
   }
 
-  function addCustom() {
-    const name = customName.trim();
-    if (!name) return;
+  function addCustomNamed(name) {
     onLinesChange([
       { key: `custom-${Date.now()}-${Math.round(Math.random() * 1e6)}`, itemId: null, name, nameBn: null, unit: null, unitOptions: [], unitBased: true, icon: '🛒', quantity: '', unitPrice: '' },
       ...lines,
     ]);
-    setCustomName('');
+  }
+
+  // The single search/add box: typing filters the catalog (shown below as
+  // tappable rows, same as before); the Add button next to it acts on
+  // whatever's typed — an exact catalog match is added like tapping its
+  // row, otherwise it's added as a new one-off item. Previously this was
+  // two separate inputs (search vs. "add another item"), so clicking Add
+  // after searching silently added stale text from the other box instead
+  // of the item just searched for.
+  function handleAddClick() {
+    const term = search.trim();
+    if (!term) return;
+    const exact = catalog.find(
+      (c) => c.name.toLowerCase() === term.toLowerCase() || (c.name_bn && c.name_bn === term)
+    );
+    if (exact) {
+      if (!addedItemIds.has(exact.id)) addItem(exact);
+    } else {
+      addCustomNamed(term);
+    }
+    setSearch('');
   }
 
   // Quantity and unit price are the two stored fields; the basket shows
@@ -197,13 +214,17 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
 
   return (
     <div className="bazar-picker">
-      <div className="bazar-picker-toolbar">
+      <div className="bazar-custom-add">
         <input
           type="text"
           value={search}
           onChange={(e) => { setSearch(e.target.value); if (e.target.value.trim()) setShowFrequent(false); }}
-          placeholder={t('Search items...')}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddClick(); } }}
+          placeholder={t('Search or add an item...')}
         />
+        <button type="button" className="btn secondary" onClick={handleAddClick} disabled={!search.trim()}>{t('Add')}</button>
+      </div>
+      <div className="bazar-picker-toolbar">
         <button
           type="button"
           className={`btn secondary bazar-browse-btn bazar-frequent-btn${showFrequent ? ' on' : ''}`}
@@ -219,7 +240,7 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
       {search.trim() ? (
         <div className="bazar-search-results">
           {searchResults.length === 0 ? (
-            <p className="bazar-search-empty">{t('No items match your search.')}</p>
+            <p className="bazar-search-empty">{t('No items match — tap Add to add it as a new item.')}</p>
           ) : (
             searchResults.map((item) => {
               const added = addedItemIds.has(item.id);
@@ -269,16 +290,6 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
           )}
         </div>
       )}
-
-      <div className="bazar-custom-add">
-        <input
-          type="text"
-          value={customName}
-          onChange={(e) => setCustomName(e.target.value)}
-          placeholder={t('Add another item...')}
-        />
-        <button type="button" className="btn secondary" onClick={addCustom}>{t('Add')}</button>
-      </div>
 
       {lines.length > 0 && (
         <div className="bazar-basket">

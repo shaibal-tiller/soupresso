@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLang } from './LangProvider';
 import { todayStr, shiftDateStr, toDateStr } from '@/lib/dates';
+import { cachedFetchJson, peekCache } from '@/lib/clientCache';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -27,22 +28,30 @@ export default function DatePicker({ value, onChange, minDate = '2026-08-01' }) 
     let cancelled = false;
     const first = ymd(viewYear, viewMonth, 1);
     const last = ymd(viewYear, viewMonth, new Date(viewYear, viewMonth + 1, 0).getDate());
-    fetch(`/api/entries?from=${first}&to=${last}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        const map = {};
-        for (const e of data.entries || []) {
-          // entry_date is a full ISO timestamp (API doesn't cast to text) —
-          // slicing the raw string can land on the wrong calendar day (pg
-          // parses DATE as server-local midnight); going through a real
-          // Date object resolves it via the browser's local getters instead,
-          // which is correct (see lib/dates.js's toLocalDate comment).
-          map[toDateStr(new Date(e.entry_date))] = !!e.is_off_day;
-        }
-        setMonthEntries(map);
-      })
-      .catch(() => { if (!cancelled) setMonthEntries({}); });
+    const url = `/api/entries?from=${first}&to=${last}`;
+
+    function toMap(data) {
+      const map = {};
+      for (const e of data.entries || []) {
+        // entry_date is a full ISO timestamp (API doesn't cast to text) —
+        // slicing the raw string can land on the wrong calendar day (pg
+        // parses DATE as server-local midnight); going through a real
+        // Date object resolves it via the browser's local getters instead,
+        // which is correct (see lib/dates.js's toLocalDate comment).
+        map[toDateStr(new Date(e.entry_date))] = !!e.is_off_day;
+      }
+      return map;
+    }
+
+    // Same shared cache other pages hit for this same range (e.g. the
+    // Calendar page) — repeatedly opening this popup for a month already
+    // seen elsewhere in the session paints instantly instead of refetching.
+    const cached = peekCache(url);
+    if (cached) setMonthEntries(toMap(cached));
+
+    cachedFetchJson(url)
+      .then((data) => { if (!cancelled) setMonthEntries(toMap(data)); })
+      .catch(() => { if (!cancelled && !cached) setMonthEntries({}); });
     return () => { cancelled = true; };
   }, [open, viewYear, viewMonth]);
 

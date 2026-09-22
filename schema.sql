@@ -529,3 +529,26 @@ CREATE TABLE IF NOT EXISTS task_comments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments (task_id, created_at);
+
+-- Usability round 11 (2026-09-23): manageable bazar categories. `category`
+-- on bazar_items stays plain TEXT (not an FK — matches this project's
+-- established "free text, not an enum" style elsewhere), but this table is
+-- the curated list the catalog UI offers for add/rename/remove, backfilled
+-- once from whatever category names already exist on bazar_items. Renaming
+-- a row here must also UPDATE bazar_items.category to match (done by the
+-- API, not by a trigger, to keep this a plain lookup table).
+CREATE TABLE IF NOT EXISTS bazar_categories (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT UNIQUE NOT NULL,
+  icon       TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO bazar_categories (name, sort_order)
+SELECT DISTINCT category, 0 FROM bazar_items WHERE category IS NOT NULL AND category != ''
+ON CONFLICT (name) DO NOTHING;
+UPDATE bazar_categories SET icon = v.icon FROM (VALUES
+  ('Meat & Egg', '🍗'), ('Vegetables', '🥬'), ('Herbs & Leaves', '🌿'),
+  ('Raw Spices', '🌶️'), ('Processed Spices & Sauces', '🍶'), ('Cooking Essentials', '🛢️'),
+  ('Serving & Seating', '🍽️'), ('Packaging', '📦'), ('Staff & Home', '🧑‍🍳'),
+  ('Shop Operations & Repairs', '🔧'), ('Cleaning Supplies', '🧽'), ('Other', '🗂️')
+) AS v(name, icon) WHERE bazar_categories.name = v.name AND bazar_categories.icon IS NULL;
