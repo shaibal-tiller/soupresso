@@ -24,6 +24,7 @@ const CATEGORY_ICONS = {
   'Packaging': '📦',
   'Staff & Home': '🧑‍🍳',
   'Shop Operations & Repairs': '🔧',
+  'Cleaning Supplies': '🧽',
   'Other': '🗂️',
 };
 
@@ -53,8 +54,17 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
   const [showBrowse, setShowBrowse] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
   const [customName, setCustomName] = useState('');
+  const [showFrequent, setShowFrequent] = useState(false);
+  // Optimistic local overlay for is_frequent — the parent page loads
+  // `catalog` once and shares it across both the actual/planned pickers on
+  // the same page, so this component patches the server directly and keeps
+  // its own view in sync rather than threading a callback prop through both
+  // instances; a full page reload always reflects the server truth anyway.
+  const [frequentOverride, setFrequentOverride] = useState({});
+  const isFrequent = (item) => frequentOverride[item.id] ?? !!item.is_frequent;
 
   const categories = useMemo(() => Array.from(new Set(catalog.map((c) => c.category))), [catalog]);
+  const frequentItems = useMemo(() => catalog.filter((c) => isFrequent(c)), [catalog, frequentOverride]);
 
   const searchResults = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -71,17 +81,38 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
 
   const addedItemIds = new Set(lines.filter((l) => l.itemId != null).map((l) => l.itemId));
 
+  async function toggleFrequent(item, e) {
+    e.stopPropagation();
+    const next = !isFrequent(item);
+    setFrequentOverride((prev) => ({ ...prev, [item.id]: next }));
+    try {
+      await fetch('/api/bazar-items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, isFrequent: next }),
+      });
+    } catch {
+      setFrequentOverride((prev) => ({ ...prev, [item.id]: !next })); // revert on failure
+    }
+  }
+
   function addItem(item) {
     if (addedItemIds.has(item.id)) return;
     const unitBased = item.unit_based !== false;
+    const options = unitOptionsFor(item);
+    // Default to whatever unit was actually bought most recently (if it's
+    // still a valid option for this item) instead of a possibly-stale
+    // catalog default — e.g. Coriander defaults to 250g if that's what's
+    // really been bought lately, not the catalog's static 100g.
+    const defaultUnit = item.recent_unit && options.includes(item.recent_unit) ? item.recent_unit : item.unit;
     onLinesChange([
       {
         key: `item-${item.id}`,
         itemId: item.id,
         name: item.name,
         nameBn: item.name_bn || null,
-        unit: item.unit,
-        unitOptions: unitOptionsFor(item),
+        unit: defaultUnit,
+        unitOptions: options,
         unitBased,
         icon: item.icon,
         quantity: unitBased ? '' : '1',
@@ -170,15 +201,22 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); if (e.target.value.trim()) setShowFrequent(false); }}
           placeholder={t('Search items...')}
         />
+        <button
+          type="button"
+          className={`btn secondary bazar-browse-btn bazar-frequent-btn${showFrequent ? ' on' : ''}`}
+          onClick={() => { setShowFrequent((v) => !v); setSearch(''); }}
+        >
+          ⭐ {t('Frequent')}
+        </button>
         <button type="button" className="btn secondary bazar-browse-btn" onClick={openBrowse}>
           {t('Browse categories')}
         </button>
       </div>
 
-      {search.trim() && (
+      {search.trim() ? (
         <div className="bazar-search-results">
           {searchResults.length === 0 ? (
             <p className="bazar-search-empty">{t('No items match your search.')}</p>
@@ -186,17 +224,46 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
             searchResults.map((item) => {
               const added = addedItemIds.has(item.id);
               return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="bazar-search-row"
-                  disabled={added}
-                  onClick={() => { addItem(item); setSearch(''); }}
-                >
-                  <span className="bazar-search-icon">{item.icon || '🛒'}</span>
-                  <span className="bazar-search-name">{itemLabel(lang, item.name, item.name_bn)}</span>
-                  <span className="bazar-search-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
-                </button>
+                <div key={item.id} className="bazar-search-row-wrap">
+                  <button
+                    type="button"
+                    className="bazar-search-row"
+                    disabled={added}
+                    onClick={() => { addItem(item); setSearch(''); }}
+                  >
+                    <span className="bazar-search-icon">{item.icon || '🛒'}</span>
+                    <span className="bazar-search-name">{itemLabel(lang, item.name, item.name_bn)}</span>
+                    <span className="bazar-search-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
+                  </button>
+                  <button type="button" className={`bazar-item-star${isFrequent(item) ? ' on' : ''}`} onClick={(e) => toggleFrequent(item, e)} aria-label={t('Toggle frequent')}>
+                    {isFrequent(item) ? '★' : '☆'}
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : showFrequent && (
+        <div className="bazar-search-results">
+          {frequentItems.length === 0 ? (
+            <p className="bazar-search-empty">{t('No frequent items marked yet — tap the star on any item to add it here.')}</p>
+          ) : (
+            frequentItems.map((item) => {
+              const added = addedItemIds.has(item.id);
+              return (
+                <div key={item.id} className="bazar-search-row-wrap">
+                  <button
+                    type="button"
+                    className="bazar-search-row"
+                    disabled={added}
+                    onClick={() => addItem(item)}
+                  >
+                    <span className="bazar-search-icon">{item.icon || '🛒'}</span>
+                    <span className="bazar-search-name">{itemLabel(lang, item.name, item.name_bn)}</span>
+                    <span className="bazar-search-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
+                  </button>
+                  <button type="button" className="bazar-item-star on" onClick={(e) => toggleFrequent(item, e)} aria-label={t('Toggle frequent')}>★</button>
+                </div>
               );
             })
           )}
@@ -317,17 +384,21 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                   {itemsInActiveCategory.map((item) => {
                     const added = addedItemIds.has(item.id);
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`bazar-item-card${added ? ' added' : ''}`}
-                        onClick={() => addItem(item)}
-                        disabled={added}
-                      >
-                        <span className="bazar-item-icon">{item.icon || '🛒'}</span>
-                        <span className="bazar-item-name">{itemLabel(lang, item.name, item.name_bn)}</span>
-                        <span className="bazar-item-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
-                      </button>
+                      <div key={item.id} className="bazar-item-card-wrap">
+                        <button
+                          type="button"
+                          className={`bazar-item-card${added ? ' added' : ''}`}
+                          onClick={() => addItem(item)}
+                          disabled={added}
+                        >
+                          <span className="bazar-item-icon">{item.icon || '🛒'}</span>
+                          <span className="bazar-item-name">{itemLabel(lang, item.name, item.name_bn)}</span>
+                          <span className="bazar-item-unit">{item.unit_based === false ? '' : unitLabel(item.unit)}</span>
+                        </button>
+                        <button type="button" className={`bazar-item-star${isFrequent(item) ? ' on' : ''}`} onClick={(e) => toggleFrequent(item, e)} aria-label={t('Toggle frequent')}>
+                          {isFrequent(item) ? '★' : '☆'}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

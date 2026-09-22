@@ -457,3 +457,33 @@ INSERT INTO bazar_items (name, category, unit, unit_options, unit_based, sort_or
   ('Hardware/Tools', 'Shop Operations & Repairs', 'pc', NULL, true, 1100),
   ('Cash Box', 'Shop Operations & Repairs', 'pc', NULL, true, 1110)
 ON CONFLICT (name) DO NOTHING;
+-- Usability round 7 (2026-09-22): Cleaning Supplies category — wheel powder,
+-- vim, soap, brush, broom, and similar shop-cleaning items were previously
+-- unmapped "Other" line items (see ALIGNMENT_REPORT_2026-09-20.md). Safe to
+-- always re-run.
+INSERT INTO bazar_items (name, category, unit, unit_options, unit_based, sort_order) VALUES
+  ('Wheel Powder', 'Cleaning Supplies', '500g', '["500g", "kg"]'::jsonb, true, 1120),
+  ('Vim Powder', 'Cleaning Supplies', '500g', '["500g", "kg"]'::jsonb, true, 1130),
+  ('Vim Liquid', 'Cleaning Supplies', 'litre', '["500ml", "litre"]'::jsonb, true, 1140),
+  ('Bar Soap', 'Cleaning Supplies', 'pc', '["pc", "pack"]'::jsonb, true, 1150),
+  ('Liquid Hand Soap', 'Cleaning Supplies', 'pc', '["pc", "pack"]'::jsonb, true, 1160),
+  ('Detergent Powder', 'Cleaning Supplies', '500g', '["500g", "kg"]'::jsonb, true, 1170),
+  ('Floor Cleaner (Phenyl)', 'Cleaning Supplies', 'litre', '["500ml", "litre"]'::jsonb, true, 1180),
+  ('Toilet Cleaner', 'Cleaning Supplies', 'pc', NULL, true, 1190),
+  ('Dish Sponge/Scrubber', 'Cleaning Supplies', 'pc', '["pc", "pack"]'::jsonb, true, 1200),
+  ('Scrub Brush', 'Cleaning Supplies', 'pc', NULL, true, 1210),
+  ('Broom', 'Cleaning Supplies', 'pc', NULL, true, 1220),
+  ('Mop', 'Cleaning Supplies', 'pc', NULL, true, 1230),
+  ('Bucket', 'Cleaning Supplies', 'pc', NULL, true, 1240)
+ON CONFLICT (name) DO NOTHING;
+-- Usability round 8 (2026-09-22): "frequent" quick-pick items — a manually
+-- curated shortlist so common purchases don't require browsing categories.
+ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS is_frequent BOOLEAN NOT NULL DEFAULT false;
+-- Usability round 9 (2026-09-22): baki (credit sales) tracking. baki_given
+-- is a credit sale made today (real revenue, no cash yet — counted in
+-- total_sales but never in total_counted); baki_received is cash collected
+-- today for an earlier baki sale (real cash today, but not today's sale —
+-- it's already part of total_counted like any other cash, and only
+-- subtracted back out of total_sales so it isn't double-counted as revenue).
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS baki_given NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS baki_received NUMERIC(12,2) NOT NULL DEFAULT 0;

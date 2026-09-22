@@ -341,8 +341,9 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .bazar-custom-add .btn { padding: 9px 14px; font-size: 12.5px; flex-shrink: 0; }
 
 .bazar-item-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bazar-item-card-wrap { position: relative; }
 .bazar-item-card {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%;
   background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
   padding: 10px 6px; cursor: pointer; text-align: center;
 }
@@ -350,6 +351,15 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .bazar-item-icon { font-size: 20px; }
 .bazar-item-name { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.2; }
 .bazar-item-unit { font-size: 9.5px; color: var(--text3); }
+.bazar-item-star {
+  position: absolute; top: 2px; right: 2px; z-index: 2;
+  background: none; border: none; padding: 4px; line-height: 1; font-size: 13px;
+  color: var(--text3); cursor: pointer;
+}
+.bazar-item-star.on { color: var(--brand-gold); }
+.bazar-search-row-wrap { display: flex; align-items: center; }
+.bazar-search-row-wrap .bazar-search-row { flex: 1; min-width: 0; }
+.bazar-frequent-btn.on { background: var(--brand-gold); color: #fff; border-color: var(--brand-gold); }
 
 .bazar-basket { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 10px; margin-bottom: 10px; }
 .bazar-basket-row {
@@ -426,8 +436,37 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .calc-row .g { color: var(--green) !important; }
 .calc-row .r { color: var(--red) !important; }
 
+/* ---- Sidenav (desktop) / tabbar (phone & tablet) ---- */
+.shell-layout { display: flex; align-items: stretch; min-height: 100vh; }
+.shell-main { flex: 1 1 auto; min-width: 0; }
+
+.sidenav { display: none; }
+
+@media (min-width: 900px) {
+  .sidenav {
+    display: flex; flex-direction: column; width: 224px; flex: none;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: var(--bg2); border-right: 1px solid var(--border);
+    padding: 22px 14px;
+  }
+  .sidenav-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; }
+  .sidenav-links { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .sidenav-links a {
+    display: flex; align-items: center; padding: 10px 12px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 600; color: var(--text2);
+  }
+  .sidenav-links a:hover { background: var(--bg3); }
+  .sidenav-links a.active { background: var(--brand-green); color: #fff; }
+  .sidenav-footer { padding: 14px 8px 0; border-top: 1px solid var(--border); margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Topbar becomes a slim desktop header — brand/tabs move into the sidenav. */
+  .topbar-inner .brand, .tabbar { display: none; }
+  .topbar-inner { justify-content: flex-end; }
+  main { max-width: 900px; }
+}
+
 @media print {
-  .topbar, .tabbar, .no-print { display: none !important; }
+  .topbar, .tabbar, .sidenav, .no-print { display: none !important; }
   body { background: #fff; }
   main { max-width: 100%; padding: 0; }
 }

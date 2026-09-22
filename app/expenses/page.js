@@ -5,7 +5,7 @@ import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import DatePicker from '../DatePicker';
 import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
-import { todayStr, shiftDateStr } from '@/lib/dates';
+import { todayStr, shiftDateStr, startOfMonthStr, endOfMonthStr } from '@/lib/dates';
 
 const RANGES = [
   { key: '7d', label: '7 days' },
@@ -30,9 +30,22 @@ const COST_OF_PRODUCTS_CATEGORIES = new Set([
   'Meat & Egg', 'Vegetables', 'Herbs & Leaves', 'Raw Spices',
   'Processed Spices & Sauces', 'Cooking Essentials',
 ]);
-const OVERHEAD_CATEGORIES = new Set(['Staff & Home', 'Shop Operations & Repairs']);
+const OVERHEAD_CATEGORIES = new Set(['Staff & Home', 'Shop Operations & Repairs', 'Cleaning Supplies']);
 const GROUP_COLORS = { 'Cost of products': '#C1502E', Overhead: '#1F8C5A', Other: '#9C9080' };
-function groupFor(category) {
+// Staff & Home mixes fixed overhead (rent, salary, utilities) with day-to-day
+// operating cost (chef's meals, bazar transport) — these specific items are
+// pulled into Cost of products even though their catalog category is
+// Staff & Home, since the category alone isn't granular enough.
+const ITEM_GROUP_OVERRIDES = {
+  'Chef Breakfast': 'Cost of products',
+  'Nasta (Snack)': 'Cost of products',
+  'Lunch': 'Cost of products',
+  'Dinner': 'Cost of products',
+  'Auto Fare': 'Cost of products',
+  'Bulk Transport / Van Hire': 'Cost of products',
+};
+function groupFor(category, name) {
+  if (name && ITEM_GROUP_OVERRIDES[name]) return ITEM_GROUP_OVERRIDES[name];
   if (COST_OF_PRODUCTS_CATEGORIES.has(category)) return 'Cost of products';
   if (OVERHEAD_CATEGORIES.has(category)) return 'Overhead';
   return 'Other';
@@ -40,6 +53,7 @@ function groupFor(category) {
 
 function apiUrl({ rangeMode, range, from, to }) {
   if (rangeMode === 'custom' && from && to) return `/api/expenses?from=${from}&to=${to}`;
+  if (rangeMode === 'monthly') return `/api/expenses?range=all`;
   return `/api/expenses?range=${range}`;
 }
 
@@ -88,26 +102,38 @@ export default function ExpensesPage() {
   const itemizedTotal = useMemo(() => lines.reduce((s, l) => s + l.lineTotal, 0), [lines]);
   const unitemizedGap = Math.round((totalRecorded - itemizedTotal) * 100) / 100;
 
+  // A catalog category (e.g. "Staff & Home") can mix items from different
+  // groups (Salary = Overhead, Nasta = Cost of products) — each category row
+  // tracks its own group sub-totals so it can be tinted by whichever group
+  // dominates it, while byGroup (the source of truth for the KPI tiles and
+  // the part-to-whole bar) sums straight from the per-line group, never from
+  // the category rollup.
   const byCategory = useMemo(() => {
     const map = new Map();
     for (const l of lines) {
-      const cur = map.get(l.category) || { category: l.category, total: 0, count: 0 };
+      const cur = map.get(l.category) || { category: l.category, total: 0, count: 0, groupBreakdown: {} };
       cur.total += l.lineTotal; cur.count += 1;
+      const g = groupFor(l.category, l.name);
+      cur.groupBreakdown[g] = (cur.groupBreakdown[g] || 0) + l.lineTotal;
       map.set(l.category, cur);
     }
-    const rows = Array.from(map.values());
-    if (unitemizedGap > 0.5) rows.push({ category: 'Unitemized', total: unitemizedGap, count: null });
+    const rows = Array.from(map.values()).map((r) => ({
+      ...r,
+      dominantGroup: Object.entries(r.groupBreakdown).sort((a, b) => b[1] - a[1])[0][0],
+    }));
+    if (unitemizedGap > 0.5) rows.push({ category: 'Unitemized', total: unitemizedGap, count: null, dominantGroup: 'Other' });
     return rows.sort((a, b) => b.total - a.total);
   }, [lines, unitemizedGap]);
 
   const byGroup = useMemo(() => {
     const totals = { 'Cost of products': 0, Overhead: 0, Other: 0 };
-    for (const r of byCategory) totals[groupFor(r.category)] += r.total;
+    for (const l of lines) totals[groupFor(l.category, l.name)] += l.lineTotal;
+    if (unitemizedGap > 0.5) totals.Other += unitemizedGap;
     return Object.entries(totals)
       .map(([group, total]) => ({ group, total: Math.round(total * 100) / 100 }))
       .filter((r) => r.total > 0.5)
       .sort((a, b) => b.total - a.total);
-  }, [byCategory]);
+  }, [lines, unitemizedGap]);
 
   const scopedLines = useMemo(
     () => (categoryFilter ? lines.filter((l) => l.category === categoryFilter) : lines),
@@ -156,7 +182,7 @@ export default function ExpensesPage() {
       const itemized = dayLines.reduce((s, l) => s + l.lineTotal, 0);
       const recorded = dayMeta ? dayMeta.bazarActualCost : itemized;
       const groupTotals = { 'Cost of products': 0, Overhead: 0, Other: 0 };
-      for (const l of dayLines) groupTotals[groupFor(l.category)] += l.lineTotal;
+      for (const l of dayLines) groupTotals[groupFor(l.category, l.name)] += l.lineTotal;
       const gap = Math.round((recorded - itemized) * 100) / 100;
       if (gap > 0.5) groupTotals.Other += gap; // unitemized gap folds into "Other" for the stacked bar
       return {
@@ -170,6 +196,31 @@ export default function ExpensesPage() {
     rows.sort((a, b) => (daySort === 'desc' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)));
     return rows;
   }, [scopedLines, daily, categoryFilter, daySort]);
+
+  // Monthly rollup — always computed from the full-history fetch (rangeMode
+  // 'monthly' points apiUrl at range=all), independent of whatever
+  // range/view is currently selected, so switching into Monthly always shows
+  // every month regardless of what was picked before.
+  const byMonth = useMemo(() => {
+    if (rangeMode !== 'monthly') return [];
+    const map = new Map();
+    for (const d of daily) {
+      const key = d.date.slice(0, 7);
+      const cur = map.get(key) || { month: key, sales: 0, expense: 0, days: 0 };
+      cur.sales += d.totalSales; cur.expense += d.bazarActualCost; cur.days += 1;
+      map.set(key, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.month.localeCompare(a.month));
+  }, [daily, rangeMode]);
+
+  function pickMonth(monthKey) {
+    const anyDayInMonth = `${monthKey}-15`;
+    setCustomFrom(startOfMonthStr(anyDayInMonth));
+    setCustomTo(endOfMonthStr(anyDayInMonth));
+    setRangeMode('custom');
+    setView('category');
+    setCategoryFilter(null);
+  }
 
   function toggleItemSort(key) {
     setItemSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }));
@@ -199,7 +250,49 @@ export default function ExpensesPage() {
         <button className={rangeMode === 'custom' ? 'on' : ''} onClick={() => setRangeMode('custom')} style={{ fontSize: 12, padding: '7px 10px' }}>
           {t('Custom range')}
         </button>
+        <button className={rangeMode === 'monthly' ? 'on' : ''} onClick={() => setRangeMode('monthly')} style={{ fontSize: 12, padding: '7px 10px' }}>
+          📅 {t('Monthly')}
+        </button>
       </div>
+
+      {rangeMode === 'monthly' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card-title" style={{ padding: '16px 16px 0' }}>{t('Expense by month')}</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="denom-table" style={{ minWidth: 420 }}>
+              <thead>
+                <tr>
+                  <th>{t('Month')}</th>
+                  <th>{t('Days')}</th>
+                  <th>{t('Sales (৳)')}</th>
+                  <th>{t('Expense (৳)')}</th>
+                  <th>{t('Net (৳)')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byMonth.length === 0 && (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text2)', padding: 20 }}>{t('No data yet.')}</td></tr>
+                )}
+                {byMonth.map((m) => {
+                  const net = m.sales - m.expense;
+                  return (
+                    <tr key={m.month} onClick={() => pickMonth(m.month)} style={{ cursor: 'pointer' }}>
+                      <td style={{ fontWeight: 600 }}>{m.month}</td>
+                      <td>{num(m.days)}</td>
+                      <td style={{ color: 'var(--brand-green)', fontFamily: 'var(--mono)' }}>{taka(m.sales)}</td>
+                      <td style={{ color: 'var(--brand-paprika)', fontFamily: 'var(--mono)' }}>{taka(m.expense)}</td>
+                      <td style={{ color: net >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>{taka(net)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text3)', padding: '10px 16px 16px' }}>
+            {t('Tap a month for its full category / item / day breakdown.')}
+          </p>
+        </div>
+      )}
       {rangeMode === 'custom' && (
         <div className="card" style={{ padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
@@ -214,6 +307,8 @@ export default function ExpensesPage() {
         </div>
       )}
 
+      {rangeMode !== 'monthly' && (
+      <>
       {/* ---- KPIs ---- */}
       <div className="kpi-row" style={{ gridTemplateColumns: `repeat(${Math.max(byGroup.length, 1) + 1}, 1fr)` }}>
         <div className="kpi">
@@ -298,7 +393,7 @@ export default function ExpensesPage() {
             {byCategory.map((r) => {
               const maxCat = Math.max(...byCategory.map((x) => x.total), 1);
               const isUnitemized = r.category === 'Unitemized';
-              const barColor = isUnitemized ? 'var(--border2)' : GROUP_COLORS[groupFor(r.category)];
+              const barColor = isUnitemized ? 'var(--border2)' : GROUP_COLORS[r.dominantGroup];
               const widthPct = Math.max(2, (r.total / maxCat) * 100);
               return (
                 <div
@@ -369,7 +464,7 @@ export default function ExpensesPage() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 40, height: 6, background: 'var(--bg3)', borderRadius: 3, overflow: 'hidden', flex: 'none' }}>
-                              <div style={{ width: `${(r.total / maxItemTotal) * 100}%`, height: '100%', background: GROUP_COLORS[groupFor(r.category)], borderRadius: 3 }} />
+                              <div style={{ width: `${(r.total / maxItemTotal) * 100}%`, height: '100%', background: GROUP_COLORS[groupFor(r.category, r.name)], borderRadius: 3 }} />
                             </div>
                             <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>{taka(r.total)}</span>
                           </div>
@@ -504,6 +599,8 @@ export default function ExpensesPage() {
             </div>
           </div>
         </>
+      )}
+      </>
       )}
     </AppShell>
   );
