@@ -513,6 +513,12 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks (due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
 
+-- Multi-person assignment (replaces the single assigned_to going forward;
+-- that column is kept, unused, rather than dropped). Backfill wraps any
+-- existing single assignee into a one-element array.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignees TEXT[] NOT NULL DEFAULT '{}';
+UPDATE tasks SET assignees = ARRAY[assigned_to] WHERE assigned_to IS NOT NULL AND assignees = '{}';
+
 -- One row per status change / note — the audit trail for a task, shown as a
 -- comment thread (mirrors entry_edit_log's audit-trail pattern elsewhere).
 CREATE TABLE IF NOT EXISTS task_comments (

@@ -222,6 +222,8 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 
 /* ---- Full-page month calendar (app/calendar) — bigger cells than the popup above ---- */
 .date-calendar-grid { display: flex; flex-direction: column; }
+.date-calendar-row-day { grid-template-columns: 1fr; max-width: 220px; margin: 0 auto; }
+.date-calendar-row-day .cal-cell { aspect-ratio: 2 / 1; }
 .cal-cell {
   aspect-ratio: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 5px;
@@ -240,7 +242,11 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 .cal-tag-actual { background: rgba(31,140,90,0.16); color: var(--brand-green); }
 .cal-tag-roster { background: rgba(201,138,31,0.16); color: var(--amber); }
 .cal-tag-off { background: rgba(209,67,67,0.14); color: var(--red); }
-.cal-task-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--brand-paprika); }
+.cal-task-count {
+  position: absolute; top: 2px; right: 2px; min-width: 14px; height: 14px; padding: 0 3px;
+  border-radius: 999px; background: var(--brand-paprika); color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 14px; text-align: center;
+}
 .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11px; color: var(--text2); }
 .cal-legend span { display: flex; align-items: center; gap: 5px; }
 .cal-legend .date-calendar-dot { border-radius: 4px; width: 10px; height: 10px; }
@@ -541,6 +547,57 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
   background: var(--bg2); color: var(--text2); font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
 .chip-select button.on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+
+/* ---- STICKY NOTES (Calendar day's tasks) ---- */
+.sticky-notes { display: flex; flex-wrap: wrap; gap: 16px 14px; margin-bottom: 6px; }
+.sticky-note {
+  position: relative; width: 160px; min-height: 128px; padding: 16px 12px 10px;
+  background: #FFF6C9; border-radius: 3px 3px 8px 8px;
+  box-shadow: 0 8px 16px -8px rgba(43,33,24,0.3), 0 1px 0 rgba(0,0,0,0.04);
+  display: flex; flex-direction: column; gap: 6px;
+  transform: rotate(var(--tilt, -1.5deg));
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.sticky-note:hover { transform: rotate(0deg) translateY(-2px); box-shadow: 0 14px 22px -10px rgba(43,33,24,0.36); }
+.sticky-note:nth-child(3n+2) { --tilt: 1.4deg; background: #D9F2DD; }
+.sticky-note:nth-child(3n+3) { --tilt: -1deg; background: #FFE1D6; }
+.sticky-note.open { width: 100%; max-width: 320px; }
+.sticky-note.done { opacity: .62; }
+.sticky-note.cancelled { opacity: .5; }
+.sticky-note-pin {
+  position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+  width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff9b9b, #c53d3d);
+  box-shadow: 0 2px 4px rgba(0,0,0,.3);
+}
+.sticky-note-remove {
+  position: absolute; top: 4px; right: 4px; background: none; border: none;
+  font-size: 12px; color: rgba(43,33,24,.4); cursor: pointer; line-height: 1; padding: 3px;
+}
+.sticky-note-remove:hover { color: var(--red); }
+.sticky-note-title {
+  font-family: var(--display); font-weight: 700; font-size: 13.5px; color: #2B2118;
+  line-height: 1.28; cursor: pointer;
+}
+.sticky-note.done .sticky-note-title { text-decoration: line-through; }
+.sticky-note-meta { font-size: 10.5px; color: rgba(43,33,24,.65); display: flex; flex-direction: column; gap: 3px; }
+.sticky-note-body { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.sticky-note-actions { margin-top: auto; padding-top: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+.sticky-note-actions button, .sticky-note-check {
+  font-size: 10px; font-weight: 600; padding: 4px 7px; border-radius: 6px;
+  border: 1px solid rgba(43,33,24,.15); background: rgba(255,255,255,.55);
+  color: rgba(43,33,24,.8); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.sticky-note-check input { width: auto; margin: 0; }
+.sticky-note-confirm { display: flex; flex-direction: column; gap: 10px; justify-content: center; height: 100%; font-size: 12px; color: var(--text2); }
+.sticky-note-add {
+  background: transparent; border: 2px dashed var(--border2); box-shadow: none;
+  align-items: center; justify-content: center; cursor: pointer; transform: none;
+}
+.sticky-note-add:hover { border-color: var(--brand-green); transform: none; }
+.sticky-note-add.open { width: 100%; max-width: 260px; align-items: stretch; justify-content: flex-start; cursor: default; }
+.sticky-note-add-label { font-size: 12.5px; font-weight: 700; color: var(--text3); }
+.sticky-note-add-form { display: flex; flex-direction: column; gap: 8px; height: 100%; }
 
 /* ---- SPLASH SCREEN (full-viewport cold-load branding) ---- */
 .splash-screen {

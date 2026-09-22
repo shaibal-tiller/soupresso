@@ -31,17 +31,18 @@ export async function GET(request) {
   }
 }
 
-// POST /api/tasks { title, description?, assignedTo?, dueDate? } -> create.
+// POST /api/tasks { title, description?, assignees?, dueDate? } -> create.
 export async function POST(request) {
   try {
     const body = await request.json();
     const title = (body.title || '').trim();
     if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
+    const assignees = Array.isArray(body.assignees) ? body.assignees.filter((n) => typeof n === 'string') : [];
 
     const { rows } = await query(
-      `INSERT INTO tasks (title, description, assigned_to, due_date)
+      `INSERT INTO tasks (title, description, assignees, due_date)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [title, body.description || null, body.assignedTo || null, body.dueDate || null]
+      [title, body.description || null, assignees, body.dueDate || null]
     );
     return NextResponse.json({ task: rows[0] });
   } catch (err) {

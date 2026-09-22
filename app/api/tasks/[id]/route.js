@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
   }
 }
 
-// PATCH /api/tasks/:id { status?, assignedTo?, title?, description?, dueDate?, comment? }
+// PATCH /api/tasks/:id { status?, assignees?, title?, description?, dueDate?, comment? }
 // Any provided field is updated; if `status` changes or a `comment` is given,
 // a row is logged to task_comments so there's a visible history.
 export async function PATCH(request, { params }) {
@@ -32,7 +32,9 @@ export async function PATCH(request, { params }) {
     const next = {
       title: body.title !== undefined ? body.title : existing.title,
       description: body.description !== undefined ? body.description : existing.description,
-      assigned_to: body.assignedTo !== undefined ? body.assignedTo : existing.assigned_to,
+      assignees: Array.isArray(body.assignees)
+        ? body.assignees.filter((n) => typeof n === 'string')
+        : existing.assignees,
       due_date: body.dueDate !== undefined ? body.dueDate : existing.due_date,
       status: body.status !== undefined ? body.status : existing.status,
     };
@@ -41,9 +43,9 @@ export async function PATCH(request, { params }) {
     }
 
     const { rows } = await query(
-      `UPDATE tasks SET title=$1, description=$2, assigned_to=$3, due_date=$4, status=$5, updated_at=now()
+      `UPDATE tasks SET title=$1, description=$2, assignees=$3, due_date=$4, status=$5, updated_at=now()
        WHERE id = $6 RETURNING *`,
-      [next.title, next.description, next.assigned_to, next.due_date, next.status, id]
+      [next.title, next.description, next.assignees, next.due_date, next.status, id]
     );
 
     const statusChanged = next.status !== existing.status;

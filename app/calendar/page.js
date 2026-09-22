@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import DatePicker from '../DatePicker';
-import { todayStr, shiftDateStr, toDateStr } from '@/lib/dates';
+import { todayStr, shiftDateStr, toDateStr, startOfWeekStr } from '@/lib/dates';
 import { cachedFetchJson, invalidateCache } from '@/lib/clientCache';
 
 const MIN_DATE = '2026-08-01';
@@ -29,17 +29,18 @@ const STATUS_COLORS = { pending: 'var(--amber)', done: 'var(--green)', cancelled
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function ymd(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
-function emptyTaskForm() { return { title: '', description: '', assignedTo: '', dueDate: '', useDueDate: false }; }
+function emptyTaskForm() { return { title: '', description: '', assignees: [], dueDate: '', useDueDate: false }; }
 
 export default function CalendarPage() {
   const { t, digits, dateNice } = useLang();
+  const [viewMode, setViewMode] = useState('month'); // 'month' | 'week' | 'day'
   const [viewYear, setViewYear] = useState(() => Number(todayStr().slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(() => Number(todayStr().slice(5, 7)) - 1);
   const [entries, setEntries] = useState({}); // date -> entry row
   const [tasksByDate, setTasksByDate] = useState({}); // date -> [tasks]
   const [roster, setRoster] = useState(null); // [{day_of_week, people}]
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(() => todayStr());
   const [showRoster, setShowRoster] = useState(false);
   const [rosterDraft, setRosterDraft] = useState(null);
   const [savingRoster, setSavingRoster] = useState(false);
@@ -53,6 +54,10 @@ export default function CalendarPage() {
   const [commentDraft, setCommentDraft] = useState('');
   const [pendingAction, setPendingAction] = useState(null); // { taskId, status }
   const [savingTask, setSavingTask] = useState(false);
+  const [removeConfirmId, setRemoveConfirmId] = useState(null);
+  const [rescheduleTaskId, setRescheduleTaskId] = useState(null);
+  const [assignEditor, setAssignEditor] = useState(null); // { taskId, draft: [names] }
+  const [addingNoteOpen, setAddingNoteOpen] = useState(false);
 
   // All-tasks list (status-filtered, not bound to the visible month).
   const [taskFilter, setTaskFilter] = useState('pending');
@@ -145,7 +150,35 @@ export default function CalendarPage() {
     setSelectedDate(null);
   }
 
+  // Week/day nav shifts the selected date itself (instead of clearing it,
+  // like month nav does) and keeps viewYear/viewMonth in sync so switching
+  // back to Month view lands on the right page.
+  const periodAnchor = selectedDate || todayStr();
+  function jumpTo(ds) {
+    setSelectedDate(ds);
+    setViewYear(Number(ds.slice(0, 4)));
+    setViewMonth(Number(ds.slice(5, 7)) - 1);
+  }
+  const periodStep = viewMode === 'week' ? 7 : 1;
+  const canGoPrevPeriod = shiftDateStr(periodAnchor, -periodStep) >= MIN_DATE;
+  const canGoNextPeriod = shiftDateStr(periodAnchor, periodStep) <= MAX_DATE;
+  function prevPeriod() {
+    if (viewMode === 'month') return prevMonth();
+    if (!canGoPrevPeriod) return;
+    jumpTo(shiftDateStr(periodAnchor, -periodStep));
+  }
+  function nextPeriod() {
+    if (viewMode === 'month') return nextMonth();
+    if (!canGoNextPeriod) return;
+    jumpTo(shiftDateStr(periodAnchor, periodStep));
+  }
+
   const monthLabel = digits(new Date(viewYear, viewMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+  const weekStart = startOfWeekStr(periodAnchor);
+  const weekEnd = shiftDateStr(weekStart, 6);
+  const weekLabel = `${digits(new Date(weekStart + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))} – ${digits(new Date(weekEnd + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}`;
+  const dayLabel = `${t(WEEKDAY_NAMES[new Date(periodAnchor + 'T12:00:00').getDay()])}, ${dateNice(periodAnchor)}`;
+  const periodLabel = viewMode === 'month' ? monthLabel : viewMode === 'week' ? weekLabel : dayLabel;
 
   const weeks = useMemo(() => {
     const startOffset = new Date(viewYear, viewMonth, 1).getDay();
@@ -218,7 +251,7 @@ export default function CalendarPage() {
         body: JSON.stringify({
           title: taskForm.title.trim(),
           description: taskForm.description.trim() || null,
-          assignedTo: taskForm.assignedTo || null,
+          assignees: taskForm.assignees,
           dueDate: taskForm.useDueDate && taskForm.dueDate ? taskForm.dueDate : null,
         }),
       });
@@ -295,6 +328,63 @@ export default function CalendarPage() {
     }
   }
 
+  async function removeTask(taskId) {
+    setSavingTask(true);
+    try {
+      await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      setRemoveConfirmId(null);
+      if (expandedTaskId === taskId) setExpandedTaskId(null);
+      invalidateAllTaskCaches(taskId);
+      await Promise.all([load(), loadAllTasks()]);
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  async function rescheduleTask(taskId, newDate) {
+    setSavingTask(true);
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: newDate }),
+      });
+      setRescheduleTaskId(null);
+      await refreshAfterTaskChange(taskId);
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  function openAssignEditor(task) {
+    setAssignEditor({ taskId: task.id, draft: [...(task.assignees || [])] });
+  }
+
+  function toggleAssignDraft(name) {
+    setAssignEditor((prev) => {
+      if (!prev) return prev;
+      const has = prev.draft.includes(name);
+      return { ...prev, draft: has ? prev.draft.filter((n) => n !== name) : [...prev.draft, name] };
+    });
+  }
+
+  async function saveAssignEditor() {
+    if (!assignEditor) return;
+    setSavingTask(true);
+    try {
+      await fetch(`/api/tasks/${assignEditor.taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignees: assignEditor.draft }),
+      });
+      const taskId = assignEditor.taskId;
+      setAssignEditor(null);
+      await refreshAfterTaskChange(taskId);
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
   const selected = selectedDate ? {
     date: selectedDate,
     dow: new Date(selectedDate + 'T12:00:00').getDay(),
@@ -324,8 +414,8 @@ export default function CalendarPage() {
               {task.title}
             </span>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>
-              {task.assigned_to && <span>{task.assigned_to}</span>}
-              {task.due_date && <span>{task.assigned_to ? ' · ' : ''}{dateNice(toDateStr(new Date(task.due_date)))}</span>}
+              {task.assignees?.length > 0 && <span>{task.assignees.join(', ')}</span>}
+              {task.due_date && <span>{task.assignees?.length ? ' · ' : ''}{dateNice(toDateStr(new Date(task.due_date)))}</span>}
             </div>
           </div>
           <span style={{ fontSize: 10.5, fontWeight: 700, color: STATUS_COLORS[task.status], textTransform: 'uppercase', flexShrink: 0 }}>
@@ -385,52 +475,172 @@ export default function CalendarPage() {
     );
   }
 
+  // Compact "sticky note" card for a single day's tasks — quick actions
+  // (done/reschedule/assign/remove) live on the card face; tapping the
+  // title expands it in place for the description + full comment history
+  // (shares state/handlers with renderTaskItem's expand behavior above).
+  function renderStickyNote(task) {
+    const expanded = expandedTaskId === task.id;
+    const confirmingRemove = removeConfirmId === task.id;
+    const reschedule = rescheduleTaskId === task.id;
+    const assignees = task.assignees || [];
+    const cls = `sticky-note${task.status === 'done' ? ' done' : ''}${task.status === 'cancelled' ? ' cancelled' : ''}${expanded ? ' open' : ''}`;
+
+    if (confirmingRemove) {
+      return (
+        <div key={task.id} className={cls}>
+          <div className="sticky-note-confirm">
+            <span>{t('Remove this task?')}</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" className="btn btn-small" style={{ background: 'var(--red)' }} onClick={() => removeTask(task.id)} disabled={savingTask}>{t('Remove')}</button>
+              <button type="button" className="btn secondary btn-small" onClick={() => setRemoveConfirmId(null)}>{t('Cancel')}</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={task.id} className={cls}>
+        <span className="sticky-note-pin" />
+        <button type="button" className="sticky-note-remove" onClick={() => setRemoveConfirmId(task.id)} aria-label={t('Remove')}>✕</button>
+
+        <div className="sticky-note-title" onClick={() => toggleExpand(task.id)}>{task.title}</div>
+        <div className="sticky-note-meta">
+          <span>{assignees.length ? assignees.join(', ') : t('Unassigned')}</span>
+          {task.due_date && <span>📅 {dateNice(toDateStr(new Date(task.due_date)))}</span>}
+        </div>
+
+        {expanded && (
+          <div className="sticky-note-body" onClick={(e) => e.stopPropagation()}>
+            {task.description && <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>{task.description}</p>}
+
+            {reschedule && (
+              <input
+                type="date"
+                defaultValue={task.due_date ? toDateStr(new Date(task.due_date)) : ''}
+                autoFocus
+                onChange={(e) => { if (e.target.value) rescheduleTask(task.id, e.target.value); }}
+                onBlur={() => setRescheduleTaskId(null)}
+              />
+            )}
+
+            {pendingAction?.taskId === task.id && (
+              <div style={{ background: 'rgba(255,255,255,.5)', borderRadius: 8, padding: 8 }}>
+                <input type="text" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder={t('Optional comment for this change')} style={{ marginBottom: 6, fontSize: 12 }} />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="btn secondary btn-small" onClick={() => setPendingAction(null)}>{t('Cancel')}</button>
+                  <button type="button" className="btn btn-small" onClick={confirmStatusChange} disabled={savingTask}>{t('Confirm')}</button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', textTransform: 'uppercase' }}>{t('History')}</div>
+            {(commentsByTask[task.id] || []).length === 0 ? (
+              <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: 0 }}>{t('No comments yet.')}</p>
+            ) : (
+              commentsByTask[task.id].map((c) => (
+                <div key={c.id} style={{ fontSize: 11.5, borderBottom: '1px solid rgba(43,33,24,.12)', paddingBottom: 4 }}>
+                  <div>{c.comment}</div>
+                  <div style={{ color: 'var(--text3)', fontSize: 10 }}>{dateNice(c.created_at)}</div>
+                </div>
+              ))
+            )}
+            <div className="bazar-custom-add" style={{ marginTop: 0, marginBottom: 0 }}>
+              <input type="text" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder={t('Add a comment...')} />
+              <button type="button" className="btn secondary btn-small" onClick={() => addPlainComment(task.id)} disabled={savingTask || !commentDraft.trim()}>{t('Add')}</button>
+            </div>
+          </div>
+        )}
+
+        <div className="sticky-note-actions">
+          <label className="sticky-note-check">
+            <input type="checkbox" checked={task.status === 'done'} onChange={() => toggleTaskDone(task)} />
+            {t('Done')}
+          </label>
+          <button type="button" onClick={() => setRescheduleTaskId(reschedule ? null : task.id)}>📅 {t('Reschedule')}</button>
+          <button type="button" onClick={() => openAssignEditor(task)}>👤 {t('Assign')}</button>
+          {task.status !== 'cancelled' && task.status !== 'done' && (
+            <button type="button" onClick={() => startStatusChange(task.id, 'cancelled')}>✕ {t('Cancel task')}</button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderDayCell(ds, dayNum, key) {
+    const disabled = ds < MIN_DATE || ds > MAX_DATE;
+    const entry = entries[ds];
+    const dow = new Date(ds + 'T12:00:00').getDay();
+    const rosterNames = rosterFor(dow);
+    const dayTasks = tasksByDate[ds] || [];
+    let cls = 'cal-cell';
+    if (disabled) cls += ' disabled';
+    else if (entry?.is_off_day) cls += ' cal-off';
+    else if (entry) cls += ' cal-has-entry';
+    if (ds === todayStr()) cls += ' cal-today';
+    if (ds === selectedDate) cls += ' cal-selected';
+    return (
+      <button key={key} type="button" className={cls} disabled={disabled} onClick={() => jumpTo(ds)}>
+        <span className="cal-daynum">{digits(String(dayNum))}</span>
+        {entry?.is_off_day ? (
+          <span className="cal-tag cal-tag-off">{t('OFF')}</span>
+        ) : entry ? (
+          <span className="cal-tag cal-tag-actual">
+            {(entry.closed_by || []).slice(0, 2).join(', ') || t('closed')}
+          </span>
+        ) : rosterNames.length > 0 ? (
+          <span className="cal-tag cal-tag-roster">{rosterNames.slice(0, 2).join(', ')}</span>
+        ) : null}
+        {dayTasks.length > 0 && (
+          <span className="cal-task-count" title={`${dayTasks.length} task(s)`}>{digits(String(dayTasks.length))}</span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <AppShell>
       <div className="card">
+        <div className="toggle-row" style={{ marginBottom: 10 }}>
+          {[['month', 'Month'], ['week', 'Week'], ['day', 'Day']].map(([key, label]) => (
+            <button key={key} type="button" className={viewMode === key ? 'on' : ''} onClick={() => setViewMode(key)}>
+              {t(label)}
+            </button>
+          ))}
+        </div>
         <div className="date-calendar-header">
-          <button type="button" onClick={prevMonth} disabled={!canGoPrev} aria-label="Previous month">‹</button>
-          <span>{monthLabel}</span>
-          <button type="button" onClick={nextMonth} disabled={!canGoNext} aria-label="Next month">›</button>
+          <button type="button" onClick={prevPeriod} disabled={viewMode === 'month' ? !canGoPrev : !canGoPrevPeriod} aria-label="Previous">‹</button>
+          <span>{periodLabel}</span>
+          <button type="button" onClick={nextPeriod} disabled={viewMode === 'month' ? !canGoNext : !canGoNextPeriod} aria-label="Next">›</button>
         </div>
-        <div className="date-calendar-weekdays">
-          {WEEKDAY_SHORT.map((w, i) => <span key={i}>{w}</span>)}
-        </div>
+        {viewMode !== 'day' && (
+          <div className="date-calendar-weekdays">
+            {WEEKDAY_SHORT.map((w, i) => <span key={i}>{w}</span>)}
+          </div>
+        )}
         <div className="date-calendar-grid">
-          {weeks.map((row, ri) => (
+          {viewMode === 'month' && weeks.map((row, ri) => (
             <div key={ri} className="date-calendar-row">
               {row.map((day, di) => {
                 if (day == null) return <span key={di} className="date-calendar-cell empty" />;
-                const ds = ymd(viewYear, viewMonth, day);
-                const disabled = ds < MIN_DATE || ds > MAX_DATE;
-                const entry = entries[ds];
-                const dow = new Date(viewYear, viewMonth, day).getDay();
-                const rosterNames = rosterFor(dow);
-                const dayTasks = tasksByDate[ds] || [];
-                let cls = 'cal-cell';
-                if (disabled) cls += ' disabled';
-                else if (entry?.is_off_day) cls += ' cal-off';
-                else if (entry) cls += ' cal-has-entry';
-                if (ds === todayStr()) cls += ' cal-today';
-                if (ds === selectedDate) cls += ' cal-selected';
-                return (
-                  <button key={di} type="button" className={cls} disabled={disabled} onClick={() => setSelectedDate(ds)}>
-                    <span className="cal-daynum">{digits(String(day))}</span>
-                    {entry?.is_off_day ? (
-                      <span className="cal-tag cal-tag-off">{t('OFF')}</span>
-                    ) : entry ? (
-                      <span className="cal-tag cal-tag-actual">
-                        {(entry.closed_by || []).slice(0, 2).join(', ') || t('closed')}
-                      </span>
-                    ) : rosterNames.length > 0 ? (
-                      <span className="cal-tag cal-tag-roster">{rosterNames.slice(0, 2).join(', ')}</span>
-                    ) : null}
-                    {dayTasks.length > 0 && <span className="cal-task-dot" title={`${dayTasks.length} task(s)`} />}
-                  </button>
-                );
+                return renderDayCell(ymd(viewYear, viewMonth, day), day, di);
               })}
             </div>
           ))}
+          {viewMode === 'week' && (
+            <div className="date-calendar-row">
+              {Array.from({ length: 7 }, (_, i) => {
+                const ds = shiftDateStr(weekStart, i);
+                return renderDayCell(ds, Number(ds.slice(8, 10)), i);
+              })}
+            </div>
+          )}
+          {viewMode === 'day' && (
+            <div className="date-calendar-row date-calendar-row-day">
+              {renderDayCell(periodAnchor, Number(periodAnchor.slice(8, 10)), 0)}
+            </div>
+          )}
         </div>
         <div className="cal-legend">
           <span><i className="date-calendar-dot cal-tag-actual" />{t('Actual closer (saved entry)')}</span>
@@ -473,12 +683,27 @@ export default function CalendarPage() {
           ) : null}
 
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>{t('Tasks due this day')}</div>
-            {selected.tasks.length === 0 && <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8 }}>{t('None yet.')}</p>}
-            {selected.tasks.map(renderTaskItem)}
-            <div className="bazar-custom-add" style={{ marginTop: 10, marginBottom: 0 }}>
-              <input type="text" value={quickTaskTitle} onChange={(e) => setQuickTaskTitle(e.target.value)} placeholder={t('Add a task for this day...')} />
-              <button type="button" className="btn secondary" onClick={addQuickTask} disabled={addingTask || !quickTaskTitle.trim()}>{t('Add')}</button>
+            <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 8 }}>{t('Tasks due this day')}</div>
+            <div className="sticky-notes">
+              {selected.tasks.map(renderStickyNote)}
+              <div className={`sticky-note sticky-note-add${addingNoteOpen ? ' open' : ''}`} onClick={() => !addingNoteOpen && setAddingNoteOpen(true)}>
+                {addingNoteOpen ? (
+                  <div onClick={(e) => e.stopPropagation()} className="sticky-note-add-form">
+                    <input
+                      type="text" autoFocus value={quickTaskTitle}
+                      onChange={(e) => setQuickTaskTitle(e.target.value)}
+                      placeholder={t('New task...')}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addQuickTask(); }}
+                    />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" className="btn btn-small" onClick={async () => { await addQuickTask(); setAddingNoteOpen(false); }} disabled={addingTask || !quickTaskTitle.trim()}>{t('Add')}</button>
+                      <button type="button" className="btn secondary btn-small" onClick={() => { setAddingNoteOpen(false); setQuickTaskTitle(''); }}>{t('Cancel')}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="sticky-note-add-label">＋ {t('New task')}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -509,11 +734,19 @@ export default function CalendarPage() {
               <input type="text" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} placeholder={t('Details')} />
             </div>
             <div className="field">
-              <label>{t('Assign to (optional)')}</label>
+              <label>{t('Assign to (optional, multiple allowed)')}</label>
               <div className="chip-select" style={{ marginBottom: 0 }}>
-                <button type="button" className={!taskForm.assignedTo ? 'on' : ''} onClick={() => setTaskForm({ ...taskForm, assignedTo: '' })}>{t('Unassigned')}</button>
                 {HISHAB_CLOSERS.map((n) => (
-                  <button key={n} type="button" className={taskForm.assignedTo === n ? 'on' : ''} onClick={() => setTaskForm({ ...taskForm, assignedTo: n })}>{n}</button>
+                  <button
+                    key={n} type="button"
+                    className={taskForm.assignees.includes(n) ? 'on' : ''}
+                    onClick={() => setTaskForm((f) => ({
+                      ...f,
+                      assignees: f.assignees.includes(n) ? f.assignees.filter((x) => x !== n) : [...f.assignees, n],
+                    }))}
+                  >
+                    {n}
+                  </button>
                 ))}
               </div>
             </div>
@@ -575,6 +808,27 @@ export default function CalendarPage() {
               <button className="btn secondary" onClick={() => setShowRoster(false)}>{t('Cancel')}</button>
               <button className="btn" style={{ background: 'var(--green)' }} onClick={saveRoster} disabled={savingRoster}>
                 {savingRoster ? t('Saving…') : t('Save roster')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {assignEditor && (
+        <div className="modal-overlay" onClick={() => setAssignEditor(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <h3>{t('Assign people')}</h3>
+            <div className="chip-select" style={{ marginTop: 10, marginBottom: 0 }}>
+              {HISHAB_CLOSERS.map((n) => (
+                <button key={n} type="button" className={assignEditor.draft.includes(n) ? 'on' : ''} onClick={() => toggleAssignDraft(n)}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn secondary" onClick={() => setAssignEditor(null)}>{t('Cancel')}</button>
+              <button className="btn" style={{ background: 'var(--green)' }} onClick={saveAssignEditor} disabled={savingTask}>
+                {savingTask ? t('Saving…') : t('Save')}
               </button>
             </div>
           </div>
