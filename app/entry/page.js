@@ -207,11 +207,9 @@ function EntryPageInner() {
         setIsOffDay(!!e.is_off_day);
         if (e.denominations) {
           setMode('denom');
-          setNextBhangtiMode('denom');
           setDenoms({ ...emptyDenoms(), ...e.denominations });
         } else {
           setMode('total');
-          setNextBhangtiMode('total');
           setTotalDirect(String(e.total_counted));
         }
         setOpeningBhangti(Number(e.opening_bhangti));
@@ -220,7 +218,14 @@ function EntryPageInner() {
         setBakiGiven(Number(e.baki_given) || 0);
         setBakiReceived(Number(e.baki_received) || 0);
         setNextBhangti(Number(e.next_bhangti));
+        // nextBhangtiMode must follow next_bhangti_denominations (tomorrow's
+        // bhangti breakdown), NOT e.denominations (today's box count) — they
+        // are independent. Coupling them here previously meant re-opening a
+        // day whose count was denom-based but whose next-bhangti was saved as
+        // a flat total would silently switch Step 5 into denom mode with no
+        // overrides, computing and saving a different (wrong) total on save.
         if (e.next_bhangti_denominations) {
+          setNextBhangtiMode('denom');
           const qtyOverride = {};
           const markOverride = {};
           for (const denom of STANDARD_DENOMINATIONS) {
@@ -233,6 +238,7 @@ function EntryPageInner() {
           setNextBhangtiQtyOverride(qtyOverride);
           setNextBhangtiMarkOverride(markOverride);
         } else {
+          setNextBhangtiMode('total');
           setNextBhangtiQtyOverride({});
           setNextBhangtiMarkOverride({});
         }
