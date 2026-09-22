@@ -24,6 +24,12 @@ export default function SplashScreen() {
       <div className="splash-dot" style={{ width: 14, height: 14, top: '72%', left: '80%', background: '#fff' }} />
       <div className="splash-dot" style={{ width: 8, height: 8, top: '78%', left: '16%', background: '#1F5C42' }} />
 
+      <span className="splash-doodle" style={{ top: '14%', left: '12%', animationDelay: '0s' }}>🛒</span>
+      <span className="splash-doodle" style={{ top: '20%', left: '78%', animationDelay: '0.6s' }}>🥟</span>
+      <span className="splash-doodle" style={{ top: '64%', left: '10%', animationDelay: '1.1s' }}>🌶️</span>
+      <span className="splash-doodle" style={{ top: '68%', left: '72%', animationDelay: '0.3s' }}>🍲</span>
+      <span className="splash-doodle" style={{ top: '85%', left: '40%', animationDelay: '0.9s' }}>🥣</span>
+
       <svg width="90" height="44" viewBox="0 0 90 44" style={{ marginBottom: -6 }}>
         <path className="splash-steam-line" d="M18 40 C 10 28, 26 22, 18 10" stroke="#fff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.7" />
         <path className="splash-steam-line" style={{ animationDelay: '0.4s' }} d="M45 40 C 37 26, 53 20, 45 6" stroke="#fff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.85" />
