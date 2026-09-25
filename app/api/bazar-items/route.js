@@ -5,36 +5,43 @@ export const dynamic = 'force-dynamic';
 
 // GET /api/bazar-items -> the tappable item catalog for the bazar planner,
 // active items only, each with:
-//   - `recent_price` — the unit price it was actually bought at most
-//     recently, within the last 10 days (null if none). Matched on the
-//     item's current default unit too, so a suggestion never mixes e.g. a
-//     per-dozen price into a per-piece default.
 //   - `recent_unit` — whatever unit it was actually bought in most recently
-//     (any lookback, no unit match required), so the picker can default to
-//     "what we actually buy" (e.g. Coriander in 250g) instead of a static
-//     catalog default that may be stale (e.g. catalog says 100g).
+//     (any lookback), so the picker can default to "what we actually buy"
+//     (e.g. Coriander in 500g) instead of a static catalog default that may
+//     be stale (e.g. catalog says 100g).
+//   - `recent_price` — the unit price paid the last time it was bought AT
+//     THAT SAME recent unit, within the last 10 days (null if none). This
+//     must be resolved against `recent_unit`, not the catalog's static
+//     default unit — otherwise the suggested unit and suggested price can
+//     come from two different transactions (e.g. unit updates to 500g but
+//     price stays pinned to whatever was last paid for 100g, which may not
+//     exist at all, or may be unrelated).
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const includeInactive = searchParams.get('all') === '1';
   try {
     const { rows } = await query(
-      `SELECT bi.*,
-              (SELECT bpi.unit_price
-                 FROM bazar_plan_items bpi
-                WHERE bpi.item_id = bi.id
-                  AND bpi.kind = 'actual'
-                  AND bpi.unit = bi.unit
-                  AND bpi.for_date >= CURRENT_DATE - INTERVAL '10 days'
-                ORDER BY bpi.for_date DESC, bpi.id DESC
-                LIMIT 1) AS recent_price,
-              (SELECT bpi.unit
-                 FROM bazar_plan_items bpi
-                WHERE bpi.item_id = bi.id
-                  AND bpi.kind = 'actual'
-                  AND bpi.unit IS NOT NULL AND bpi.unit != ''
-                ORDER BY bpi.for_date DESC, bpi.id DESC
-                LIMIT 1) AS recent_unit
+      `SELECT bi.*, rp.unit_price AS recent_price, ru.unit AS recent_unit
          FROM bazar_items bi
+         LEFT JOIN LATERAL (
+           SELECT bpi.unit
+             FROM bazar_plan_items bpi
+            WHERE bpi.item_id = bi.id
+              AND bpi.kind = 'actual'
+              AND bpi.unit IS NOT NULL AND bpi.unit != ''
+            ORDER BY bpi.for_date DESC, bpi.id DESC
+            LIMIT 1
+         ) ru ON true
+         LEFT JOIN LATERAL (
+           SELECT bpi.unit_price
+             FROM bazar_plan_items bpi
+            WHERE bpi.item_id = bi.id
+              AND bpi.kind = 'actual'
+              AND bpi.unit = ru.unit
+              AND bpi.for_date >= CURRENT_DATE - INTERVAL '10 days'
+            ORDER BY bpi.for_date DESC, bpi.id DESC
+            LIMIT 1
+         ) rp ON true
         ${includeInactive ? '' : 'WHERE bi.active = true'}
         ORDER BY bi.category ASC, bi.sort_order ASC, bi.name ASC`
     );

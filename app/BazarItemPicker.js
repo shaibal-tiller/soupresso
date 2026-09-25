@@ -30,10 +30,17 @@ const CATEGORY_ICONS = {
 
 // Which units an item can be bought in, and whether it's unit-priced at
 // all — falls back to the catalog's single `unit` (as its only option)
-// when a catalog item has no `unit_options` of its own.
+// when a catalog item has no `unit_options` of its own. If the most
+// recently-bought unit isn't in that configured list (a one-off custom
+// unit, or the list just never got updated), it's still added — otherwise
+// the "default to what we actually buy" logic below silently discards it
+// and falls back to the stale catalog default instead.
 function unitOptionsFor(item) {
-  if (Array.isArray(item.unit_options) && item.unit_options.length > 0) return item.unit_options;
-  return item.unit ? [item.unit] : [];
+  const base = Array.isArray(item.unit_options) && item.unit_options.length > 0
+    ? item.unit_options
+    : (item.unit ? [item.unit] : []);
+  if (item.recent_unit && !base.includes(item.recent_unit)) return [...base, item.recent_unit];
+  return base;
 }
 
 // A tappable, category-filtered card picker for building one day's bazar
@@ -98,12 +105,10 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
   function addItem(item) {
     if (addedItemIds.has(item.id)) return;
     const unitBased = item.unit_based !== false;
+    // unitOptionsFor already folds recent_unit into the option list when
+    // present, so it's always safe to default straight to it.
     const options = unitOptionsFor(item);
-    // Default to whatever unit was actually bought most recently (if it's
-    // still a valid option for this item) instead of a possibly-stale
-    // catalog default — e.g. Coriander defaults to 250g if that's what's
-    // really been bought lately, not the catalog's static 100g.
-    const defaultUnit = item.recent_unit && options.includes(item.recent_unit) ? item.recent_unit : item.unit;
+    const defaultUnit = item.recent_unit || item.unit;
     onLinesChange([
       {
         key: `item-${item.id}`,
