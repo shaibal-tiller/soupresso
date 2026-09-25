@@ -49,6 +49,8 @@ const MAPPING = {
   'wrapping poly': 'Poly Bag - Large (Carry)',
   'piller': 'Peeler',
   'chicken sausage': 'Chicken Sausage',
+  'chef medicine': 'Chef Medicine',
+  'white pepper': 'White Pepper',
 };
 
 async function main() {
