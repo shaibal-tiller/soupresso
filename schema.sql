@@ -429,7 +429,7 @@ INSERT INTO bazar_items (name, category, unit, unit_options, unit_based, sort_or
   ('Straw & Cap', 'Packaging', 'pc', '["pc", "pack"]'::jsonb, true, 820),
   ('Ice', 'Packaging', 'kg', '["kg", "block"]'::jsonb, true, 830),
   ('Ice Carrying/Delivery', 'Packaging', 'trip', NULL, true, 840),
-  ('Onthon Sheet', 'Packaging', 'packet', NULL, true, 850),
+  ('Wonton Sheet', 'Cooking Essentials', 'packet', NULL, true, 850),
   ('Gloves', 'Packaging', 'pack', NULL, true, 860),
   ('Mask', 'Packaging', 'pack', NULL, true, 870),
   ('Hair Net', 'Packaging', 'pack', NULL, true, 880),
@@ -580,7 +580,17 @@ UPDATE bazar_items SET category = 'Serving, Seating & Packaging'
  WHERE category IN ('Serving & Seating', 'Packaging');
 
 -- "Onthon Sheet" was always Wonton Sheet — an ingredient (used to wrap rolls
--- and wontons before frying), not packaging.
+-- and wontons before frying), not packaging. The catalog seed above used to
+-- still say 'Onthon Sheet' (fixed now, but on a database where this ran
+-- before that fix, ON CONFLICT DO NOTHING would keep silently recreating an
+-- "Onthon Sheet" row every re-run once this UPDATE had already renamed the
+-- real one) — repoint any purchases on that stray row and remove it before
+-- the plain rename below, which is a no-op once no "Onthon Sheet" row exists.
+UPDATE bazar_plan_items SET item_id = (SELECT id FROM bazar_items WHERE name = 'Wonton Sheet')
+ WHERE item_id = (SELECT id FROM bazar_items WHERE name = 'Onthon Sheet')
+   AND EXISTS (SELECT 1 FROM bazar_items WHERE name = 'Wonton Sheet');
+DELETE FROM bazar_items
+ WHERE name = 'Onthon Sheet' AND EXISTS (SELECT 1 FROM bazar_items x WHERE x.name = 'Wonton Sheet');
 UPDATE bazar_items SET name = 'Wonton Sheet', category = 'Cooking Essentials'
  WHERE name = 'Onthon Sheet';
 
