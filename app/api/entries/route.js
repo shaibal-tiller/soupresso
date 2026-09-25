@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { computeCashSummary } from '@/lib/cash-math';
 import { coerceLocaleNumber } from '@/lib/numerals';
 import { todayStrTZ, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
+import { upsertLedgerForEntry } from '@/lib/cash-in-hand-ledger';
 
 export const dynamic = 'force-dynamic'; // always hits the live database, never statically cached
 
@@ -185,6 +186,16 @@ export async function POST(request) {
         closedByArr,
       ]
     );
+
+    // Best-effort: advance the cash-in-hand ledger for this day (no-op if
+    // tracking isn't active yet, or this day is already confirmed/frozen).
+    // Never blocks the entry save itself on a ledger hiccup.
+    try {
+      await upsertLedgerForEntry({ query }, entryDate, summary.cashTakenHome);
+    } catch (ledgerErr) {
+      console.error('cash-in-hand ledger update failed:', ledgerErr.message);
+    }
+
     return NextResponse.json({ entry: rows[0] });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });

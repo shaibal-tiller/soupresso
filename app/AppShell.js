@@ -14,6 +14,7 @@ const TABS = [
   { href: '/products', label: 'Products' },
   { href: '/bazar-items', label: 'Bazar Catalog' },
   { href: '/investments', label: 'Investments' },
+  { href: '/cash-in-hand', label: 'Cash in Hand' },
 ];
 
 export default function AppShell({ children }) {

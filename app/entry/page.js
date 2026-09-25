@@ -299,6 +299,26 @@ function EntryPageInner() {
 
   useEffect(() => { load(date); }, [date, load]);
 
+  // Previous day's cash-in-hand closing balance — used only to project
+  // today's running balance live on the Review step (null = not tracked).
+  const [prevCashInHand, setPrevCashInHand] = useState(null);
+  const [cashInHandSettings, setCashInHandSettings] = useState(null);
+  useEffect(() => {
+    const prevDate = shiftDateStr(date, -1);
+    cachedFetchJson(`/api/cash-in-hand?from=${prevDate}&to=${prevDate}`)
+      .then((data) => { setPrevCashInHand(data.ledger?.[0] || null); setCashInHandSettings(data.settings || null); })
+      .catch(() => { setPrevCashInHand(null); setCashInHandSettings(null); });
+  }, [date]);
+
+  // The opening balance for `date`: yesterday's closing if it's tracked,
+  // else the configured starting balance if `date` IS the starting date
+  // (day 1 has no previous ledger row to read), else null (not tracked).
+  const cashInHandOpening = prevCashInHand
+    ? Number(prevCashInHand.closing_balance)
+    : cashInHandSettings?.starting_date === date
+    ? Number(cashInHandSettings.starting_balance)
+    : null;
+
   // Idle-prefetch yesterday/tomorrow's bundle so the ‹ / › arrows feel
   // instant after the first load — catalog/recurring-items are already
   // cached globally, so this only needs to warm the four date-scoped URLs.
@@ -948,6 +968,17 @@ function EntryPageInner() {
                 {summary.isShort && (
                   <div className="insight red" style={{ marginTop: 10 }}>
                     <b>{t('Box is short.')}</b> {t("Not enough to cover tomorrow's advance and bhangti.")}
+                  </div>
+                )}
+                {cashInHandOpening != null && (
+                  <div className="step-calc" style={{ marginTop: 10 }}>
+                    <div className="calc-row"><span>{t('Cash in Hand (opening)')}</span><span>{taka(cashInHandOpening)}</span></div>
+                    <div className={`calc-row result`}>
+                      <span>{t('Cash in Hand (after today)')}</span>
+                      <span className={cashInHandOpening + summary.cashTakenHome >= 0 ? 'g' : 'r'}>
+                        {taka(cashInHandOpening + summary.cashTakenHome)}
+                      </span>
+                    </div>
                   </div>
                 )}
                 <div className="field" style={{ marginTop: 12 }}>

@@ -599,3 +599,44 @@ VALUES
   ('Peeler', 'Cooking Essentials', 'pc', '🔪', true),
   ('Extra Travel / Bazar Trip', 'Staff & Home', 'trip', '🚗', true)
 ON CONFLICT (name) DO NOTHING;
+
+-- Cash in Hand (beta), 2026-09-25 — see
+-- docs/superpowers/specs/2026-09-25-cash-in-hand-design.md for the full design.
+-- One row per tracked day, mirroring the daily_entries per-day-row pattern
+-- already used throughout this app. Only created for
+-- entry_date >= cash_in_hand_settings.starting_date.
+CREATE TABLE IF NOT EXISTS cash_in_hand_ledger (
+  entry_date        DATE PRIMARY KEY REFERENCES daily_entries(entry_date) ON DELETE CASCADE,
+  opening_balance   NUMERIC(12,2) NOT NULL,
+  day_delta         NUMERIC(12,2) NOT NULL,
+  adjustment_delta  NUMERIC(12,2) NOT NULL DEFAULT 0,
+  closing_balance   NUMERIC(12,2) NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed')),
+  pending_since     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  confirmed_at      TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- A reconciliation correction — always dated to when it's entered, never
+-- silently rewriting a confirmed day's own recorded numbers. Applying one
+-- recomputes closing_balance for its target day and cascades forward
+-- through every later day (see app/api/cash-in-hand/adjustments/route.js).
+CREATE TABLE IF NOT EXISTS cash_in_hand_adjustments (
+  id           SERIAL PRIMARY KEY,
+  entry_date   DATE NOT NULL REFERENCES cash_in_hand_ledger(entry_date),
+  amount       NUMERIC(12,2) NOT NULL,
+  note         TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Singleton settings row (id always 1). NULL starting_date means "not
+-- configured yet" — the whole feature shows as "not started" until set.
+CREATE TABLE IF NOT EXISTS cash_in_hand_settings (
+  id                SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  starting_date     DATE,
+  starting_balance  NUMERIC(12,2),
+  note              TEXT,
+  set_at            TIMESTAMPTZ
+);
+INSERT INTO cash_in_hand_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

@@ -26,6 +26,11 @@ export default function DashboardPage() {
   const [data, setData] = useState(() => peekCache(`/api/dashboard?range=month`) ?? null);
   const [loading, setLoading] = useState(() => peekCache(`/api/dashboard?range=month`) === undefined);
   const requestRef = useRef(0);
+  const [cashInHand, setCashInHand] = useState(() => peekCache('/api/cash-in-hand') ?? null);
+
+  useEffect(() => {
+    cachedFetchJson('/api/cash-in-hand').then(setCashInHand).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const url = `/api/dashboard?range=${range}`;
@@ -106,6 +111,21 @@ export default function DashboardPage() {
             {s.bestDay ? taka(s.bestDay.total_sales) : '—'}
           </div>
           {s.bestDay && <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{dateShort(s.bestDay.entry_date)}</div>}
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">{t('Cash in hand')}</div>
+          {cashInHand?.settings?.starting_date && cashInHand.ledger.length > 0 ? (
+            <>
+              <div className={`kpi-value ${Number(cashInHand.ledger[cashInHand.ledger.length - 1].closing_balance) >= 0 ? 'g' : 'r'}`}>
+                {taka(cashInHand.ledger[cashInHand.ledger.length - 1].closing_balance)}
+              </div>
+              {cashInHand.ledger[cashInHand.ledger.length - 1].status === 'pending' && (
+                <div style={{ fontSize: 10, color: 'var(--amber)' }}>{t('pending')}</div>
+              )}
+            </>
+          ) : (
+            <div className="kpi-value" style={{ fontSize: 14, color: 'var(--text3)' }}>{t('Not started')}</div>
+          )}
         </div>
       </div>
 

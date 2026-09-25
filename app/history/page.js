@@ -11,6 +11,10 @@ function entryUrl(d) {
   return `/api/entries?date=${d}`;
 }
 
+function cashInHandUrl(d) {
+  return `/api/cash-in-hand?from=${d}&to=${d}`;
+}
+
 export default function HistoryPage() {
   const { t, taka, dateLong, dateNice } = useLang();
   const [date, setDate] = useState(todayStr());
@@ -52,6 +56,14 @@ export default function HistoryPage() {
   }, []);
 
   useEffect(() => { load(date); }, [date, load]);
+
+  const [cashInHandRow, setCashInHandRow] = useState(null);
+  useEffect(() => {
+    setCashInHandRow(null);
+    cachedFetchJson(cashInHandUrl(date))
+      .then((data) => setCashInHandRow(data.ledger?.[0] || null))
+      .catch(() => setCashInHandRow(null));
+  }, [date]);
 
   // Idle-prefetch neighboring days so ‹ / › feel instant after the first visit.
   useEffect(() => {
@@ -215,6 +227,20 @@ export default function HistoryPage() {
               {taka(Number(entry.cash_taken_home))}
             </span>
           </div>
+
+          {cashInHandRow && (
+            <>
+              <div className="receipt-divider dashed" />
+              <div className="receipt-row">
+                <span className="receipt-label">
+                  {t('Cash in Hand')}{cashInHandRow.status === 'pending' ? ` (${t('pending')})` : ''}
+                </span>
+                <span className={`receipt-value ${Number(cashInHandRow.closing_balance) >= 0 ? 'green' : 'red'}`}>
+                  {taka(cashInHandRow.closing_balance)}
+                </span>
+              </div>
+            </>
+          )}
 
           {entry.notes && (
             <>
