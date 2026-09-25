@@ -427,6 +427,7 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 }
 .bazar-basket-total-input:focus { outline: none; border-color: var(--brand-green); }
 .bazar-basket-unitprice { font-size: 10.5px; color: var(--text3); text-align: left; font-family: var(--mono); }
+.bazar-basket-hint { font-size: 10.5px; color: var(--amber); text-align: left; margin-top: 2px; line-height: 1.4; }
 .bazar-basket-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 4px; flex-shrink: 0; }
 
 /* ---- Bazar category-browse popup ---- */

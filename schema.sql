@@ -552,3 +552,50 @@ UPDATE bazar_categories SET icon = v.icon FROM (VALUES
   ('Serving & Seating', '🍽️'), ('Packaging', '📦'), ('Staff & Home', '🧑‍🍳'),
   ('Shop Operations & Repairs', '🔧'), ('Cleaning Supplies', '🧽'), ('Other', '🗂️')
 ) AS v(name, icon) WHERE bazar_categories.name = v.name AND bazar_categories.icon IS NULL;
+
+-- Usability round 12 (2026-09-25): bazar catalog category reorganization —
+-- see docs/superpowers/specs/2026-09-25-bazar-category-reorg-design.md.
+-- "Staff & Home" was a jumble of staff/home costs AND shop costs; split them.
+-- "Serving & Seating" + "Packaging" merge into one category. A few items
+-- move to the category that actually matches what they're for.
+ALTER TABLE bazar_categories ADD COLUMN IF NOT EXISTS group_name TEXT;
+
+INSERT INTO bazar_categories (name, icon, group_name)
+VALUES ('Shop', '🏪', 'Overhead'), ('Serving, Seating & Packaging', '🍽️', NULL)
+ON CONFLICT (name) DO NOTHING;
+
+UPDATE bazar_items SET category = 'Shop'
+ WHERE name IN ('Shop Rent', 'Shop Utility', 'Shop Electric Bill', 'Shop Water Bill', 'Shop Cleaning', 'Bulk Transport / Van Hire')
+   AND category = 'Staff & Home';
+
+UPDATE bazar_items SET category = 'Shop'
+ WHERE name IN ('Cash Box', 'Hardware/Tools', 'Repair & Maintenance Work')
+   AND category = 'Shop Operations & Repairs';
+UPDATE bazar_items SET category = 'Cooking Essentials'
+ WHERE name = 'Gas Cylinder Refill - Shop/Cart' AND category = 'Shop Operations & Repairs';
+UPDATE bazar_items SET category = 'Staff & Home'
+ WHERE name = 'Gas Cylinder Refill - Chef Home' AND category = 'Shop Operations & Repairs';
+
+UPDATE bazar_items SET category = 'Serving, Seating & Packaging'
+ WHERE category IN ('Serving & Seating', 'Packaging');
+
+-- "Onthon Sheet" was always Wonton Sheet — an ingredient (used to wrap rolls
+-- and wontons before frying), not packaging.
+UPDATE bazar_items SET name = 'Wonton Sheet', category = 'Cooking Essentials'
+ WHERE name = 'Onthon Sheet';
+
+DELETE FROM bazar_categories WHERE name IN ('Shop Operations & Repairs', 'Serving & Seating', 'Packaging')
+  AND NOT EXISTS (SELECT 1 FROM bazar_items WHERE bazar_items.category = bazar_categories.name);
+
+UPDATE bazar_categories SET group_name = 'Overhead' WHERE name IN ('Staff & Home', 'Shop');
+UPDATE bazar_categories SET group_name = 'Cooking'
+ WHERE name IN ('Vegetables', 'Herbs & Leaves', 'Raw Spices', 'Processed Spices & Sauces', 'Cooking Essentials');
+
+INSERT INTO bazar_items (name, category, unit, icon, active)
+VALUES
+  ('Chef Medicine', 'Staff & Home', 'pc', '💊', true),
+  ('White Pepper', 'Processed Spices & Sauces', 'gm', '🧂', true),
+  ('Chicken Sausage', 'Meat & Egg', 'pc', '🌭', true),
+  ('Peeler', 'Cooking Essentials', 'pc', '🔪', true),
+  ('Extra Travel / Bazar Trip', 'Staff & Home', 'trip', '🚗', true)
+ON CONFLICT (name) DO NOTHING;

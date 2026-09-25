@@ -407,6 +407,16 @@ export default function BazarItemsPage() {
 
   const activeCatMeta = categories.find((c) => c.name === activeCategory);
 
+  // Categories arrive pre-sorted by group_name (nulls last) from the API, so
+  // a single pass preserves group order and keeps each group's cards together.
+  const groupedCategories = [];
+  for (const c of categories) {
+    const key = c.group_name || null;
+    const last = groupedCategories[groupedCategories.length - 1];
+    if (last && last[0] === key) last[1].push(c);
+    else groupedCategories.push([key, [c]]);
+  }
+
   return (
     <AppShell>
       <div className="card">
@@ -459,15 +469,24 @@ export default function BazarItemsPage() {
             )}
           </div>
         ) : (
-          <div className="bazar-item-grid">
-            {categories.map((c) => (
-              <button key={c.id} type="button" className="bazar-item-card bazar-category-card" onClick={() => setActiveCategory(c.name)}>
-                <span className="bazar-item-icon">{c.icon || '🗂️'}</span>
-                <span className="bazar-item-name">{t(c.name)}</span>
-                <span className="bazar-item-unit">{c.item_count}</span>
-              </button>
-            ))}
-          </div>
+          groupedCategories.map(([groupName, cats]) => (
+            <div key={groupName || '__ungrouped'} style={{ marginBottom: 18 }}>
+              {groupName && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 8, letterSpacing: 0.3 }}>
+                  {t(groupName)}
+                </div>
+              )}
+              <div className="bazar-item-grid">
+                {cats.map((c) => (
+                  <button key={c.id} type="button" className="bazar-item-card bazar-category-card" onClick={() => setActiveCategory(c.name)}>
+                    <span className="bazar-item-icon">{c.icon || '🗂️'}</span>
+                    <span className="bazar-item-name">{t(c.name)}</span>
+                    <span className="bazar-item-unit">{c.item_count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </div>
 

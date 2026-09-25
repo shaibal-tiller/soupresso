@@ -339,6 +339,11 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                           {'≈ '}{taka(norm.value)}/{unitLabel(norm.baseUnit)}
                         </div>
                       )}
+                      {line.name === 'Auto Fare' && lineTotalVal > 50 && (
+                        <div className="bazar-basket-hint">
+                          {t("Over the usual ৳50 daily fare — if this is a separate trip (e.g. a bazar run), consider adding it as its own \"Extra Travel / Bazar Trip\" item instead.")}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="bazar-basket-inputs">

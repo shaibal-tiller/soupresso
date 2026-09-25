@@ -12,7 +12,7 @@ export async function GET() {
          FROM bazar_categories bc
          LEFT JOIN bazar_items bi ON bi.category = bc.name
         GROUP BY bc.id
-        ORDER BY bc.sort_order ASC, bc.name ASC`
+        ORDER BY bc.group_name ASC NULLS LAST, bc.sort_order ASC, bc.name ASC`
     );
     return NextResponse.json({ categories: rows });
   } catch (err) {
