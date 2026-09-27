@@ -691,3 +691,24 @@ ON CONFLICT (name) DO NOTHING;
 
 UPDATE menu_items SET tracking_mode = 'bowl_single' WHERE name = 'Thai Soup (Chicken & Mushroom)';
 UPDATE menu_items SET tracking_mode = 'bowl_double' WHERE name = 'Parcel Soup (Thai Soup, to go)';
+
+-- Leftovers for 'production'-mode items (Roll, Taquitos, Wonton, Chicken
+-- Fry, etc. — anything made in batches sometimes has unsold pieces at
+-- closing). One row per item per day. If carried_forward, that quantity is
+-- mirrored into tomorrow's production_entries (see the leftover route) so
+-- it counts as available stock without re-entering it as a fresh batch.
+CREATE TABLE IF NOT EXISTS production_leftovers (
+  entry_date       DATE NOT NULL,
+  item_id          INTEGER NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  leftover_qty     INTEGER NOT NULL DEFAULT 0 CHECK (leftover_qty >= 0),
+  carried_forward  BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (entry_date, item_id)
+);
+
+-- If your database already has production_entries without these, run this:
+-- carried_over marks a row as auto-inserted from yesterday's leftover
+-- (not a batch the chef actually cooked that day); carried_from is the
+-- source leftover's entry_date, used to find and update/remove this row
+-- if that leftover entry is later edited or un-checked.
+ALTER TABLE production_entries ADD COLUMN IF NOT EXISTS carried_over BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE production_entries ADD COLUMN IF NOT EXISTS carried_from DATE;
