@@ -650,3 +650,44 @@ CREATE TABLE IF NOT EXISTS cash_in_hand_settings (
   set_at            TIMESTAMPTZ
 );
 INSERT INTO cash_in_hand_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Sales Tally (production batches + closing bowl counts), 2026-09-27 — see
+-- docs/superpowers/specs/2026-09-27-sales-tally-design.md for the full design.
+-- Replaces the old Products page's single daily_product_sales number with
+-- per-item tracking that matches how sales are actually recorded on paper.
+
+-- If your database already has menu_items without tracking_mode, run this:
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS tracking_mode TEXT NOT NULL DEFAULT 'production'
+  CHECK (tracking_mode IN ('production', 'bowl_single', 'bowl_double'));
+
+-- Batch log for 'production'-mode items — many rows per item per day, one
+-- per batch made. No FK to daily_entries: production is logged through the
+-- day, often before that day's cash entry is saved.
+CREATE TABLE IF NOT EXISTS production_entries (
+  id           SERIAL PRIMARY KEY,
+  entry_date   DATE NOT NULL,
+  item_id      INTEGER NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  quantity     INTEGER NOT NULL CHECK (quantity > 0),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_production_entries_date ON production_entries (entry_date);
+
+-- Closing bowl count for 'bowl_single'/'bowl_double'-mode items (Soup /
+-- Parcel Soup) — one row per item per day. double_count is always 0 for
+-- bowl_single items; for bowl_double, quantity sold = single + 2*double.
+CREATE TABLE IF NOT EXISTS bowl_counts (
+  entry_date     DATE NOT NULL,
+  item_id        INTEGER NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  single_count   INTEGER NOT NULL DEFAULT 0 CHECK (single_count >= 0),
+  double_count   INTEGER NOT NULL DEFAULT 0 CHECK (double_count >= 0),
+  PRIMARY KEY (entry_date, item_id)
+);
+
+-- Parcel Soup is a new menu item (separate price from the dine-in bowl).
+-- Price below is a placeholder — correct it from Manage Menu once this ships.
+INSERT INTO menu_items (name, price, sort_order, tracking_mode) VALUES
+  ('Parcel Soup (Thai Soup, to go)', 70, 1, 'bowl_double')
+ON CONFLICT (name) DO NOTHING;
+
+UPDATE menu_items SET tracking_mode = 'bowl_single' WHERE name = 'Thai Soup (Chicken & Mushroom)';
+UPDATE menu_items SET tracking_mode = 'bowl_double' WHERE name = 'Parcel Soup (Thai Soup, to go)';
