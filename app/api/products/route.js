@@ -36,6 +36,22 @@ export async function POST(request) {
 
   try {
     if (id) {
+      const { rows: currentRows } = await query(`SELECT tracking_mode FROM menu_items WHERE id = $1`, [id]);
+      if (!currentRows.length) return NextResponse.json({ error: 'item not found' }, { status: 404 });
+      if (currentRows[0].tracking_mode !== mode) {
+        const { rows: activityRows } = await query(
+          `SELECT
+             EXISTS (SELECT 1 FROM production_entries WHERE item_id = $1) AS has_production,
+             EXISTS (SELECT 1 FROM bowl_counts WHERE item_id = $1) AS has_bowl_counts`,
+          [id]
+        );
+        if (activityRows[0].has_production || activityRows[0].has_bowl_counts) {
+          return NextResponse.json(
+            { error: 'This item already has recorded production/bowl-count data — its tracking mode cannot be changed, since switching it would silently drop those historical entries from the tally.' },
+            { status: 409 }
+          );
+        }
+      }
       const { rows } = await query(
         `UPDATE menu_items SET name=$1, price=$2, active=$3, sort_order=$4, tracking_mode=$5 WHERE id=$6 RETURNING *`,
         [name, p, !!active, sort, mode, id]

@@ -22,8 +22,10 @@ export default function SalesTallyPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [batchQty, setBatchQty] = useState({});
+  const [bowlDraft, setBowlDraft] = useState({});
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [msg, setMsg] = useState(null);
 
   const requestRef = useRef(0);
 
@@ -69,39 +71,86 @@ export default function SalesTallyPage() {
     });
   }, [tab, date, loading]);
 
+  // Refetches the tally in place without ever flipping `loading` back to
+  // true — a plain invalidateCache()+loadTally() would blank the card list
+  // (and any input the chef is mid-typing into) between every save.
+  const refreshTally = useCallback(async () => {
+    invalidateCache(tallyUrl(date));
+    const json = await cachedFetchJson(tallyUrl(date));
+    setData(json);
+  }, [date]);
+
+  function bowlValue(item, field) {
+    const draft = bowlDraft[item.id]?.[field];
+    if (draft !== undefined) return draft;
+    return field === 'single' ? item.singleCount : item.doubleCount;
+  }
+
+  function setBowlDraftField(itemId, field, value) {
+    setBowlDraft((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
+  }
+
   async function addBatch(item) {
     const qty = batchQty[item.id];
     if (!qty || Number(qty) <= 0) return;
     setSaving(true);
-    await fetch('/api/sales-tally/entries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, itemId: item.id, quantity: qty }),
-    });
-    setBatchQty((prev) => ({ ...prev, [item.id]: '' }));
-    setSaving(false);
-    invalidateCache(tallyUrl(date));
-    loadTally(date);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/sales-tally/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, itemId: item.id, quantity: qty }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
+      setBatchQty((prev) => ({ ...prev, [item.id]: '' }));
+      await refreshTally();
+    } catch {
+      setMsg({ type: 'err', text: t('Save failed.') });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteBatch(entryId) {
     setSaving(true);
-    await fetch(`/api/sales-tally/entries?id=${entryId}`, { method: 'DELETE' });
-    setSaving(false);
-    invalidateCache(tallyUrl(date));
-    loadTally(date);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/sales-tally/entries?id=${entryId}`, { method: 'DELETE' });
+      if (!res.ok) { setMsg({ type: 'err', text: t('Save failed.') }); return; }
+      await refreshTally();
+    } catch {
+      setMsg({ type: 'err', text: t('Save failed.') });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function saveBowlCount(item, singleCount, doubleCount) {
+  async function saveBowlCount(item) {
+    const single = bowlValue(item, 'single');
+    const double = item.trackingMode === 'bowl_double' ? bowlValue(item, 'double') : 0;
+    if (single === item.singleCount && double === item.doubleCount) return; // nothing changed — skip the round-trip
     setSaving(true);
-    await fetch('/api/sales-tally/bowl-count', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, itemId: item.id, singleCount, doubleCount }),
-    });
-    setSaving(false);
-    invalidateCache(tallyUrl(date));
-    loadTally(date);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/sales-tally/bowl-count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, itemId: item.id, singleCount: single, doubleCount: double }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
+      await refreshTally();
+      setBowlDraft((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    } catch {
+      setMsg({ type: 'err', text: t('Save failed.') });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function addMenuItem() {
@@ -150,17 +199,25 @@ export default function SalesTallyPage() {
 
   async function updateTrackingMode(item, trackingMode) {
     setSaving(true);
-    await fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: item.id, name: item.name, price: item.price,
-        active: item.active, sortOrder: item.sort_order, trackingMode,
-      }),
-    });
-    setSaving(false);
-    invalidateCache(MENU_URL);
-    loadMenu();
+    setMsg(null);
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id, name: item.name, price: item.price,
+          active: item.active, sortOrder: item.sort_order, trackingMode,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
+      invalidateCache(MENU_URL);
+      await loadMenu();
+    } catch {
+      setMsg({ type: 'err', text: t('Save failed.') });
+    } finally {
+      setSaving(false);
+    }
   }
 
   const statusClass = { good: 'green', warning: 'amber', danger: 'red' };
@@ -176,6 +233,8 @@ export default function SalesTallyPage() {
         <button className={tab === 'tally' ? 'on' : ''} onClick={() => setTab('tally')}>{t("Today's tally")}</button>
         <button className={tab === 'menu' ? 'on' : ''} onClick={() => setTab('menu')}>{t('Manage menu')}</button>
       </div>
+
+      {msg && <div className={`status-msg ${msg.type}`}>{msg.text}</div>}
 
       {tab === 'tally' ? (
         <>
@@ -235,20 +294,20 @@ export default function SalesTallyPage() {
                       <div className="field" style={{ marginBottom: 0, flex: 1 }}>
                         <label>{item.trackingMode === 'bowl_double' ? t('Single') : t('Bowls sold')}</label>
                         <NumberInput
-                          value={item.singleCount}
+                          value={bowlValue(item, 'single')}
                           min={0}
-                          onValueChange={() => {}}
-                          onBlur={(n) => { if (n != null) saveBowlCount(item, n, item.doubleCount); }}
+                          onValueChange={(n) => setBowlDraftField(item.id, 'single', n ?? 0)}
+                          onBlur={() => saveBowlCount(item)}
                         />
                       </div>
                       {item.trackingMode === 'bowl_double' && (
                         <div className="field" style={{ marginBottom: 0, flex: 1 }}>
                           <label>{t('Double')}</label>
                           <NumberInput
-                            value={item.doubleCount}
+                            value={bowlValue(item, 'double')}
                             min={0}
-                            onValueChange={() => {}}
-                            onBlur={(n) => { if (n != null) saveBowlCount(item, item.singleCount, n); }}
+                            onValueChange={(n) => setBowlDraftField(item.id, 'double', n ?? 0)}
+                            onBlur={() => saveBowlCount(item)}
                           />
                         </div>
                       )}
