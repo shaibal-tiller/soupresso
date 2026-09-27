@@ -23,6 +23,7 @@ export default function SalesTallyPage() {
   const [saving, setSaving] = useState(false);
   const [batchQty, setBatchQty] = useState({});
   const [bowlDraft, setBowlDraft] = useState({});
+  const [leftoverDraft, setLeftoverDraft] = useState({});
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [msg, setMsg] = useState(null);
@@ -90,6 +91,16 @@ export default function SalesTallyPage() {
     setBowlDraft((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
   }
 
+  function leftoverValue(item, field) {
+    const draft = leftoverDraft[item.id]?.[field];
+    if (draft !== undefined) return draft;
+    return field === 'qty' ? item.leftoverQty : item.carriedForward;
+  }
+
+  function setLeftoverDraftField(itemId, field, value) {
+    setLeftoverDraft((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
+  }
+
   async function addBatch(item) {
     const qty = batchQty[item.id];
     if (!qty || Number(qty) <= 0) return;
@@ -142,6 +153,33 @@ export default function SalesTallyPage() {
       if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
       await refreshTally();
       setBowlDraft((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    } catch {
+      setMsg({ type: 'err', text: t('Save failed.') });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveLeftover(item, overrides = {}) {
+    const qty = overrides.qty !== undefined ? overrides.qty : leftoverValue(item, 'qty');
+    const carried = overrides.carried !== undefined ? overrides.carried : leftoverValue(item, 'carried');
+    if (qty === item.leftoverQty && carried === item.carriedForward) return; // nothing changed — skip the round-trip
+    setSaving(true);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/sales-tally/leftover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, itemId: item.id, leftoverQty: qty, carriedForward: carried }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
+      await refreshTally();
+      setLeftoverDraft((prev) => {
         const next = { ...prev };
         delete next[item.id];
         return next;
@@ -262,7 +300,12 @@ export default function SalesTallyPage() {
                           <tbody>
                             {item.entries.map((entry) => (
                               <tr key={entry.id}>
-                                <td>{digits(String(entry.quantity))}</td>
+                                <td>
+                                  {digits(String(entry.quantity))}
+                                  {entry.carriedOver && (
+                                    <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>{t('carried from yesterday')}</div>
+                                  )}
+                                </td>
                                 <td>
                                   <button
                                     className="btn secondary"
@@ -287,6 +330,31 @@ export default function SalesTallyPage() {
                           onValueChange={(n) => setBatchQty((prev) => ({ ...prev, [item.id]: n }))}
                         />
                         <button className="btn" onClick={() => addBatch(item)} disabled={saving}>{t('Add batch')}</button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                        <div className="field" style={{ marginBottom: 0, flex: 1 }}>
+                          <label>{t('Leftover (not sold)')}</label>
+                          <NumberInput
+                            value={leftoverValue(item, 'qty')}
+                            min={0}
+                            onValueChange={(n) => setLeftoverDraftField(item.id, 'qty', n ?? 0)}
+                            onBlur={() => saveLeftover(item)}
+                          />
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)', paddingBottom: 11, flex: 1 }}>
+                          <input
+                            type="checkbox"
+                            checked={!!leftoverValue(item, 'carried')}
+                            disabled={saving}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setLeftoverDraftField(item.id, 'carried', checked);
+                              saveLeftover(item, { carried: checked });
+                            }}
+                          />
+                          {t('Bringing it back tomorrow?')}
+                        </label>
                       </div>
                     </>
                   ) : (

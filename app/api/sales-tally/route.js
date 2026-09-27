@@ -19,16 +19,20 @@ export async function GET(request) {
          m.id, m.name, m.price, m.tracking_mode,
          COALESCE(bc.single_count, 0) AS single_count,
          COALESCE(bc.double_count, 0) AS double_count,
+         COALESCE(pl.leftover_qty, 0) AS leftover_qty,
+         COALESCE(pl.carried_forward, false) AS carried_forward,
          COALESCE(
-           (SELECT json_agg(json_build_object('id', pe.id, 'quantity', pe.quantity, 'createdAt', pe.created_at) ORDER BY pe.created_at)
+           (SELECT json_agg(json_build_object('id', pe.id, 'quantity', pe.quantity, 'createdAt', pe.created_at, 'carriedOver', pe.carried_over) ORDER BY pe.created_at)
             FROM production_entries pe WHERE pe.item_id = m.id AND pe.entry_date = $1),
            '[]'
          ) AS entries
        FROM menu_items m
        LEFT JOIN bowl_counts bc ON bc.item_id = m.id AND bc.entry_date = $1
+       LEFT JOIN production_leftovers pl ON pl.item_id = m.id AND pl.entry_date = $1
        WHERE m.active = true
           OR EXISTS (SELECT 1 FROM production_entries pe2 WHERE pe2.item_id = m.id AND pe2.entry_date = $1)
           OR EXISTS (SELECT 1 FROM bowl_counts bc2 WHERE bc2.item_id = m.id AND bc2.entry_date = $1)
+          OR EXISTS (SELECT 1 FROM production_leftovers pl2 WHERE pl2.item_id = m.id AND pl2.entry_date = $1)
        ORDER BY m.sort_order ASC, m.name ASC`,
       [date]
     );
@@ -41,6 +45,8 @@ export async function GET(request) {
         trackingMode: r.tracking_mode,
         singleCount: Number(r.single_count),
         doubleCount: Number(r.double_count),
+        leftoverQty: Number(r.leftover_qty),
+        carriedForward: r.carried_forward,
         entries: r.entries || [],
       };
       const quantitySold = quantitySoldForItem(item);
