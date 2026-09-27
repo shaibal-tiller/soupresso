@@ -15,6 +15,8 @@ export async function GET() {
   }
 }
 
+const TRACKING_MODES = ['production', 'bowl_single', 'bowl_double'];
+
 // Create a new item, or update an existing one if `id` is provided.
 export async function POST(request) {
   let body;
@@ -23,25 +25,26 @@ export async function POST(request) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { id, name, price, active = true, sortOrder = 0 } = body || {};
+  const { id, name, price, active = true, sortOrder = 0, trackingMode = 'production' } = body || {};
 
   const p = coerceLocaleNumber(price);
   if (!name || price === undefined || p == null) {
     return NextResponse.json({ error: 'name and a numeric price are required' }, { status: 400 });
   }
   const sort = coerceLocaleNumber(sortOrder) ?? 0;
+  const mode = TRACKING_MODES.includes(trackingMode) ? trackingMode : 'production';
 
   try {
     if (id) {
       const { rows } = await query(
-        `UPDATE menu_items SET name=$1, price=$2, active=$3, sort_order=$4 WHERE id=$5 RETURNING *`,
-        [name, p, !!active, sort, id]
+        `UPDATE menu_items SET name=$1, price=$2, active=$3, sort_order=$4, tracking_mode=$5 WHERE id=$6 RETURNING *`,
+        [name, p, !!active, sort, mode, id]
       );
       return NextResponse.json({ item: rows[0] });
     } else {
       const { rows } = await query(
-        `INSERT INTO menu_items (name, price, active, sort_order) VALUES ($1,$2,$3,$4) RETURNING *`,
-        [name, p, !!active, sort]
+        `INSERT INTO menu_items (name, price, active, sort_order, tracking_mode) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [name, p, !!active, sort, mode]
       );
       return NextResponse.json({ item: rows[0] });
     }
