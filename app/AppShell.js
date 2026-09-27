@@ -11,7 +11,7 @@ const TABS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/expenses', label: 'Expenses' },
   { href: '/calendar', label: 'Calendar' },
-  { href: '/products', label: 'Products' },
+  { href: '/sales-tally', label: 'Sales Tally' },
   { href: '/bazar-items', label: 'Bazar Catalog' },
   { href: '/investments', label: 'Investments' },
   { href: '/cash-in-hand', label: 'Cash in Hand' },
