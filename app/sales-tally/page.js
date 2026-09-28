@@ -10,8 +10,24 @@ import { cachedFetchJson, peekCache, invalidateCache, prefetchJson, runWhenIdle 
 function tallyUrl(d) {
   return `/api/sales-tally?date=${d}`;
 }
+function tallyDraftKey(d) {
+  return `soupresso-tally-draft:${d}`;
+}
 const MENU_URL = '/api/products';
 const TRACKING_MODES = ['production', 'bowl_single', 'bowl_double'];
+
+// Small +/-1 stepper wrapped around NumberInput — faster than typing for the
+// small counts (bowl sales, leftovers) this page deals with most.
+function Stepper({ value, onChange, min = 0, disabled }) {
+  const current = value == null || value === '' ? 0 : Number(value);
+  return (
+    <div className="tally-stepper">
+      <button type="button" onClick={() => onChange(Math.max(min, current - 1))} disabled={disabled || current <= min} aria-label="-1">−</button>
+      <NumberInput value={value} min={min} disabled={disabled} onValueChange={(n) => onChange(n ?? 0)} />
+      <button type="button" onClick={() => onChange(current + 1)} disabled={disabled} aria-label="+1">+</button>
+    </div>
+  );
+}
 
 export default function SalesTallyPage() {
   const { t, taka, digits, dateDisplay } = useLang();
@@ -24,11 +40,13 @@ export default function SalesTallyPage() {
   const [batchQty, setBatchQty] = useState({});
   const [bowlDraft, setBowlDraft] = useState({});
   const [leftoverDraft, setLeftoverDraft] = useState({});
+  const [itemErrors, setItemErrors] = useState({});
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [msg, setMsg] = useState(null);
 
   const requestRef = useRef(0);
+  const refreshTimerRef = useRef(null);
 
   const loadTally = useCallback(async (d) => {
     const url = tallyUrl(d);
@@ -81,6 +99,49 @@ export default function SalesTallyPage() {
     setData(json);
   }, [date]);
 
+  // Restore any unsaved bowl-count/leftover draft left over from a crash or
+  // accidental navigation the last time this date was open. Runs whenever
+  // the selected date changes so each day keeps its own draft.
+  useEffect(() => {
+    if (tab !== 'tally') return;
+    let restored = false;
+    try {
+      const raw = localStorage.getItem(tallyDraftKey(date));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.bowlDraft || parsed.leftoverDraft)) {
+          setBowlDraft(parsed.bowlDraft || {});
+          setLeftoverDraft(parsed.leftoverDraft || {});
+          restored = true;
+        }
+      }
+    } catch {}
+    if (!restored) {
+      setBowlDraft({});
+      setLeftoverDraft({});
+    } else {
+      setMsg({ type: 'ok', text: t('Restored unsaved changes from earlier.') });
+    }
+    setItemErrors({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, date]);
+
+  // Debounced crash-recovery snapshot of unsaved drafts — mirrors the
+  // pattern in app/entry/page.js. Never hits the network; local only.
+  useEffect(() => {
+    const hasDraft = Object.keys(bowlDraft).length > 0 || Object.keys(leftoverDraft).length > 0;
+    const timer = setTimeout(() => {
+      try {
+        if (hasDraft) {
+          localStorage.setItem(tallyDraftKey(date), JSON.stringify({ savedAt: Date.now(), bowlDraft, leftoverDraft }));
+        } else {
+          localStorage.removeItem(tallyDraftKey(date));
+        }
+      } catch {}
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [date, bowlDraft, leftoverDraft]);
+
   function bowlValue(item, field) {
     const draft = bowlDraft[item.id]?.[field];
     if (draft !== undefined) return draft;
@@ -101,6 +162,68 @@ export default function SalesTallyPage() {
     setLeftoverDraft((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
   }
 
+  function isBowlDirty(item) {
+    const draft = bowlDraft[item.id];
+    if (!draft) return false;
+    const single = draft.single !== undefined ? draft.single : item.singleCount;
+    const double = item.trackingMode === 'bowl_double'
+      ? (draft.double !== undefined ? draft.double : item.doubleCount)
+      : 0;
+    return single !== item.singleCount || double !== item.doubleCount;
+  }
+
+  function isLeftoverDirty(item) {
+    const draft = leftoverDraft[item.id];
+    if (!draft) return false;
+    const qty = draft.qty !== undefined ? draft.qty : item.leftoverQty;
+    const carried = draft.carried !== undefined ? draft.carried : item.carriedForward;
+    return qty !== item.leftoverQty || carried !== item.carriedForward;
+  }
+
+  const dirtyItems = data ? data.items.filter((item) => isBowlDirty(item) || isLeftoverDirty(item)) : [];
+  const dirtyCount = dirtyItems.length;
+
+  // Warn on tab close/refresh while there's unsaved work, and flush the
+  // latest edits to the crash-recovery draft first (localStorage writes are
+  // synchronous, so this is safe inside beforeunload).
+  useEffect(() => {
+    if (dirtyCount === 0) return;
+    function handleBeforeUnload(e) {
+      flushDraftNow();
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirtyCount, bowlDraft, leftoverDraft, date]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) { clearTimeout(refreshTimerRef.current); refreshTimerRef.current = null; }
+    };
+  }, [date]);
+
+  function flushDraftNow() {
+    try {
+      const hasDraft = Object.keys(bowlDraft).length > 0 || Object.keys(leftoverDraft).length > 0;
+      if (hasDraft) {
+        localStorage.setItem(tallyDraftKey(date), JSON.stringify({ savedAt: Date.now(), bowlDraft, leftoverDraft }));
+      }
+    } catch {}
+  }
+
+  // Coalesces refetches after batch add/delete — a few clicks in a row
+  // (e.g. removing three mis-entered batches) collapse into one GET instead
+  // of one per click.
+  function scheduleRefresh() {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      refreshTally();
+    }, 500);
+  }
+
   async function addBatch(item) {
     const qty = batchQty[item.id];
     if (!qty || Number(qty) <= 0) return;
@@ -115,7 +238,7 @@ export default function SalesTallyPage() {
       const body = await res.json();
       if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
       setBatchQty((prev) => ({ ...prev, [item.id]: '' }));
-      await refreshTally();
+      scheduleRefresh();
     } catch {
       setMsg({ type: 'err', text: t('Save failed.') });
     } finally {
@@ -129,7 +252,7 @@ export default function SalesTallyPage() {
     try {
       const res = await fetch(`/api/sales-tally/entries?id=${entryId}`, { method: 'DELETE' });
       if (!res.ok) { setMsg({ type: 'err', text: t('Save failed.') }); return; }
-      await refreshTally();
+      scheduleRefresh();
     } catch {
       setMsg({ type: 'err', text: t('Save failed.') });
     } finally {
@@ -137,58 +260,92 @@ export default function SalesTallyPage() {
     }
   }
 
-  async function saveBowlCount(item) {
-    const single = bowlValue(item, 'single');
-    const double = item.trackingMode === 'bowl_double' ? bowlValue(item, 'double') : 0;
-    if (single === item.singleCount && double === item.doubleCount) return; // nothing changed — skip the round-trip
+  // Batches every changed bowl-count/leftover item into one round of
+  // requests (fired together, not one-per-blur), then does exactly one
+  // refetch — replacing what used to be a POST+GET pair per field.
+  async function saveTally() {
+    if (!data || dirtyCount === 0) return;
     setSaving(true);
     setMsg(null);
-    try {
-      const res = await fetch('/api/sales-tally/bowl-count', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, itemId: item.id, singleCount: single, doubleCount: double }),
-      });
-      const body = await res.json();
-      if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
-      await refreshTally();
-      setBowlDraft((prev) => {
-        const next = { ...prev };
-        delete next[item.id];
-        return next;
-      });
-    } catch {
-      setMsg({ type: 'err', text: t('Save failed.') });
-    } finally {
-      setSaving(false);
+    if (refreshTimerRef.current) { clearTimeout(refreshTimerRef.current); refreshTimerRef.current = null; }
+
+    const tasks = dirtyItems.map((item) => {
+      if (item.trackingMode === 'production') {
+        return {
+          itemId: item.id,
+          run: () => fetch('/api/sales-tally/leftover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              date, itemId: item.id,
+              leftoverQty: leftoverValue(item, 'qty'),
+              carriedForward: leftoverValue(item, 'carried'),
+            }),
+          }),
+        };
+      }
+      return {
+        itemId: item.id,
+        run: () => fetch('/api/sales-tally/bowl-count', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date, itemId: item.id,
+            singleCount: bowlValue(item, 'single'),
+            doubleCount: item.trackingMode === 'bowl_double' ? bowlValue(item, 'double') : 0,
+          }),
+        }),
+      };
+    });
+
+    const settled = await Promise.allSettled(tasks.map((task) => task.run()));
+
+    const succeededIds = new Set();
+    const errors = {};
+    for (let i = 0; i < settled.length; i++) {
+      const result = settled[i];
+      const { itemId } = tasks[i];
+      if (result.status === 'fulfilled' && result.value.ok) {
+        succeededIds.add(itemId);
+        continue;
+      }
+      let text = t('Save failed.');
+      if (result.status === 'fulfilled') {
+        try {
+          const body = await result.value.json();
+          if (body.error) text = body.error;
+        } catch {}
+      }
+      errors[itemId] = text;
     }
+
+    setBowlDraft((prev) => {
+      const next = { ...prev };
+      for (const id of succeededIds) delete next[id];
+      return next;
+    });
+    setLeftoverDraft((prev) => {
+      const next = { ...prev };
+      for (const id of succeededIds) delete next[id];
+      return next;
+    });
+    setItemErrors(errors);
+
+    await refreshTally();
+
+    setMsg(
+      Object.keys(errors).length > 0
+        ? { type: 'err', text: t('Some items failed to save — check the highlighted rows.') }
+        : { type: 'ok', text: t('Saved!') }
+    );
+    setSaving(false);
   }
 
-  async function saveLeftover(item, overrides = {}) {
-    const qty = overrides.qty !== undefined ? overrides.qty : leftoverValue(item, 'qty');
-    const carried = overrides.carried !== undefined ? overrides.carried : leftoverValue(item, 'carried');
-    if (qty === item.leftoverQty && carried === item.carriedForward) return; // nothing changed — skip the round-trip
-    setSaving(true);
+  function discardChanges() {
+    setBowlDraft({});
+    setLeftoverDraft({});
+    setItemErrors({});
     setMsg(null);
-    try {
-      const res = await fetch('/api/sales-tally/leftover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, itemId: item.id, leftoverQty: qty, carriedForward: carried }),
-      });
-      const body = await res.json();
-      if (!res.ok) { setMsg({ type: 'err', text: body.error || t('Save failed.') }); return; }
-      await refreshTally();
-      setLeftoverDraft((prev) => {
-        const next = { ...prev };
-        delete next[item.id];
-        return next;
-      });
-    } catch {
-      setMsg({ type: 'err', text: t('Save failed.') });
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function addMenuItem() {
@@ -277,9 +434,9 @@ export default function SalesTallyPage() {
       {tab === 'tally' ? (
         <>
           <div className="day-nav">
-            <button onClick={() => setDate(shiftDateStr(date, -1))}>‹</button>
+            <button onClick={() => { flushDraftNow(); setDate(shiftDateStr(date, -1)); }}>‹</button>
             <div className="date-display">{dateDisplay(date)}</div>
-            <button onClick={() => setDate(shiftDateStr(date, 1))}>›</button>
+            <button onClick={() => { flushDraftNow(); setDate(shiftDateStr(date, 1)); }}>›</button>
           </div>
 
           {loading || !data ? (
@@ -288,106 +445,120 @@ export default function SalesTallyPage() {
             <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No menu items yet — add some under "Manage menu".')}</p>
           ) : (
             <>
-              {data.items.map((item) => (
-                <div className="card" key={item.id}>
-                  <div className="card-title">{item.name}</div>
+              <div className="tally-table-wrap">
+                <table className="tally-table">
+                  <thead>
+                    <tr>
+                      <th className="tally-sticky-col">{t('Item')}</th>
+                      <th>{t('Batches')}</th>
+                      <th>{t('Leftover')}</th>
+                      <th title={t('Bringing it back tomorrow?')}>↺</th>
+                      <th>{t('Sold')}</th>
+                      <th>{t('Value')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items.map((item) => {
+                      const dirty = isBowlDirty(item) || isLeftoverDirty(item);
+                      const hasError = !!itemErrors[item.id];
+                      const rowClass = [dirty ? 'dirty' : '', hasError ? 'row-error' : ''].filter(Boolean).join(' ');
+                      return (
+                        <tr key={item.id} className={rowClass || undefined}>
+                          <td className="tally-item-cell tally-sticky-col">
+                            {item.name}
+                            {hasError && <div className="tally-item-error">{itemErrors[item.id]}</div>}
+                          </td>
 
-                  {item.trackingMode === 'production' ? (
-                    <>
-                      {item.entries.length > 0 && (
-                        <table className="denom-table">
-                          <thead><tr><th>{t('Batch')}</th><th></th></tr></thead>
-                          <tbody>
-                            {item.entries.map((entry) => (
-                              <tr key={entry.id}>
-                                <td>
-                                  {digits(String(entry.quantity))}
-                                  {entry.carriedOver && (
-                                    <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>{t('carried from yesterday')}</div>
-                                  )}
-                                </td>
-                                <td>
-                                  <button
-                                    className="btn secondary"
-                                    style={{ padding: '4px 9px', fontSize: 11 }}
-                                    aria-label={t('Remove')}
-                                    onClick={() => deleteBatch(entry.id)}
+                          {item.trackingMode === 'production' ? (
+                            <>
+                              <td>
+                                <div className="tally-batches">
+                                  {item.entries.map((entry) => (
+                                    <span className="tally-chip" key={entry.id}>
+                                      {entry.carriedOver && <span title={t('carried from yesterday')}>↺</span>}
+                                      {digits(String(entry.quantity))}
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteBatch(entry.id)}
+                                        disabled={saving}
+                                        aria-label={t('Remove')}
+                                      >
+                                        ✕
+                                      </button>
+                                    </span>
+                                  ))}
+                                  <span className="tally-add">
+                                    <NumberInput
+                                      value={batchQty[item.id] ?? ''}
+                                      min={0}
+                                      placeholder={t('Qty made')}
+                                      onValueChange={(n) => setBatchQty((prev) => ({ ...prev, [item.id]: n }))}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBatch(item); } }}
+                                      disabled={saving}
+                                    />
+                                    <button type="button" onClick={() => addBatch(item)} disabled={saving} aria-label={t('Add batch')}>+</button>
+                                  </span>
+                                </div>
+                              </td>
+                              <td>
+                                <Stepper
+                                  value={leftoverValue(item, 'qty')}
+                                  min={0}
+                                  disabled={saving}
+                                  onChange={(n) => setLeftoverDraftField(item.id, 'qty', n)}
+                                />
+                              </td>
+                              <td>
+                                <label className="tally-carry-wrap" title={t('Bringing it back tomorrow?')}>
+                                  <input
+                                    type="checkbox"
+                                    className="tally-carry-check"
+                                    checked={!!leftoverValue(item, 'carried')}
                                     disabled={saving}
-                                  >
-                                    ✕
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                      <div style={{ display: 'flex', gap: 8, marginTop: item.entries.length > 0 ? 10 : 0 }}>
-                        <NumberInput
-                          value={batchQty[item.id] ?? ''}
-                          min={0}
-                          placeholder={t('Qty made')}
-                          onValueChange={(n) => setBatchQty((prev) => ({ ...prev, [item.id]: n }))}
-                        />
-                        <button className="btn" onClick={() => addBatch(item)} disabled={saving}>{t('Add batch')}</button>
-                      </div>
+                                    onChange={(e) => setLeftoverDraftField(item.id, 'carried', e.target.checked)}
+                                  />
+                                </label>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td>
+                                <div className="tally-bowl-fields">
+                                  <div className="tally-bowl-field">
+                                    <span className="bowl-label">{item.trackingMode === 'bowl_double' ? t('Single') : t('Bowls sold')}</span>
+                                    <Stepper
+                                      value={bowlValue(item, 'single')}
+                                      min={0}
+                                      disabled={saving}
+                                      onChange={(n) => setBowlDraftField(item.id, 'single', n)}
+                                    />
+                                  </div>
+                                  {item.trackingMode === 'bowl_double' && (
+                                    <div className="tally-bowl-field">
+                                      <span className="bowl-label">{t('Double')}</span>
+                                      <Stepper
+                                        value={bowlValue(item, 'double')}
+                                        min={0}
+                                        disabled={saving}
+                                        onChange={(n) => setBowlDraftField(item.id, 'double', n)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td><span className="tally-dash">—</span></td>
+                              <td><span className="tally-dash">—</span></td>
+                            </>
+                          )}
 
-                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                        <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-                          <label>{t('Leftover (not sold)')}</label>
-                          <NumberInput
-                            value={leftoverValue(item, 'qty')}
-                            min={0}
-                            onValueChange={(n) => setLeftoverDraftField(item.id, 'qty', n ?? 0)}
-                            onBlur={() => saveLeftover(item)}
-                          />
-                        </div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)', paddingBottom: 11, flex: 1 }}>
-                          <input
-                            type="checkbox"
-                            checked={!!leftoverValue(item, 'carried')}
-                            disabled={saving}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setLeftoverDraftField(item.id, 'carried', checked);
-                              saveLeftover(item, { carried: checked });
-                            }}
-                          />
-                          {t('Bringing it back tomorrow?')}
-                        </label>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-                        <label>{item.trackingMode === 'bowl_double' ? t('Single') : t('Bowls sold')}</label>
-                        <NumberInput
-                          value={bowlValue(item, 'single')}
-                          min={0}
-                          onValueChange={(n) => setBowlDraftField(item.id, 'single', n ?? 0)}
-                          onBlur={() => saveBowlCount(item)}
-                        />
-                      </div>
-                      {item.trackingMode === 'bowl_double' && (
-                        <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-                          <label>{t('Double')}</label>
-                          <NumberInput
-                            value={bowlValue(item, 'double')}
-                            min={0}
-                            onValueChange={(n) => setBowlDraftField(item.id, 'double', n ?? 0)}
-                            onBlur={() => saveBowlCount(item)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="kpi-row" style={{ marginTop: 12 }}>
-                    <div className="kpi"><div className="kpi-label">{t('Qty sold')}</div><div className="kpi-value">{digits(String(item.quantitySold))}</div></div>
-                    <div className="kpi"><div className="kpi-label">{t('Value')}</div><div className="kpi-value">{taka(item.value)}</div></div>
-                  </div>
-                </div>
-              ))}
+                          <td className="tally-sold">{digits(String(item.quantitySold))}</td>
+                          <td className="tally-value">{taka(item.value)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               <div className="card">
                 <div className="card-title">{t('Reconciliation')}</div>
@@ -406,6 +577,8 @@ export default function SalesTallyPage() {
                   )}
                 </div>
               </div>
+
+              {dirtyCount > 0 && <div className="tally-save-spacer" />}
             </>
           )}
         </>
@@ -465,6 +638,18 @@ export default function SalesTallyPage() {
               <NumberInput value={newPrice} min={0} placeholder={t('e.g. 50')} onValueChange={(n) => setNewPrice(n == null ? '' : String(n))} />
             </div>
             <button className="btn block" onClick={addMenuItem} disabled={saving || !newName || !newPrice}>{t('Add item')}</button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'tally' && dirtyCount > 0 && (
+        <div className="tally-save-bar">
+          <div className="tally-save-bar-inner">
+            <div className="tally-save-count">{digits(String(dirtyCount))} {t('changed')}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn secondary btn-small" onClick={discardChanges} disabled={saving}>{t('Discard')}</button>
+              <button className="btn" onClick={saveTally} disabled={saving}>{saving ? t('Saving…') : t('Save tally')}</button>
+            </div>
           </div>
         </div>
       )}
