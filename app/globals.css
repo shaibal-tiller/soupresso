@@ -685,6 +685,9 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
   padding: 2px 5px; font-size: 10px; line-height: 1;
 }
 .tally-chip button:hover { color: var(--red); }
+/* Not-yet-saved batch — dashed amber outline distinguishes it from an
+   already-persisted chip until "Save tally" commits it. */
+.tally-chip.pending { background: rgba(201,138,31,0.1); border: 1px dashed var(--brand-gold); padding: 2px 4px 2px 9px; color: var(--amber); }
 .tally-add { display: inline-flex; gap: 4px; align-items: center; flex-shrink: 0; }
 .tally-add input {
   width: 56px; flex-shrink: 0; padding: 6px 7px; font-size: 12.5px; font-family: var(--mono);
