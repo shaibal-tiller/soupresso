@@ -447,6 +447,14 @@ export default function SalesTallyPage() {
             <>
               <div className="tally-table-wrap">
                 <table className="tally-table">
+                  <colgroup>
+                    <col style={{ width: 90 }} />
+                    <col style={{ width: 200 }} />
+                    <col style={{ width: 140 }} />
+                    <col style={{ width: 56 }} />
+                    <col style={{ width: 56 }} />
+                    <col style={{ width: 76 }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th className="tally-sticky-col">{t('Item')}</th>
