@@ -471,6 +471,9 @@ table.receipt-table td:last-child { text-align: right; font-family: var(--mono);
 }
 .calc-row:last-child { border-bottom: none; }
 .calc-row span:last-child { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.review-section { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text2); margin: 14px 0 6px; }
+.calc-row.sub { font-size: 12px; }
+.calc-row.sub span:first-child { color: var(--text2); }
 .calc-row.result { background: var(--bg); font-weight: 700; font-size: 15px; padding: 12px 14px; }
 .calc-row.result span:first-child { color: var(--text); }
 .calc-row.result.short { background: rgba(209,67,67,.08); }

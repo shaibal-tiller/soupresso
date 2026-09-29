@@ -712,3 +712,18 @@ CREATE TABLE IF NOT EXISTS production_leftovers (
 -- if that leftover entry is later edited or un-checked.
 ALTER TABLE production_entries ADD COLUMN IF NOT EXISTS carried_over BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE production_entries ADD COLUMN IF NOT EXISTS carried_from DATE;
+
+-- Investment returns (money paid back out of the business to the investor).
+-- Each return reduces Cash in Hand: saving one applies a negative
+-- cash_in_hand_adjustments entry to the latest ledger row on/before
+-- returned_on (ledger_entry_date remembers which, so deleting reverses it).
+-- ledger_entry_date is NULL when cash-in-hand tracking wasn't active.
+CREATE TABLE IF NOT EXISTS investment_returns (
+  id                 SERIAL PRIMARY KEY,
+  returned_on        DATE NOT NULL,
+  amount             NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  notes              TEXT,
+  ledger_entry_date  DATE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_investment_returns_date ON investment_returns (returned_on DESC);

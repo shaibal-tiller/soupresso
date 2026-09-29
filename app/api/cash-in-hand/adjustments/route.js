@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
-import { applyAdjustmentCascade } from '@/lib/cash-in-hand';
+import { applyLedgerAdjustment } from '@/lib/cash-in-hand-ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,30 +30,13 @@ export async function POST(request) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const targetRes = await client.query(`SELECT 1 FROM cash_in_hand_ledger WHERE entry_date = $1`, [entryDate]);
-      if (!targetRes.rows.length) {
+      const updatedThrough = await applyLedgerAdjustment(client, entryDate, amount, note);
+      if (!updatedThrough) {
         await client.query('ROLLBACK');
         return NextResponse.json({ error: 'No cash-in-hand ledger entry for that date' }, { status: 404 });
       }
-
-      const laterRes = await client.query(
-        `SELECT * FROM cash_in_hand_ledger WHERE entry_date >= $1 ORDER BY entry_date ASC`,
-        [entryDate]
-      );
-      const updated = applyAdjustmentCascade(laterRes.rows, 0, amount);
-      for (const row of updated) {
-        await client.query(
-          `UPDATE cash_in_hand_ledger SET opening_balance = $1, adjustment_delta = $2, closing_balance = $3, updated_at = now()
-           WHERE entry_date = $4`,
-          [row.opening_balance, row.adjustment_delta, row.closing_balance, row.entry_date]
-        );
-      }
-      await client.query(
-        `INSERT INTO cash_in_hand_adjustments (entry_date, amount, note) VALUES ($1, $2, $3)`,
-        [entryDate, amount, note]
-      );
       await client.query('COMMIT');
-      return NextResponse.json({ ok: true, updatedThrough: updated[updated.length - 1]?.entry_date });
+      return NextResponse.json({ ok: true, updatedThrough });
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

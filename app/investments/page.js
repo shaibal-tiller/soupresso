@@ -8,6 +8,7 @@ import { todayStr } from '@/lib/dates';
 import { cachedFetchJson, peekCache, invalidateCache } from '@/lib/clientCache';
 
 const INVESTMENTS_URL = '/api/investments';
+const RETURNS_URL = '/api/investment-returns';
 
 const KNOWN_CATEGORIES = [
   'Food Cart', 'Chef Home Development', 'Gas', 'Convayance & Misc',
@@ -28,12 +29,20 @@ export default function InvestmentsPage() {
   const [form, setForm] = useState(emptyForm());
   const [showForm, setShowForm] = useState(false);
 
+  const [returns, setReturns] = useState(() => peekCache(RETURNS_URL)?.items || []);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnForm, setReturnForm] = useState({ returnedOn: todayStr(), amount: '', notes: '' });
+  const [savingReturn, setSavingReturn] = useState(false);
+  const [returnMsg, setReturnMsg] = useState(null);
+
   const load = useCallback(async () => {
     const cached = peekCache(INVESTMENTS_URL);
     if (!cached) setLoading(true);
     try {
       const data = await cachedFetchJson(INVESTMENTS_URL);
       setItems(data.items || []);
+      const r = await cachedFetchJson(RETURNS_URL);
+      setReturns(r.items || []);
     } finally {
       setLoading(false);
     }
@@ -51,6 +60,51 @@ export default function InvestmentsPage() {
   for (const item of filtered) {
     if (!grouped[item.category]) grouped[item.category] = [];
     grouped[item.category].push(item);
+  }
+
+  const totalInvested = items.reduce((sum, i) => sum + Number(i.amount), 0);
+  const totalReturned = returns.reduce((sum, r) => sum + Number(r.amount), 0);
+
+  function startReturn() {
+    setReturnForm({ returnedOn: todayStr(), amount: '', notes: '' });
+    setReturnMsg(null);
+    setShowReturnForm(true);
+  }
+
+  async function handleReturnSubmit(e) {
+    e.preventDefault();
+    setSavingReturn(true);
+    setReturnMsg(null);
+    try {
+      const res = await fetch(RETURNS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(returnForm),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReturnMsg({ type: 'err', text: data.error || t('Save failed.') });
+      } else {
+        setShowReturnForm(false);
+        invalidateCache(RETURNS_URL);
+        invalidateCache('/api/cash-in-hand');
+        load();
+      }
+    } catch {
+      setReturnMsg({ type: 'err', text: t('Could not reach the server.') });
+    } finally {
+      setSavingReturn(false);
+    }
+  }
+
+  async function deleteReturn(r) {
+    if (!window.confirm(t('Delete this return? The amount goes back into Cash in Hand.'))) return;
+    const res = await fetch(`${RETURNS_URL}?id=${r.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      invalidateCache(RETURNS_URL);
+      invalidateCache('/api/cash-in-hand');
+      load();
+    }
   }
 
   function startNew() {
@@ -106,11 +160,23 @@ export default function InvestmentsPage() {
 
   return (
     <AppShell>
-      <div className="kpi-row" style={{ gridTemplateColumns: '1fr' }}>
+      <div className="kpi-row" style={{ gridTemplateColumns: categoryFilter === 'ALL' ? '1fr 1fr 1fr' : '1fr' }}>
         <div className="kpi">
-          <div className="kpi-label">{t('Grand total')}</div>
+          <div className="kpi-label">{categoryFilter === 'ALL' ? t('Invested') : t('Grand total')}</div>
           <div className="kpi-value">{taka(grandTotal)}</div>
         </div>
+        {categoryFilter === 'ALL' && (
+          <>
+            <div className="kpi">
+              <div className="kpi-label">{t('Returned')}</div>
+              <div className="kpi-value">{taka(totalReturned)}</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label">{t('Not yet returned')}</div>
+              <div className="kpi-value">{taka(totalInvested - totalReturned)}</div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="chip-select">
@@ -124,7 +190,61 @@ export default function InvestmentsPage() {
         ))}
       </div>
 
-      <button className="btn block" onClick={startNew} style={{ marginBottom: 16 }}>{t('Add entry')}</button>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <button className="btn block" onClick={startNew}>{t('Add entry')}</button>
+        <button className="btn secondary block" onClick={startReturn}>{t('Record return')}</button>
+      </div>
+
+      {showReturnForm && (
+        <div className="card">
+          <div className="card-title">{t('Record return')}</div>
+          <form onSubmit={handleReturnSubmit}>
+            <div className="field">
+              <label>{t('Date')}</label>
+              <input type="date" value={returnForm.returnedOn} onChange={(e) => setReturnForm({ ...returnForm, returnedOn: e.target.value })} required />
+            </div>
+            <div className="field">
+              <label>{t('Amount (৳)')}</label>
+              <NumberInput value={returnForm.amount} min={0} onValueChange={(n) => setReturnForm({ ...returnForm, amount: n == null ? '' : String(n) })} />
+            </div>
+            <div className="field">
+              <label>{t('Notes (optional)')}</label>
+              <input type="text" value={returnForm.notes} onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })} />
+            </div>
+            <p className="step-hint">{t('This amount is deducted from Cash in Hand.')}</p>
+            {returnMsg && <div className={`status-msg ${returnMsg.type}`}>{returnMsg.text}</div>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" className="btn secondary" onClick={() => setShowReturnForm(false)}>{t('Cancel')}</button>
+              <button type="submit" className="btn" disabled={savingReturn}>{savingReturn ? t('Saving…') : t('Save')}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {categoryFilter === 'ALL' && returns.length > 0 && (
+        <div className="card">
+          <div className="card-title">{t('Returns')}</div>
+          <table className="denom-table">
+            <thead>
+              <tr><th>{t('Date')}</th><th>{t('Notes (optional)')}</th><th>{t('Amount (৳)')}</th><th></th></tr>
+            </thead>
+            <tbody>
+              {returns.map((r) => (
+                <tr key={r.id}>
+                  <td>{dateNice(r.returned_on)}</td>
+                  <td>{r.notes || ''}</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{taka(r.amount)}</td>
+                  <td><button type="button" className="btn secondary" onClick={() => deleteReturn(r)} aria-label={t('Delete')}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="step-result" style={{ marginTop: 8 }}>
+            <span>{t('Total')}</span>
+            <strong>{taka(totalReturned)}</strong>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="card">

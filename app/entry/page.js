@@ -946,20 +946,38 @@ function EntryPageInner() {
             {step === 5 && (
               <div className="card">
                 <div className="card-title">{t('Review & save')}</div>
+
+                <div className="review-section">{t('Sales')}</div>
                 <div className="step-calc">
                   <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
                   <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(summary.totalSales)}</span></div>
                   {Number(bakiGiven) > 0 && (
-                    <div className="calc-row"><span>{t('— includes baki given (not yet in cash)')}</span><span>{taka(bakiGiven)}</span></div>
+                    <div className="calc-row sub"><span>{t('— includes baki given (not yet in cash)')}</span><span>{taka(bakiGiven)}</span></div>
                   )}
                   {Number(bakiReceived) > 0 && (
-                    <div className="calc-row"><span>{t('— cash includes baki received today')}</span><span>{taka(bakiReceived)}</span></div>
+                    <div className="calc-row sub"><span>{t('— cash includes baki received today')}</span><span>{taka(bakiReceived)}</span></div>
                   )}
+                </div>
+
+                <div className="review-section">{t("Today's expense")}</div>
+                <div className="step-calc">
+                  <div className="calc-row"><span>{t('Expense (bazar)')}</span><span className="r">{taka(effectiveBazarActualCost)}</span></div>
+                  <div className="calc-row sub"><span>{t('Bazar advance received')}</span><span>{taka(Number(bazarAdvanceReceived) || 0)}</span></div>
                   {summary.toReimburse > 0 && (
                     <div className="calc-row"><span>{t('Reimbursed to chef (from box)')}</span><span>{'−'}{taka(summary.toReimburse)}</span></div>
                   )}
+                  {summary.bazarVariance < 0 && (
+                    <div className="calc-row sub"><span>{t('Unspent advance returned to box')}</span><span>{taka(-summary.bazarVariance)}</span></div>
+                  )}
+                </div>
+
+                <div className="review-section">{t('Set aside for tomorrow')}</div>
+                <div className="step-calc">
                   <div className="calc-row"><span>{t("Tomorrow's bazar")}</span><span>{'−'}{taka(effectiveNextBazarAdvance)}</span></div>
                   <div className="calc-row"><span>{t("Tomorrow's bhangti")}</span><span>{'−'}{taka(effectiveNextBhangti)}</span></div>
+                </div>
+
+                <div className="step-calc" style={{ marginTop: 12 }}>
                   <div className={`calc-row result ${summary.isShort ? 'short' : ''}`}>
                     <span>{t('Cash taken home')}</span>
                     <span className={summary.cashTakenHome >= 0 ? 'g' : 'r'}>{taka(summary.cashTakenHome)}</span>
