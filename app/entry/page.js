@@ -303,11 +303,12 @@ function EntryPageInner() {
   // today's running balance live on the Review step (null = not tracked).
   const [prevCashInHand, setPrevCashInHand] = useState(null);
   const [cashInHandSettings, setCashInHandSettings] = useState(null);
+  const [bakiBefore, setBakiBefore] = useState(null); // unpaid baki as of yesterday
   useEffect(() => {
     const prevDate = shiftDateStr(date, -1);
     cachedFetchJson(`/api/cash-in-hand?from=${prevDate}&to=${prevDate}`)
-      .then((data) => { setPrevCashInHand(data.ledger?.[0] || null); setCashInHandSettings(data.settings || null); })
-      .catch(() => { setPrevCashInHand(null); setCashInHandSettings(null); });
+      .then((data) => { setPrevCashInHand(data.ledger?.[0] || null); setCashInHandSettings(data.settings || null); setBakiBefore(typeof data.bakiOutstanding === 'number' ? data.bakiOutstanding : null); })
+      .catch(() => { setPrevCashInHand(null); setCashInHandSettings(null); setBakiBefore(null); });
   }, [date]);
 
   // The opening balance for `date`: yesterday's closing if it's tracked,
@@ -956,6 +957,9 @@ function EntryPageInner() {
                   )}
                   {Number(bakiReceived) > 0 && (
                     <div className="calc-row sub"><span>{t('— cash includes baki received today')}</span><span>{taka(bakiReceived)}</span></div>
+                  )}
+                  {bakiBefore != null && (bakiBefore + (Number(bakiGiven) || 0) - (Number(bakiReceived) || 0)) > 0 && (
+                    <div className="calc-row sub"><span>{t('Baki still unpaid after today (in sales, not in cash)')}</span><span>{taka(bakiBefore + (Number(bakiGiven) || 0) - (Number(bakiReceived) || 0))}</span></div>
                   )}
                 </div>
 

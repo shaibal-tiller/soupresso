@@ -13,6 +13,7 @@ export default function CashInHandPage() {
   const { t, taka, dateNice } = useLang();
   const [ledger, setLedger] = useState(() => peekCache(LEDGER_URL)?.ledger || []);
   const [settings, setSettings] = useState(() => peekCache(LEDGER_URL)?.settings || null);
+  const [bakiOutstanding, setBakiOutstanding] = useState(() => peekCache(LEDGER_URL)?.bakiOutstanding || 0);
   const [loading, setLoading] = useState(() => peekCache(LEDGER_URL) === undefined);
 
   const [startDate, setStartDate] = useState(todayStr());
@@ -35,6 +36,7 @@ export default function CashInHandPage() {
       const data = await cachedFetchJson(LEDGER_URL);
       setLedger(data.ledger || []);
       setSettings(data.settings || null);
+      setBakiOutstanding(data.bakiOutstanding || 0);
     } finally {
       setLoading(false);
     }
@@ -109,6 +111,12 @@ export default function CashInHandPage() {
               </p>
             )}
             <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 2 }}>{t('as of')} {dateNice(latest.entry_date)}</p>
+            {bakiOutstanding > 0 && (
+              <div className="insight" style={{ marginTop: 12, textAlign: 'left' }}>
+                <b>{t('Baki not yet received:')} {taka(bakiOutstanding)}</b>{' '}
+                {t('This was sold (it is in sales) but no cash has come in, so it is not in the balance above. Sales − expense will look higher than the cash that exists by this amount until it is paid. Enter it as "Baki received" on the day it is paid.')}
+              </div>
+            )}
           </>
         ) : (
           <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No entries in the tracked range yet.')}</p>
