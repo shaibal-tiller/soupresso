@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { coerceLocaleNumber } from '@/lib/numerals';
+import { convertToStorageUnit } from '@/lib/units';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,18 @@ export async function POST(request) {
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // Items stored in their smallest unit (pc / gm) are converted on the way in
+    // — see convertToStorageUnit. Total stays exactly as entered.
+    const ids = [...new Set(clean.map((c) => c.itemId).filter((x) => x != null))];
+    const catalogUnit = new Map();
+    if (ids.length) {
+      const { rows } = await client.query(`SELECT id, unit FROM bazar_items WHERE id = ANY($1)`, [ids]);
+      rows.forEach((r) => catalogUnit.set(r.id, r.unit));
+    }
+    for (const it of clean) {
+      const conv = convertToStorageUnit({ unit: it.unit, quantity: it.quantity, total: it.lineTotal }, catalogUnit.get(it.itemId));
+      if (conv.converted) { it.unit = conv.unit; it.quantity = conv.quantity; it.unitPrice = conv.unitPrice; }
+    }
     await client.query('BEGIN');
     await client.query(`DELETE FROM bazar_plan_items WHERE for_date = $1 AND kind = $2`, [date, kind]);
     for (const it of clean) {

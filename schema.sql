@@ -727,3 +727,10 @@ CREATE TABLE IF NOT EXISTS investment_returns (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_investment_returns_date ON investment_returns (returned_on DESC);
+
+-- 2026-10-01: items stored in their smallest unit (pc / gm) get converted on save,
+-- which can make unit prices tiny (৳0.25 per gm) — two decimals lost real money
+-- when a day was re-saved (qty x rounded price != total). Six decimals fixes that.
+ALTER TABLE bazar_plan_items ALTER COLUMN unit_price TYPE NUMERIC(14,6);
+-- ...and quantities like 0.425 kg (425 gm of mushroom) need more than two decimals too.
+ALTER TABLE bazar_plan_items ALTER COLUMN quantity TYPE NUMERIC(12,4);

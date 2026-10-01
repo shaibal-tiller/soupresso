@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import NumberInput from './NumberInput';
 import { useLang } from './LangProvider';
-import { unitLabel, normalizedUnitPrice } from '@/lib/units';
+import { unitLabel, normalizedUnitPrice, convertToStorageUnit, suspectedPieceCount } from '@/lib/units';
 
 function itemLabel(lang, name, nameBn) {
   return lang === 'bn' && nameBn ? nameBn : name;
@@ -302,6 +302,9 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
             const unitOptions = line.unitOptions && line.unitOptions.length > 0 ? line.unitOptions : (line.unit ? [line.unit] : []);
             const lineTotalVal = round2((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0));
             const norm = line.unitBased ? normalizedUnitPrice(line.quantity, line.unit, lineTotalVal) : null;
+            const storeUnit = catalog.find((i) => i.id === line.itemId)?.unit;
+            const stored = line.unitBased ? convertToStorageUnit({ unit: line.unit, quantity: line.quantity, total: lineTotalVal }, storeUnit) : null;
+            const suspect = line.unitBased ? suspectedPieceCount(line.unit, line.quantity) : null;
             return (
               <div key={line.key} className="bazar-basket-row">
                 <div className="bazar-basket-icon">{line.icon || '🛒'}</div>
@@ -339,6 +342,16 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                           onValueChange={(n) => updateTotal(line, n)}
                         />
                       </div>
+                      {stored?.converted && (
+                        <div className="bazar-basket-unitprice">
+                          {'= '}{stored.quantity}{/^\d/.test(unitLabel(stored.unit)) ? ' × ' : ' '}{unitLabel(stored.unit)} {t('(saved in this unit)')}
+                        </div>
+                      )}
+                      {suspect != null && (
+                        <div className="bazar-basket-hint">
+                          {t('That is a lot of')} {unitLabel(line.unit)} — {t('did you mean pieces? Switch the unit to pc if so.')}
+                        </div>
+                      )}
                       {norm && (
                         <div className="bazar-basket-unitprice">
                           {'≈ '}{taka(norm.value)}/{unitLabel(norm.baseUnit)}
