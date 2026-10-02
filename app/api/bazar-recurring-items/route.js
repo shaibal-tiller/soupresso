@@ -9,8 +9,21 @@ export const dynamic = 'force-dynamic';
 // item_id, same as a saved bazar_plan_items row.
 export async function GET() {
   try {
+    // The stored quantity is the template; the price follows the latest real
+    // price paid in that same unit, so a fare/price change (Auto Fare 50 -> 80)
+    // flows into tomorrow's preloaded list without editing anything. The stored
+    // total_price is only the fallback for an item never bought in that unit.
     const { rows } = await query(
-      `SELECT * FROM bazar_recurring_items WHERE active = true ORDER BY sort_order ASC, id ASC`
+      `SELECT r.id, r.item_id, r.quantity, r.unit, r.sort_order, r.active, r.created_at,
+              CASE WHEN lp.unit_price IS NOT NULL THEN ROUND(lp.unit_price * r.quantity, 2) ELSE r.total_price END AS total_price
+         FROM bazar_recurring_items r
+         LEFT JOIN LATERAL (
+           SELECT bpi.unit_price FROM bazar_plan_items bpi
+            WHERE bpi.item_id = r.item_id AND bpi.kind = 'actual' AND bpi.quantity > 0
+              AND bpi.unit IS NOT DISTINCT FROM r.unit
+            ORDER BY bpi.for_date DESC, bpi.id DESC LIMIT 1
+         ) lp ON true
+        WHERE r.active = true ORDER BY r.sort_order ASC, r.id ASC`
     );
     return NextResponse.json({ items: rows });
   } catch (err) {

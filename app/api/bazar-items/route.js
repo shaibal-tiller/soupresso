@@ -21,8 +21,20 @@ export async function GET(request) {
   const includeInactive = searchParams.get('all') === '1';
   try {
     const { rows } = await query(
-      `SELECT bi.*, rp.unit_price AS recent_price, ru.unit AS recent_unit
+      `SELECT bi.*, rp.unit_price AS recent_price, ru.unit AS recent_unit, up.price AS usual_price
          FROM bazar_items bi
+         LEFT JOIN LATERAL (
+           -- "usual" price per piece/trip: the most recent price that shows up at least twice in the
+           -- last 7 purchases, so a one-off (an extra trip, a splurge) doesn't become the norm, and a
+           -- real change (a fare going 50 -> 80) takes over after it repeats.
+           SELECT g.price FROM (
+             SELECT ROUND(r.line_total / NULLIF(r.quantity, 0), 2) AS price, COUNT(*) AS c, MAX(r.for_date) AS latest
+               FROM (SELECT line_total, quantity, for_date FROM bazar_plan_items
+                      WHERE item_id = bi.id AND kind = 'actual' AND quantity > 0
+                      ORDER BY for_date DESC, id DESC LIMIT 7) r
+              GROUP BY 1
+           ) g WHERE g.c >= 2 ORDER BY g.latest DESC LIMIT 1
+         ) up ON true
          LEFT JOIN LATERAL (
            SELECT bpi.unit
              FROM bazar_plan_items bpi

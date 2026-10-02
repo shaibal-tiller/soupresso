@@ -305,6 +305,7 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
             const storeUnit = catalog.find((i) => i.id === line.itemId)?.unit;
             const stored = line.unitBased ? convertToStorageUnit({ unit: line.unit, quantity: line.quantity, total: lineTotalVal }, storeUnit) : null;
             const suspect = line.unitBased ? suspectedPieceCount(line.unit, line.quantity) : null;
+            const usualFare = Number(catalog.find((i) => i.id === line.itemId)?.usual_price) || null;
             return (
               <div key={line.key} className="bazar-basket-row">
                 <div className="bazar-basket-icon">{line.icon || '🛒'}</div>
@@ -357,9 +358,9 @@ export default function BazarItemPicker({ catalog, lines, onLinesChange, adjustm
                           {'≈ '}{taka(norm.value)}/{unitLabel(norm.baseUnit)}
                         </div>
                       )}
-                      {line.name === 'Auto Fare' && lineTotalVal > 50 && (
+                      {line.name === 'Auto Fare' && usualFare != null && lineTotalVal > usualFare && (
                         <div className="bazar-basket-hint">
-                          {t("Over the usual ৳50 daily fare — if this is a separate trip (e.g. a bazar run), consider adding it as its own \"Extra Travel / Bazar Trip\" item instead.")}
+                          {t('Over the usual')} {taka(usualFare)} {t("daily fare — if this is a separate trip (e.g. a bazar run), consider adding it as its own \"Extra Travel / Bazar Trip\" item instead.")}
                         </div>
                       )}
                     </>
