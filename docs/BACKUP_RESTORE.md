@@ -9,7 +9,15 @@ one on its own, so there are never more than two. It can also be run any time: G
 - `DATABASE_URL_UNPOOLED` — Neon connection string with the **direct** host (no `-pooler`).
 - `BACKUP_PASSPHRASE` — the passphrase used to encrypt. Keep a copy somewhere safe outside GitHub; without it a backup cannot be opened.
 
-## Get a backup
+## The easy way (one command)
+`scripts/restore-backup.sh` does the download, decrypt, check and restore for you (it installs missing tools with Homebrew if you agree).
+1. Once: `scripts/restore-backup.sh setup` — asks for the backup passphrase and saves it here and in the Drive folder (`restore.config`, plain text).
+2. Any time: `scripts/restore-backup.sh check` — downloads the latest backup from Drive, decrypts, verifies, shows what's inside. Restores nothing.
+3. To actually restore: create a **new** Neon branch, then `scripts/restore-backup.sh restore '<that branch's connection string>'`.
+   It refuses your live database and any database that already has tables.
+
+## The manual way
+### Get a backup
 1. GitHub → **Actions** → pick a green "Weekly database backup" run → download **soupresso-db-backup** (a zip) from *Artifacts*.
 2. Unzip it. You get `soupresso-backup-YYYY-MM-DD.dump.gpg`.
 3. Decrypt (asks for the passphrase):
