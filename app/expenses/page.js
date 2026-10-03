@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import DatePicker from '../DatePicker';
+import { useChartTip } from '../ChartTooltip';
 import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 import { todayStr, shiftDateStr, startOfMonthStr, endOfMonthStr } from '@/lib/dates';
 
@@ -59,6 +60,7 @@ function apiUrl({ rangeMode, range, from, to }) {
 
 export default function ExpensesPage() {
   const { t, taka, num, dateNice, dateShort } = useLang();
+  const { bind: bindTip, view: tipView } = useChartTip();
   const [rangeMode, setRangeMode] = useState('preset'); // 'preset' | 'custom'
   const [range, setRange] = useState('30d');
   const [customFrom, setCustomFrom] = useState(shiftDateStr(todayStr(), -29));
@@ -337,7 +339,7 @@ export default function ExpensesPage() {
             {byGroup.map((g) => (
               <div
                 key={g.group}
-                title={`${t(g.group)}: ${taka(g.total)} (${totalRecorded ? Math.round((g.total / totalRecorded) * 100) : 0}%)`}
+                {...bindTip({ title: t(g.group), rows: [{ label: t('Amount'), value: taka(g.total), color: GROUP_COLORS[g.group] }, { label: t('Share'), value: `${totalRecorded ? Math.round((g.total / totalRecorded) * 100) : 0}%` }] })}
                 style={{
                   width: `${totalRecorded ? (g.total / totalRecorded) * 100 : 0}%`,
                   background: GROUP_COLORS[g.group], minWidth: 3,
@@ -400,7 +402,7 @@ export default function ExpensesPage() {
                   key={r.category}
                   onClick={() => !isUnitemized && pickCategory(r.category)}
                   style={{ cursor: isUnitemized ? 'default' : 'pointer' }}
-                  title={`${t(r.category)}: ${taka(r.total)}${r.count != null ? ` (${r.count} lines)` : ''}`}
+                  {...bindTip({ title: t(r.category), rows: [{ label: t('Amount'), value: taka(r.total), color: barColor }, ...(r.count != null ? [{ label: t('Lines'), value: num(r.count) }] : [])] })}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: isUnitemized ? 'var(--text3)' : 'var(--text)', fontWeight: 600, fontStyle: isUnitemized ? 'italic' : 'normal' }}>
@@ -519,11 +521,17 @@ export default function ExpensesPage() {
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 170, minWidth: chronological.length * 14 }}>
                     {chronological.map((d) => {
                       const barH = Math.max(3, (d.recorded / maxDay) * 140);
-                      const tip = `${d.date}${d.isOffDay ? ' (off)' : ''} — ${Object.entries(d.groupTotals).filter(([, v]) => v > 0.5).map(([g, v]) => `${g}: ৳${Math.round(v)}`).join(', ') || 'no data'} — total ৳${Math.round(d.recorded)}`;
+                      const tip = {
+                        title: `${dateShort(d.date, { weekday: 'short' })}${d.isOffDay ? ` (${t('off')})` : ''}`,
+                        rows: [
+                          ...Object.entries(d.groupTotals).filter(([, v]) => v > 0.5).map(([g, v]) => ({ label: t(g), value: taka(v), color: GROUP_COLORS[g] })),
+                          { label: t('Total'), value: taka(d.recorded) },
+                        ],
+                      };
                       return (
                         <div
                           key={d.date}
-                          title={tip}
+                          {...bindTip(tip)}
                           onClick={() => { setExpandedDate((e) => (e === d.date ? null : d.date)); setDaySort('desc'); }}
                           style={{ flex: '1 0 8px', maxWidth: 26, display: 'flex', flexDirection: 'column-reverse', height: barH, cursor: 'pointer', borderRadius: '3px 3px 0 0', overflow: 'hidden', outline: expandedDate === d.date ? '2px solid var(--brand-green)' : 'none' }}
                         >
@@ -602,6 +610,7 @@ export default function ExpensesPage() {
       )}
       </>
       )}
+      {tipView}
     </AppShell>
   );
 }

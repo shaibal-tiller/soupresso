@@ -754,3 +754,12 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
   opacity: 1; color: var(--text); -webkit-text-fill-color: var(--text); background: var(--bg); cursor: default;
 }
 .view-only-fieldset:disabled button { cursor: default; }
+
+/* Chart hover / tap tooltip (app/ChartTooltip.js) */
+.chart-tip { position: fixed; z-index: 70; pointer-events: none; background: #231f1a; color: #fff; border-radius: 9px;
+  padding: 8px 11px; font-size: 12px; line-height: 1.5; box-shadow: 0 6px 20px rgba(0,0,0,.28); }
+.chart-tip-title { font-weight: 700; margin-bottom: 3px; }
+.chart-tip-row { display: flex; justify-content: space-between; gap: 14px; }
+.chart-tip-row span { display: inline-flex; align-items: center; gap: 6px; opacity: .85; }
+.chart-tip-row i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.chart-tip-row b { font-family: var(--mono); font-weight: 600; }

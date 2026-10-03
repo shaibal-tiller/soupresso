@@ -3,7 +3,7 @@
 import { useLang } from './LangProvider';
 import DatePicker from './DatePicker';
 import { todayStr } from '@/lib/dates';
-import { PRESETS, DATA_START, stepPeriod, canStepForward, resolvePeriod } from '@/lib/periods';
+import { PRESETS, DATA_START, stepPeriod, canStepForward, canStepBack, resolvePeriod } from '@/lib/periods';
 
 // The same period filter as the Expenses page (7 / 14 / 30 days, This month,
 // All time, Custom range) plus Week and Month steppers (‹ ›) so any earlier
@@ -49,7 +49,7 @@ export default function PeriodFilter({ value, onChange, showWeek = true, showMon
 
       {(value.mode === 'week' || value.mode === 'month') && (
         <div className="day-nav">
-          <button onClick={() => onChange(stepPeriod(value, -1, today))} aria-label={t('Previous')}>‹</button>
+          <button onClick={() => onChange(stepPeriod(value, -1, today))} disabled={!canStepBack(value, today)} aria-label={t('Previous')}>‹</button>
           <span style={{ flex: 1, textAlign: 'center', fontWeight: 600, fontSize: 14 }}>
             {value.mode === 'week' ? `${dateShort(range.from)} – ${dateShort(range.to)}` : monthLabel(value.anchor)}
           </span>

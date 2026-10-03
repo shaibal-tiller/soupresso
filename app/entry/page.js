@@ -9,6 +9,7 @@ import BazarItemPicker from '../BazarItemPicker';
 import DatePicker from '../DatePicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
 import { todayStr, shiftDateStr, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
+import { DATA_START } from '@/lib/periods';
 import { cachedFetchJson, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 
 const BAZAR_ITEMS_URL = '/api/bazar-items';
@@ -617,7 +618,7 @@ function EntryPageInner() {
         {/* Header: date nav with calendar picker */}
         <div className="wizard-header">
           <div className="day-nav" style={{ marginBottom: 6 }}>
-            <button onClick={() => requestDiscardOrRun(() => setDate(shiftDateStr(date, -1)))}>‹</button>
+            <button disabled={date <= DATA_START} onClick={() => requestDiscardOrRun(() => setDate(shiftDateStr(date, -1)))}>‹</button>
             <DatePicker value={date} onChange={(d) => requestDiscardOrRun(() => setDate(d))} />
             <button onClick={() => requestDiscardOrRun(() => setDate(shiftDateStr(date, 1)))}>›</button>
           </div>

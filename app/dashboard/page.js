@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import PeriodFilter from '../PeriodFilter';
+import { useChartTip } from '../ChartTooltip';
 import { todayStr } from '@/lib/dates';
 import { initialPeriod, resolvePeriod, PRESETS } from '@/lib/periods';
 import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
@@ -23,6 +24,7 @@ const VIEWS = [
 
 export default function DashboardPage() {
   const { t, taka, num, digits, dateShort } = useLang();
+  const { bind: bindTip, view: tipView } = useChartTip();
   const [period, setPeriod] = useState(() => initialPeriod(todayStr(), 'preset', 'month'));
   const [view, setView] = useState('daily');
   const [data, setData] = useState(() => peekCache(dashUrl(initialPeriod(todayStr(), 'preset', 'month'))) ?? null);
@@ -84,12 +86,22 @@ export default function DashboardPage() {
     return num(d.getDate());
   }
 
-  function chartTooltip(row) {
-    // Native `title` attribute — left English structure; low priority.
-    const sales = taka(row.total_sales);
-    if (view === 'weekly') return `Week of ${dateShort(row.week_start)}: ${sales} (${row.days_count}d)`;
-    if (view === 'monthly') return `${row.month}: ${sales} (${row.days_count}d)`;
-    return `${row.entry_date}: ${sales}`;
+  // Hover (mouse) / tap (touch) tooltip content for one bar.
+  function chartTip(row) {
+    const daily = view === 'daily';
+    const title = view === 'weekly' ? `${t('Week')}: ${dateShort(row.week_start)} · ${num(row.days_count)} ${t('days')}`
+      : view === 'monthly' ? `${digits(row.month)} · ${num(row.days_count)} ${t('days')}`
+      : dateShort(row.entry_date, { weekday: 'short' });
+    const expense = daily ? row.bazar_actual_cost : row.total_expense;
+    const home = daily ? row.cash_taken_home : row.total_take_home;
+    return {
+      title,
+      rows: [
+        { label: t('Sales'), value: taka(row.total_sales), color: 'var(--brand-green)' },
+        { label: t('Expense'), value: taka(expense), color: 'var(--red)' },
+        { label: t('Taken home'), value: taka(home) },
+      ],
+    };
   }
 
   return (
@@ -169,7 +181,7 @@ export default function DashboardPage() {
               const val = Number(r.total_sales);
               const barH = Math.max(4, (val / maxSale) * 130);
               return (
-                <div key={i} style={{ flex: 1, textAlign: 'center', minWidth: 0 }} title={chartTooltip(r)}>
+                <div key={i} style={{ flex: 1, textAlign: 'center', minWidth: 0, cursor: 'default' }} {...bindTip(chartTip(r))}>
                   <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {taka(val)}
                   </div>
@@ -217,6 +229,7 @@ export default function DashboardPage() {
         </div>
       )}
       </div>
+      {tipView}
     </AppShell>
   );
 }

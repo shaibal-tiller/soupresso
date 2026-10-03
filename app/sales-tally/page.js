@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import AppShell from '../AppShell';
 import { todayStr, shiftDateStr } from '@/lib/dates';
+import { DATA_START } from '@/lib/periods';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
 import DatePicker from '../DatePicker';
@@ -502,7 +503,7 @@ export default function SalesTallyPage() {
       {tab === 'tally' ? (
         <>
           <div className="day-nav">
-            <button onClick={() => { flushDraftNow(); setDate(shiftDateStr(date, -1)); }}>‹</button>
+            <button disabled={date <= DATA_START} onClick={() => { flushDraftNow(); setDate(shiftDateStr(date, -1)); }}>‹</button>
             <DatePicker value={date} onChange={(d) => { flushDraftNow(); setDate(d); }} />
             <button onClick={() => { flushDraftNow(); setDate(shiftDateStr(date, 1)); }}>›</button>
           </div>
