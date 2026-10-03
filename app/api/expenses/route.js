@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { expenseTypeFor } from '@/lib/expense-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export async function GET(request) {
       ),
       query(
         `SELECT bpi.for_date::text AS date, bpi.name, bpi.unit, bpi.quantity, bpi.unit_price, bpi.line_total,
-                COALESCE(bi.category, 'Other') AS category
+                COALESCE(bi.category, 'Other') AS category, bi.expense_type
          FROM bazar_plan_items bpi
          LEFT JOIN bazar_items bi ON bi.id = bpi.item_id
          WHERE bpi.kind = 'actual' AND ${itemDateFilter}
@@ -82,6 +83,8 @@ export async function GET(request) {
       lines: lineRes.rows.map((r) => ({
         date: r.date,
         category: r.category,
+        // the item's own type; falls back to the rule for its category so an untagged item still lands somewhere sensible
+        expenseType: r.expense_type || expenseTypeFor(r.category, r.name)?.[0] || null,
         name: r.name,
         unit: r.unit,
         quantity: r.quantity === null ? null : Number(r.quantity),

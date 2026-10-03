@@ -22,34 +22,15 @@ const VIEWS = [
   { key: 'day', label: 'By day' },
 ];
 
-// Which bazar_items category rolls up into which top-level expense group.
-// Colors are validated for categorical use (dataviz skill: CVD-separated,
-// normal-vision floor cleared, >=3:1 contrast) — "Other" deliberately gets no
-// saturated color at all, per the skill's guidance to fold a residual bucket
-// into a neutral rather than spend a hue slot on it.
-const COST_OF_PRODUCTS_CATEGORIES = new Set([
-  'Meat & Egg', 'Vegetables', 'Herbs & Leaves', 'Raw Spices',
-  'Processed Spices & Sauces', 'Cooking Essentials',
-]);
-const OVERHEAD_CATEGORIES = new Set(['Staff & Home', 'Shop Operations & Repairs', 'Cleaning Supplies']);
-const GROUP_COLORS = { 'Cost of products': '#C1502E', Overhead: '#1F8C5A', Other: '#9C9080' };
-// Staff & Home mixes fixed overhead (rent, salary, utilities) with day-to-day
-// operating cost (chef's meals, bazar transport) — these specific items are
-// pulled into Cost of products even though their catalog category is
-// Staff & Home, since the category alone isn't granular enough.
-const ITEM_GROUP_OVERRIDES = {
-  'Chef Breakfast': 'Cost of products',
-  'Nasta (Snack)': 'Cost of products',
-  'Lunch': 'Cost of products',
-  'Dinner': 'Cost of products',
-  'Auto Fare': 'Cost of products',
-  'Bulk Transport / Van Hire': 'Cost of products',
-};
-function groupFor(category, name) {
-  if (name && ITEM_GROUP_OVERRIDES[name]) return ITEM_GROUP_OVERRIDES[name];
-  if (COST_OF_PRODUCTS_CATEGORIES.has(category)) return 'Cost of products';
-  if (OVERHEAD_CATEGORIES.has(category)) return 'Overhead';
-  return 'Other';
+// Each bazar item carries an expense type (set in Manage Items): Cost of Goods (needed to make the
+// product), Operational (only spent when the shop opens) or Overhead (costs even when closed).
+// 'Other' is the residual: unitemized days and anything untagged. Colors are validated for categorical
+// use (dataviz skill: CVD-separated, >=3:1 contrast); the residual gets a neutral, not a hue.
+const GROUP_COLORS = { 'Cost of Goods': '#C1502E', Operational: '#3B6FB6', Overhead: '#1F8C5A', Other: '#9C9080' };
+const TYPE_TO_GROUP = { cost_of_goods: 'Cost of Goods', operational: 'Operational', overhead: 'Overhead' };
+const emptyGroupTotals = () => ({ 'Cost of Goods': 0, Operational: 0, Overhead: 0, Other: 0 });
+function groupFor(line) {
+  return TYPE_TO_GROUP[line.expenseType] || 'Other';
 }
 
 function apiUrl({ rangeMode, range, from, to }) {
@@ -105,7 +86,7 @@ export default function ExpensesPage() {
   const unitemizedGap = Math.round((totalRecorded - itemizedTotal) * 100) / 100;
 
   // A catalog category (e.g. "Staff & Home") can mix items from different
-  // groups (Salary = Overhead, Nasta = Cost of products) — each category row
+  // groups (Salary = Overhead, Auto Fare = Operational) — each category row
   // tracks its own group sub-totals so it can be tinted by whichever group
   // dominates it, while byGroup (the source of truth for the KPI tiles and
   // the part-to-whole bar) sums straight from the per-line group, never from
@@ -115,7 +96,7 @@ export default function ExpensesPage() {
     for (const l of lines) {
       const cur = map.get(l.category) || { category: l.category, total: 0, count: 0, groupBreakdown: {} };
       cur.total += l.lineTotal; cur.count += 1;
-      const g = groupFor(l.category, l.name);
+      const g = groupFor(l);
       cur.groupBreakdown[g] = (cur.groupBreakdown[g] || 0) + l.lineTotal;
       map.set(l.category, cur);
     }
@@ -128,8 +109,8 @@ export default function ExpensesPage() {
   }, [lines, unitemizedGap]);
 
   const byGroup = useMemo(() => {
-    const totals = { 'Cost of products': 0, Overhead: 0, Other: 0 };
-    for (const l of lines) totals[groupFor(l.category, l.name)] += l.lineTotal;
+    const totals = emptyGroupTotals();
+    for (const l of lines) totals[groupFor(l)] += l.lineTotal;
     if (unitemizedGap > 0.5) totals.Other += unitemizedGap;
     return Object.entries(totals)
       .map(([group, total]) => ({ group, total: Math.round(total * 100) / 100 }))
@@ -147,7 +128,7 @@ export default function ExpensesPage() {
     for (const l of scopedLines) {
       const key = l.category + '|' + l.name;
       let cur = map.get(key);
-      if (!cur) { cur = { key, category: l.category, name: l.name, total: 0, count: 0, units: new Set(), qty: 0, qtyValid: true }; map.set(key, cur); }
+      if (!cur) { cur = { key, category: l.category, name: l.name, expenseType: l.expenseType, total: 0, count: 0, units: new Set(), qty: 0, qtyValid: true }; map.set(key, cur); }
       cur.total += l.lineTotal; cur.count += 1;
       if (l.unit) cur.units.add(l.unit); else cur.qtyValid = false;
       if (l.quantity != null) cur.qty += l.quantity; else cur.qtyValid = false;
@@ -183,8 +164,8 @@ export default function ExpensesPage() {
       const dayMeta = daily.find((d) => d.date === date);
       const itemized = dayLines.reduce((s, l) => s + l.lineTotal, 0);
       const recorded = dayMeta ? dayMeta.bazarActualCost : itemized;
-      const groupTotals = { 'Cost of products': 0, Overhead: 0, Other: 0 };
-      for (const l of dayLines) groupTotals[groupFor(l.category, l.name)] += l.lineTotal;
+      const groupTotals = emptyGroupTotals();
+      for (const l of dayLines) groupTotals[groupFor(l)] += l.lineTotal;
       const gap = Math.round((recorded - itemized) * 100) / 100;
       if (gap > 0.5) groupTotals.Other += gap; // unitemized gap folds into "Other" for the stacked bar
       return {
@@ -466,7 +447,7 @@ export default function ExpensesPage() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 40, height: 6, background: 'var(--bg3)', borderRadius: 3, overflow: 'hidden', flex: 'none' }}>
-                              <div style={{ width: `${(r.total / maxItemTotal) * 100}%`, height: '100%', background: GROUP_COLORS[groupFor(r.category, r.name)], borderRadius: 3 }} />
+                              <div style={{ width: `${(r.total / maxItemTotal) * 100}%`, height: '100%', background: GROUP_COLORS[groupFor(r)], borderRadius: 3 }} />
                             </div>
                             <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>{taka(r.total)}</span>
                           </div>

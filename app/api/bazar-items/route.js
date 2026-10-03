@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { expenseTypeFor, isExpenseType } from '@/lib/expense-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,10 +80,12 @@ export async function POST(request) {
       `SELECT COALESCE(MAX(sort_order), 0) + 10 AS next FROM bazar_items WHERE category = $1`,
       [category]
     );
+    // New items start with the expense type their category implies (editable afterwards).
+    const defaultType = isExpenseType(body.expenseType) ? body.expenseType : (expenseTypeFor(category, name)?.[0] || null);
     const { rows } = await query(
-      `INSERT INTO bazar_items (name, name_bn, category, unit, icon, is_frequent, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *, NULL::numeric AS recent_price, NULL AS recent_unit`,
-      [name, body.nameBn ? String(body.nameBn).trim() : null, category, unit, body.icon || null, !!body.isFrequent, sortRes.rows[0].next]
+      `INSERT INTO bazar_items (name, name_bn, category, unit, icon, is_frequent, sort_order, expense_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *, NULL::numeric AS recent_price, NULL AS recent_unit`,
+      [name, body.nameBn ? String(body.nameBn).trim() : null, category, unit, body.icon || null, !!body.isFrequent, sortRes.rows[0].next, defaultType]
     );
     return NextResponse.json({ item: rows[0] });
   } catch (err) {
@@ -91,7 +94,7 @@ export async function POST(request) {
   }
 }
 
-// PATCH /api/bazar-items { id, isFrequent?, name?, nameBn?, unit?, icon?, category?, active? }
+// PATCH /api/bazar-items { id, isFrequent?, name?, nameBn?, unit?, icon?, category?, active?, expenseType? }
 // Any provided field is updated; omitted fields are left as-is.
 export async function PATCH(request) {
   try {
@@ -122,6 +125,12 @@ export async function PATCH(request) {
       set('category', category);
     }
     if (body.icon !== undefined) set('icon', String(body.icon).trim() || null);
+    if (body.expenseType !== undefined) {
+      if (body.expenseType !== null && !isExpenseType(body.expenseType)) {
+        return NextResponse.json({ error: 'expenseType must be cost_of_goods, operational or overhead' }, { status: 400 });
+      }
+      set('expense_type', body.expenseType);
+    }
 
     if (!sets.length) return NextResponse.json({ error: 'no fields to update' }, { status: 400 });
     params.push(id);

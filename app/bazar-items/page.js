@@ -106,6 +106,25 @@ export default function BazarItemsPage() {
     }
   }
 
+  async function saveExpenseType(it, value) {
+    const prev = it.expense_type;
+    updateLocal(it.id, 'expense_type', value || null);
+    setSavingIds((s) => ({ ...s, [it.id]: true }));
+    try {
+      const res = await fetch('/api/bazar-items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: it.id, expenseType: value || null }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      invalidateAll();
+    } catch {
+      updateLocal(it.id, 'expense_type', prev); // put it back if the save didn't go through
+    } finally {
+      setSavingIds((s) => { const n = { ...s }; delete n[it.id]; return n; });
+    }
+  }
+
   async function toggleFrequent(it) {
     setSavingIds((s) => ({ ...s, [it.id]: true }));
     try {
@@ -399,6 +418,18 @@ export default function BazarItemsPage() {
         >
           {it.active ? '✕' : t('Restore')}
         </button>
+
+        <select
+          value={it.expense_type || ''}
+          onChange={(e) => saveExpenseType(it, e.target.value)}
+          title={t('Expense type')}
+          style={{ flexShrink: 0, fontSize: 11, padding: '4px 4px', maxWidth: 104, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg)', color: it.expense_type ? 'var(--text)' : 'var(--text3)' }}
+        >
+          <option value="">{t('Type…')}</option>
+          <option value="cost_of_goods">{t('Cost of Goods')}</option>
+          <option value="operational">{t('Operational')}</option>
+          <option value="overhead">{t('Overhead')}</option>
+        </select>
 
         {savingIds[it.id] && <span style={{ fontSize: 10.5, color: 'var(--text3)', flexShrink: 0 }}>{t('Saving…')}</span>}
       </div>

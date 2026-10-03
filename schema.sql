@@ -734,3 +734,9 @@ CREATE INDEX IF NOT EXISTS idx_investment_returns_date ON investment_returns (re
 ALTER TABLE bazar_plan_items ALTER COLUMN unit_price TYPE NUMERIC(14,6);
 -- ...and quantities like 0.425 kg (425 gm of mushroom) need more than two decimals too.
 ALTER TABLE bazar_plan_items ALTER COLUMN quantity TYPE NUMERIC(12,4);
+
+-- 2026-10-03: expense type per bazar item — cost_of_goods (needed to make the product), operational (only
+-- spent when the shop opens), overhead (costs even when closed). Set once per item (Manage Items); the
+-- Expenses page groups by it. Rules for the initial values: lib/expense-type-map.js.
+ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS expense_type TEXT
+  CHECK (expense_type IN ('cost_of_goods', 'operational', 'overhead'));
