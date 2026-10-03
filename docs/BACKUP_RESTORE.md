@@ -13,7 +13,7 @@ one on its own, so there are never more than two. It can also be run any time: G
 The Google Drive folder **Soupresso-Backups** is self-contained:
 `soupresso-latest.dump.gpg` (the backup, replaced every Saturday), `restore.config` (the passphrase, plain text, private Drive) and `restore-backup.sh`.
 1. Download the whole folder from Drive and open Terminal in it (`cd` to the folder).
-2. Create a **new** Neon branch (or database) and have its connection string ready.
+2. Create a **new empty** Neon database (or project) and have its connection string ready (a branch copies its parent's data, so it isn't empty).
 3. Run `bash restore-backup.sh`. It finds the backup, decrypts it with the passphrase from `restore.config`, checks it, asks for the
    connection string, and restores. (`bash restore-backup.sh check` only verifies, restoring nothing.)
 
@@ -31,8 +31,8 @@ It refuses any database that already has tables, so it can't overwrite your live
    Once a month, also copy one of these files to your computer or a drive — artifacts live only on GitHub.
 
 ## Restore
-Never restore straight over the live database. Restore into a **new** Neon branch or database first, check it, then switch.
-1. In Neon, create a new branch (or database) and copy its connection string (direct host).
+Never restore straight over the live database. Restore into a **new empty** Neon database or project first (not a branch — a branch is a copy of its parent), check it, then switch.
+1. In Neon, create a new empty database (or project) and copy its connection string (direct host, pooling off).
 2. Load the backup (needs the PostgreSQL 18 client tools — Neon runs 18):
    ```
    pg_restore --no-owner --no-privileges --dbname "<new connection string>" backup.dump

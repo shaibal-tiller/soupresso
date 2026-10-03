@@ -70,13 +70,13 @@ say "✓ Backup is valid: $(grep -c 'TABLE DATA' "$TMP/contents.txt") tables, $(
 # ---- restore into the new database ---------------------------------------------
 if [ -z "$TARGET" ]; then
   echo
-  echo "Now the NEW, EMPTY database to restore into (e.g. a fresh Neon branch — NOT your live one)."
+  echo "Now the NEW, EMPTY database to restore into (a new Neon database or project — NOT your live one; a Neon branch is not empty)."
   read -r -p "Connection string: " TARGET
 fi
 [ -n "$TARGET" ] || die "No connection string given."
 EXISTING="$("$PGBIN/psql" "$TARGET" -Atc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null)" \
   || die "Could not connect with that connection string. Check it and try again."
-[ "$EXISTING" = "0" ] || die "That database already has $EXISTING tables — it looks like it is in use (maybe your live one). Create a new empty database or Neon branch and use its connection string."
+[ "$EXISTING" = "0" ] || die "That database already has $EXISTING tables — it looks like it is in use (maybe your live one). Create a new empty Neon database (or project) and use its connection string."
 
 say "Restoring…"
 "$PGBIN/pg_restore" --no-owner --no-privileges --dbname "$TARGET" "$TMP/backup.dump" || die "pg_restore reported errors (see above)."

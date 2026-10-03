@@ -86,5 +86,6 @@ jobs:
           rclone copyto soupresso-backup-*.dump.gpg gdrive:Soupresso-Backups/soupresso-latest.dump.gpg -v
           # keep the restore script in the Drive folder current too (restore.config with the passphrase is placed there by hand)
           rclone copyto scripts/restore-backup.sh gdrive:Soupresso-Backups/restore-backup.sh -v
+          rclone copyto docs/BACKUP_FOLDER_README.md gdrive:Soupresso-Backups/README.md -v
           rclone lsl gdrive:Soupresso-Backups/
           rm -f ~/.config/rclone/rclone.conf
