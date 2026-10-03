@@ -1,0 +1,66 @@
+# Weekly encrypted backup of the Neon database. Runs on GitHub (free), not Vercel.
+# Restore steps: docs/BACKUP_RESTORE.md
+#
+# Secrets (GitHub -> Settings -> Secrets and variables -> Actions):
+#   DATABASE_URL_UNPOOLED  Neon connection string WITHOUT "-pooler" in the host (pg_dump needs a direct connection)
+#   BACKUP_PASSPHRASE      passphrase the dump is encrypted with (never stored in this repo)
+name: Weekly database backup
+
+on:
+  schedule:
+    - cron: '0 4 * * 6' # Saturday 10:00 AM Asia/Dhaka (UTC+6) = 04:00 UTC. GitHub may start it a few minutes late.
+  workflow_dispatch: {} # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install PostgreSQL 18 client (Neon runs 18; pg_dump refuses to dump a newer server)
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+          pg_dump --version
+
+      - name: Dump the database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo "DATABASE_URL_UNPOOLED secret is missing"; exit 1; }
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file=backup.dump
+          ls -l backup.dump
+
+      - name: Sanity-check the dump (not empty, readable, has the key tables)
+        run: |
+          set -euo pipefail
+          test "$(stat -c %s backup.dump)" -gt 20000
+          pg_restore --list backup.dump > contents.txt
+          for t in daily_entries bazar_plan_items cash_in_hand_ledger investments; do
+            grep -Eq "TABLE DATA public $t( |$)" contents.txt || { echo "table $t missing from backup"; exit 1; }
+          done
+          echo "dump looks good: $(wc -l < contents.txt) entries"
+
+      - name: Encrypt (AES-256) and remove the plain copy
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          test -n "$BACKUP_PASSPHRASE" || { echo "BACKUP_PASSPHRASE secret is missing"; exit 1; }
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+              --symmetric --cipher-algo AES256 --output "soupresso-backup-$(date -u +%F).dump.gpg" backup.dump
+          shred -u backup.dump contents.txt
+          ls -l *.gpg
+
+      # Kept 9 days: the next weekly run lands before this one expires (so there is always at
+      # least one copy) and GitHub then deletes the older one by itself.
+      - name: Upload the encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: soupresso-db-backup
+          path: soupresso-backup-*.dump.gpg
+          retention-days: 9
+          if-no-files-found: error
