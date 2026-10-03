@@ -747,3 +747,10 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
 @media (min-width: 900px) {
   .tally-save-bar-inner { max-width: 900px; }
 }
+
+/* Locked day opened read-only: fields stay legible instead of greying out. */
+.view-only-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.view-only-fieldset:disabled input, .view-only-fieldset:disabled select, .view-only-fieldset:disabled textarea {
+  opacity: 1; color: var(--text); -webkit-text-fill-color: var(--text); background: var(--bg); cursor: default;
+}
+.view-only-fieldset:disabled button { cursor: default; }

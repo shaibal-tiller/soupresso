@@ -115,6 +115,7 @@ function EntryPageInner() {
     return fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : todayStr();
   });
   const [editing, setEditing] = useState(false); // locked until user explicitly starts
+  const [viewOnly, setViewOnly] = useState(false); // opened the wizard from a locked day: read-only, nothing can be saved
   const editable = isEntryEditable(date, todayStr()); // older days are locked — corrections go through SQL
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState('denom');
@@ -160,6 +161,7 @@ function EntryPageInner() {
     setStep(0);
     setIsOffDay(false);
     setEditing(false);
+    setViewOnly(false);
     setPendingDraft(null);
     setExistingEntry(null);
     try {
@@ -453,7 +455,7 @@ function EntryPageInner() {
   // hitting Cancel) is deferred behind a confirm modal instead of running
   // immediately. `action` runs right away if there's nothing to lose.
   function requestDiscardOrRun(action) {
-    if (editing) {
+    if (editing && !viewOnly) {
       pendingActionRef.current = action;
       setShowDiscardConfirm(true);
     } else {
@@ -478,20 +480,20 @@ function EntryPageInner() {
   // there's an in-progress entry — the confirm modal above only covers
   // in-app navigation.
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || viewOnly) return;
     function handleBeforeUnload(e) {
       e.preventDefault();
       e.returnValue = '';
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [editing]);
+  }, [editing, viewOnly]);
 
   // Draft safety net: while editing, debounce-save the whole wizard's state
   // to localStorage so a crash, accidental discard, or closed tab doesn't
   // lose the entry outright — load() picks it back up as `pendingDraft`.
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || viewOnly) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem(draftKey(date), JSON.stringify({
@@ -507,7 +509,7 @@ function EntryPageInner() {
     }, 400);
     return () => clearTimeout(timer);
   }, [
-    editing, date, isOffDay, mode, denoms, totalDirect, openingBhangti,
+    editing, viewOnly, date, isOffDay, mode, denoms, totalDirect, openingBhangti,
     bazarAdvanceReceived, bazarTakenFromBox, bakiGiven, bakiReceived,
     actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
     plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
@@ -680,9 +682,14 @@ function EntryPageInner() {
                       ✎ {t('Edit this entry')}
                     </button>
                   ) : (
-                    <p className="step-hint" style={{ marginTop: 16, textAlign: 'center' }}>
-                      🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
-                    </p>
+                    <>
+                      <button className="btn secondary block" onClick={() => { setViewOnly(true); setEditing(true); setStep(0); }} style={{ marginTop: 16 }}>
+                        👁 {t('View details')}
+                      </button>
+                      <p className="step-hint" style={{ marginTop: 10, textAlign: 'center' }}>
+                        🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
+                      </p>
+                    </>
                   )}
                 </div>
               )
@@ -733,6 +740,12 @@ function EntryPageInner() {
           /* ============ EDITING: wizard steps ============ */
           <div className="wizard-body">
 
+            {viewOnly && (
+              <div className="insight amber" style={{ marginBottom: 10 }}>
+                👁 <b>{t('View only')}</b> — {t('this day is locked, so nothing here can be changed.')}
+              </div>
+            )}
+
             {/* Step dots — only shown in editing mode */}
             <div className="step-dots" style={{ marginBottom: 8 }}>
               {stepLabels.map((label, i) => (
@@ -751,6 +764,7 @@ function EntryPageInner() {
               onTouchEnd={handleTouchEnd}
               onTouchCancel={handleTouchEnd}
             >
+            <fieldset disabled={viewOnly} className="view-only-fieldset">
 
             {step === 0 && (
               <div className="card">
@@ -1026,6 +1040,7 @@ function EntryPageInner() {
               </div>
             )}
 
+            </fieldset>
             </div>
           </div>
         )}
@@ -1033,7 +1048,19 @@ function EntryPageInner() {
         {/* Footer — only when editing */}
         {!loading && editing && (
           <div className="wizard-footer">
-            {isOffDay ? (
+            {viewOnly ? (
+              <>
+                <button className="btn secondary" onClick={() => step === 0 ? setEditing(false) : setStep(Math.max(0, step - 1))}>
+                  {step === 0 ? t('✕ Close') : t('← Back')}
+                </button>
+                <span className="step-counter">{num(step + 1)} / {num(TOTAL_STEPS)}</span>
+                {step < TOTAL_STEPS - 1 ? (
+                  <button className="btn" onClick={() => setStep(step + 1)}>{t('Next →')}</button>
+                ) : (
+                  <button className="btn" onClick={() => setEditing(false)}>{t('Close')}</button>
+                )}
+              </>
+            ) : isOffDay ? (
               <>
                 <button className="btn secondary" onClick={() => requestDiscardOrRun(() => { setEditing(false); setIsOffDay(hadExistingEntry ? !!existingEntry?.is_off_day : false); })}>{t('Cancel')}</button>
                 <button className="btn" style={{ background: 'var(--green)' }} onClick={() => setShowConfirm(true)} disabled={saving}>

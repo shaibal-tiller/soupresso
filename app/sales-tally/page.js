@@ -6,6 +6,7 @@ import { todayStr, shiftDateStr } from '@/lib/dates';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
 import DatePicker from '../DatePicker';
+import TallyHistory from './TallyHistory';
 import { cachedFetchJson, peekCache, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 import { quantitySoldForItem, computeReconciliation } from '@/lib/sales-tally';
 
@@ -492,6 +493,7 @@ export default function SalesTallyPage() {
     <AppShell>
       <div className="toggle-row">
         <button className={tab === 'tally' ? 'on' : ''} onClick={() => setTab('tally')}>{t("Today's tally")}</button>
+        <button className={tab === 'history' ? 'on' : ''} onClick={() => setTab('history')}>{t('History')}</button>
         <button className={tab === 'menu' ? 'on' : ''} onClick={() => setTab('menu')}>{t('Manage menu')}</button>
       </div>
 
@@ -670,6 +672,8 @@ export default function SalesTallyPage() {
             </>
           )}
         </>
+      ) : tab === 'history' ? (
+        <TallyHistory onOpenDay={(d) => { setDate(d); setTab('tally'); }} />
       ) : (
         <div className="card">
           <div className="card-title">{t('Menu items')}</div>

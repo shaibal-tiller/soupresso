@@ -3,15 +3,17 @@
 import { useState, useEffect, useRef } from 'react';
 import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
+import PeriodFilter from '../PeriodFilter';
+import { todayStr } from '@/lib/dates';
+import { initialPeriod, resolvePeriod, PRESETS } from '@/lib/periods';
 import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 
-const RANGES = [
-  { key: '7d', label: '7 days' },
-  { key: '14d', label: '14 days' },
-  { key: '30d', label: '30 days' },
-  { key: 'month', label: 'This month' },
-  { key: 'all', label: 'All time' },
-];
+// Presets keep the cheap ?range= URL (and its prefetching); week / month / custom use ?from&to.
+function dashUrl(period) {
+  if (period.mode === 'preset') return `/api/dashboard?range=${period.preset}`;
+  const r = resolvePeriod(period, todayStr());
+  return `/api/dashboard?from=${r.from}&to=${r.to}`;
+}
 
 const VIEWS = [
   { key: 'daily', label: 'Day' },
@@ -21,10 +23,10 @@ const VIEWS = [
 
 export default function DashboardPage() {
   const { t, taka, num, digits, dateShort } = useLang();
-  const [range, setRange] = useState('month');
+  const [period, setPeriod] = useState(() => initialPeriod(todayStr(), 'preset', 'month'));
   const [view, setView] = useState('daily');
-  const [data, setData] = useState(() => peekCache(`/api/dashboard?range=month`) ?? null);
-  const [loading, setLoading] = useState(() => peekCache(`/api/dashboard?range=month`) === undefined);
+  const [data, setData] = useState(() => peekCache(dashUrl(initialPeriod(todayStr(), 'preset', 'month'))) ?? null);
+  const [loading, setLoading] = useState(() => peekCache(dashUrl(initialPeriod(todayStr(), 'preset', 'month'))) === undefined);
   const requestRef = useRef(0);
   const [cashInHand, setCashInHand] = useState(() => peekCache('/api/cash-in-hand') ?? null);
 
@@ -33,7 +35,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const url = `/api/dashboard?range=${range}`;
+    const url = dashUrl(period);
     const requestId = ++requestRef.current;
     const cached = peekCache(url);
     if (cached) {
@@ -53,20 +55,23 @@ export default function DashboardPage() {
         if (requestRef.current !== requestId) return;
         setLoading(false);
       });
-  }, [range]);
+  }, [period]);
 
   // Once the selected range has loaded, warm the other range pills in the
   // background so clicking between them feels instant after the first visit.
   useEffect(() => {
     if (loading) return;
     runWhenIdle(() => {
-      for (const r of RANGES) {
-        if (r.key !== range) prefetchJson(`/api/dashboard?range=${r.key}`);
+      if (period.mode !== 'preset') return;
+      for (const r of PRESETS) {
+        if (r.key !== period.preset) prefetchJson(`/api/dashboard?range=${r.key}`);
       }
     });
-  }, [range, loading]);
+  }, [period, loading]);
 
-  if (loading) return <AppShell><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div></AppShell>;
+  // First paint (nothing to show yet) gets a full-page loader; later period
+  // switches keep the filter on screen and dim the content instead.
+  if (loading && !data) return <AppShell><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div></AppShell>;
 
   const s = data?.summary || {};
   const chartData = view === 'weekly' ? data?.weekly : view === 'monthly' ? data?.monthly : data?.daily;
@@ -89,14 +94,8 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      {/* Range filter pills */}
-      <div className="toggle-row" style={{ marginBottom: 6 }}>
-        {RANGES.map((r) => (
-          <button key={r.key} className={range === r.key ? 'on' : ''} onClick={() => setRange(r.key)} style={{ fontSize: 12, padding: '7px 10px' }}>
-            {t(r.label)}
-          </button>
-        ))}
-      </div>
+      <PeriodFilter value={period} onChange={setPeriod} />
+      <div style={{ opacity: loading ? 0.55 : 1, transition: 'opacity .15s' }}>
 
       {/* KPIs */}
       <div className="kpi-row">
@@ -217,6 +216,7 @@ export default function DashboardPage() {
           </table>
         </div>
       )}
+      </div>
     </AppShell>
   );
 }

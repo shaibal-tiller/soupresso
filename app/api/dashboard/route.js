@@ -4,13 +4,22 @@ import { query } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 // GET /api/dashboard?range=7d|14d|30d|month|all
+//  or ?from=YYYY-MM-DD&to=YYYY-MM-DD for any week / month / custom range (takes priority)
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const range = searchParams.get('range') || '14d';
+  const from = searchParams.get('from');
+  const to = searchParams.get('to');
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   try {
     let dateFilter, label;
-    switch (range) {
+    let params = [];
+    if (DATE_RE.test(from || '') && DATE_RE.test(to || '')) {
+      dateFilter = `entry_date BETWEEN $1 AND $2`;
+      params = [from, to];
+      label = `${from} to ${to}`;
+    } else switch (range) {
       case '7d':
         dateFilter = `entry_date >= CURRENT_DATE - INTERVAL '6 days'`;
         label = 'Last 7 days';
@@ -39,7 +48,8 @@ export async function GET(request) {
       query(`SELECT * FROM daily_entries ORDER BY entry_date DESC LIMIT 1`),
       query(
         `SELECT entry_date, total_sales, cash_taken_home, bazar_actual_cost, bazar_variance
-         FROM daily_entries WHERE ${dateFilter} ORDER BY entry_date ASC`
+         FROM daily_entries WHERE ${dateFilter} ORDER BY entry_date ASC`,
+        params
       ),
       // Weekly aggregates (Mon-Sun weeks)
       query(
@@ -49,7 +59,8 @@ export async function GET(request) {
                 SUM(bazar_actual_cost) AS total_expense,
                 COUNT(*) AS days_count
          FROM daily_entries WHERE ${dateFilter}
-         GROUP BY week_start ORDER BY week_start ASC`
+         GROUP BY week_start ORDER BY week_start ASC`,
+        params
       ),
       // Monthly aggregates
       query(
@@ -60,7 +71,8 @@ export async function GET(request) {
                 COUNT(*) AS days_count,
                 ROUND(AVG(total_sales), 0) AS avg_daily_sales
          FROM daily_entries WHERE ${dateFilter}
-         GROUP BY month ORDER BY month ASC`
+         GROUP BY month ORDER BY month ASC`,
+        params
       ),
     ]);
 
