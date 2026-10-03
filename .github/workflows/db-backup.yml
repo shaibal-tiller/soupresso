@@ -4,6 +4,7 @@
 # Secrets (GitHub -> Settings -> Secrets and variables -> Actions):
 #   DATABASE_URL_UNPOOLED  Neon connection string WITHOUT "-pooler" in the host (pg_dump needs a direct connection)
 #   BACKUP_PASSPHRASE      passphrase the dump is encrypted with (never stored in this repo)
+#   RCLONE_CONFIG          (optional) rclone config for Google Drive; when set, the encrypted copy is also pushed to Drive
 name: Weekly database backup
 
 on:
@@ -18,6 +19,8 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
     steps:
       - name: Install PostgreSQL 18 client (Neon runs 18; pg_dump refuses to dump a newer server)
         run: |
@@ -64,3 +67,18 @@ jobs:
           path: soupresso-backup-*.dump.gpg
           retention-days: 9
           if-no-files-found: error
+
+      # Optional second copy on Google Drive (folder Soupresso-Backups, file soupresso-latest.dump.gpg is
+      # overwritten each week). Skipped when the RCLONE_CONFIG secret doesn't exist. Runs AFTER the artifact
+      # upload, so a Drive problem never costs you the GitHub copy — it only turns the run red so you get an email.
+      - name: Copy to Google Drive
+        if: ${{ env.RCLONE_CONFIG != '' }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y rclone
+          mkdir -p ~/.config/rclone
+          printf '%s' "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+          rclone copyto soupresso-backup-*.dump.gpg gdrive:Soupresso-Backups/soupresso-latest.dump.gpg -v
+          rclone lsl gdrive:Soupresso-Backups/
+          rm -f ~/.config/rclone/rclone.conf
