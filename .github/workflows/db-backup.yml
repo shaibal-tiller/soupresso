@@ -26,7 +26,8 @@ jobs:
         run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-18
-          pg_dump --version
+          # The runner ships PostgreSQL 16 tools first on PATH, so always call the 18 binaries by full path.
+          /usr/lib/postgresql/18/bin/pg_dump --version
 
       - name: Dump the database
         env:
@@ -34,14 +35,14 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$DATABASE_URL" || { echo "DATABASE_URL_UNPOOLED secret is missing"; exit 1; }
-          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file=backup.dump
+          /usr/lib/postgresql/18/bin/pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file=backup.dump
           ls -l backup.dump
 
       - name: Sanity-check the dump (not empty, readable, has the key tables)
         run: |
           set -euo pipefail
           test "$(stat -c %s backup.dump)" -gt 20000
-          pg_restore --list backup.dump > contents.txt
+          /usr/lib/postgresql/18/bin/pg_restore --list backup.dump > contents.txt
           for t in daily_entries bazar_plan_items cash_in_hand_ledger investments; do
             grep -Eq "TABLE DATA public $t( |$)" contents.txt || { echo "table $t missing from backup"; exit 1; }
           done
