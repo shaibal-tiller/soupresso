@@ -9,12 +9,16 @@ one on its own, so there are never more than two. It can also be run any time: G
 - `DATABASE_URL_UNPOOLED` — Neon connection string with the **direct** host (no `-pooler`).
 - `BACKUP_PASSPHRASE` — the passphrase used to encrypt. Keep a copy somewhere safe outside GitHub; without it a backup cannot be opened.
 
-## The easy way (one command)
-`scripts/restore-backup.sh` does the download, decrypt, check and restore for you (it installs missing tools with Homebrew if you agree).
-1. Once: `scripts/restore-backup.sh setup` — asks for the backup passphrase and saves it here and in the Drive folder (`restore.config`, plain text).
-2. Any time: `scripts/restore-backup.sh check` — downloads the latest backup from Drive, decrypts, verifies, shows what's inside. Restores nothing.
-3. To actually restore: create a **new** Neon branch, then `scripts/restore-backup.sh restore '<that branch's connection string>'`.
-   It refuses your live database and any database that already has tables.
+## The easy way (download the folder, run one file)
+The Google Drive folder **Soupresso-Backups** is self-contained:
+`soupresso-latest.dump.gpg` (the backup, replaced every Saturday), `restore.config` (the passphrase, plain text, private Drive) and `restore-backup.sh`.
+1. Download the whole folder from Drive and open Terminal in it (`cd` to the folder).
+2. Create a **new** Neon branch (or database) and have its connection string ready.
+3. Run `bash restore-backup.sh`. It finds the backup, decrypts it with the passphrase from `restore.config`, checks it, asks for the
+   connection string, and restores. (`bash restore-backup.sh check` only verifies, restoring nothing.)
+
+It refuses any database that already has tables, so it can't overwrite your live database. It offers to install `gnupg` and
+`postgresql@18` with Homebrew if they're missing. The same script lives in this repo as `scripts/restore-backup.sh`.
 
 ## The manual way
 ### Get a backup

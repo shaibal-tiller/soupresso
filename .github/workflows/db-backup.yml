@@ -23,6 +23,8 @@ jobs:
       # Not named RCLONE_CONFIG on purpose: rclone reads that variable as "path to the config file".
       GDRIVE_CONF: ${{ secrets.RCLONE_CONFIG }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Install PostgreSQL 18 client (Neon runs 18; pg_dump refuses to dump a newer server)
         run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
@@ -82,5 +84,7 @@ jobs:
           printf '%s' "$GDRIVE_CONF" > ~/.config/rclone/rclone.conf
           chmod 600 ~/.config/rclone/rclone.conf
           rclone copyto soupresso-backup-*.dump.gpg gdrive:Soupresso-Backups/soupresso-latest.dump.gpg -v
+          # keep the restore script in the Drive folder current too (restore.config with the passphrase is placed there by hand)
+          rclone copyto scripts/restore-backup.sh gdrive:Soupresso-Backups/restore-backup.sh -v
           rclone lsl gdrive:Soupresso-Backups/
           rm -f ~/.config/rclone/rclone.conf
