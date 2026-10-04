@@ -88,8 +88,6 @@ export async function POST(request) {
     notes,
     isOffDay,
     closedBy,
-    bakiGiven,
-    bakiReceived,
   } = body || {};
 
   if (!entryDate || !/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
@@ -105,7 +103,7 @@ export async function POST(request) {
 
   const closedByArr = Array.isArray(closedBy) ? closedBy.filter((n) => typeof n === 'string') : [];
 
-  const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, bazarTakenFromBox, nextBazarAdvance, nextBhangti, bakiGiven, bakiReceived };
+  const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, bazarTakenFromBox, nextBazarAdvance, nextBhangti };
   for (const [key, val] of Object.entries(nums)) {
     if (coerceLocaleNumber(val) == null && val !== '' && val != null) {
       return NextResponse.json({ error: `${key} must be a number` }, { status: 400 });
@@ -120,8 +118,6 @@ export async function POST(request) {
     bazarTakenFromBox: coerceLocaleNumber(bazarTakenFromBox) ?? 0,
     nextBazarAdvance: coerceLocaleNumber(nextBazarAdvance) ?? 0,
     nextBhangti: coerceLocaleNumber(nextBhangti) ?? 0,
-    bakiGiven: coerceLocaleNumber(bakiGiven) ?? 0,
-    bakiReceived: coerceLocaleNumber(bakiReceived) ?? 0,
   });
 
   try {
@@ -142,9 +138,9 @@ export async function POST(request) {
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
          bazar_advance_received, bazar_actual_cost, bazar_taken_from_box, next_bazar_advance, next_bhangti,
-         next_bhangti_denominations, baki_given, baki_received,
+         next_bhangti_denominations,
          total_sales, bazar_variance, cash_taken_home, is_off_day, notes, closed_by, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, now())
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -155,8 +151,8 @@ export async function POST(request) {
          next_bazar_advance = EXCLUDED.next_bazar_advance,
          next_bhangti = EXCLUDED.next_bhangti,
          next_bhangti_denominations = EXCLUDED.next_bhangti_denominations,
-         baki_given = EXCLUDED.baki_given,
-         baki_received = EXCLUDED.baki_received,
+         baki_given = 0,      -- credit-sale tracking was removed 2026-10-04; a re-saved day no longer carries it
+         baki_received = 0,
          total_sales = EXCLUDED.total_sales,
          bazar_variance = EXCLUDED.bazar_variance,
          cash_taken_home = EXCLUDED.cash_taken_home,
@@ -176,8 +172,6 @@ export async function POST(request) {
         coerceLocaleNumber(nextBazarAdvance) ?? 0,
         coerceLocaleNumber(nextBhangti) ?? 0,
         nextBhangtiDenominations ? JSON.stringify(nextBhangtiDenominations) : null,
-        coerceLocaleNumber(bakiGiven) ?? 0,
-        coerceLocaleNumber(bakiReceived) ?? 0,
         summary.totalSales,
         summary.bazarVariance,
         summary.cashTakenHome,

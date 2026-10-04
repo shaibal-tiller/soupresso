@@ -479,6 +479,8 @@ ON CONFLICT (name) DO NOTHING;
 -- Usability round 8 (2026-09-22): "frequent" quick-pick items — a manually
 -- curated shortlist so common purchases don't require browsing categories.
 ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS is_frequent BOOLEAN NOT NULL DEFAULT false;
+-- REMOVED 2026-10-04: the baki feature is gone from the app; these two columns stay only as history
+-- (zeroed whenever a day is re-saved) and nothing reads them.
 -- Usability round 9 (2026-09-22): baki (credit sales) tracking. baki_given
 -- is a credit sale made today (real revenue, no cash yet — counted in
 -- total_sales but never in total_counted); baki_received is cash collected

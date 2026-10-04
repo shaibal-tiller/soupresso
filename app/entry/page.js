@@ -125,8 +125,6 @@ function EntryPageInner() {
   const [openingBhangti, setOpeningBhangti] = useState(0);
   const [bazarAdvanceReceived, setBazarAdvanceReceived] = useState(0);
   const [bazarTakenFromBox, setBazarTakenFromBox] = useState(0);
-  const [bakiGiven, setBakiGiven] = useState(0);
-  const [bakiReceived, setBakiReceived] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
   const [nextBhangtiMode, setNextBhangtiMode] = useState('denom'); // 'denom' | 'total' — independent of today's count mode
   const [bazarCatalog, setBazarCatalog] = useState([]);
@@ -219,8 +217,6 @@ function EntryPageInner() {
         setOpeningBhangti(Number(e.opening_bhangti));
         setBazarAdvanceReceived(Number(e.bazar_advance_received));
         setBazarTakenFromBox(Number(e.bazar_taken_from_box) || 0);
-        setBakiGiven(Number(e.baki_given) || 0);
-        setBakiReceived(Number(e.baki_received) || 0);
         setNextBhangti(Number(e.next_bhangti));
         // nextBhangtiMode must follow next_bhangti_denominations (tomorrow's
         // bhangti breakdown), NOT e.denominations (today's box count) — they
@@ -263,8 +259,6 @@ function EntryPageInner() {
         setDenoms(emptyDenoms());
         setTotalDirect('');
         setBazarTakenFromBox(0);
-        setBakiGiven(0);
-        setBakiReceived(0);
         setNextBhangti(0);
         setNextBhangtiQtyOverride({});
         setNextBhangtiMarkOverride({});
@@ -306,12 +300,11 @@ function EntryPageInner() {
   // today's running balance live on the Review step (null = not tracked).
   const [prevCashInHand, setPrevCashInHand] = useState(null);
   const [cashInHandSettings, setCashInHandSettings] = useState(null);
-  const [bakiBefore, setBakiBefore] = useState(null); // unpaid baki as of yesterday
   useEffect(() => {
     const prevDate = shiftDateStr(date, -1);
     cachedFetchJson(`/api/cash-in-hand?from=${prevDate}&to=${prevDate}`)
-      .then((data) => { setPrevCashInHand(data.ledger?.[0] || null); setCashInHandSettings(data.settings || null); setBakiBefore(typeof data.bakiOutstanding === 'number' ? data.bakiOutstanding : null); })
-      .catch(() => { setPrevCashInHand(null); setCashInHandSettings(null); setBakiBefore(null); });
+      .then((data) => { setPrevCashInHand(data.ledger?.[0] || null); setCashInHandSettings(data.settings || null); })
+      .catch(() => { setPrevCashInHand(null); setCashInHandSettings(null); });
   }, [date]);
 
   // The opening balance for `date`: yesterday's closing if it's tracked,
@@ -381,8 +374,6 @@ function EntryPageInner() {
     bazarAdvanceReceived: Number(bazarAdvanceReceived) || 0,
     bazarActualCost: effectiveBazarActualCost,
     bazarTakenFromBox: Number(bazarTakenFromBox) || 0,
-    bakiGiven: Number(bakiGiven) || 0,
-    bakiReceived: Number(bakiReceived) || 0,
     nextBazarAdvance: effectiveNextBazarAdvance,
     nextBhangti: effectiveNextBhangti,
   });
@@ -417,8 +408,6 @@ function EntryPageInner() {
             bazarAdvanceReceived: isOffDay ? 0 : (Number(bazarAdvanceReceived) || 0),
             bazarActualCost: isOffDay ? 0 : effectiveBazarActualCost,
             bazarTakenFromBox: isOffDay ? 0 : (Number(bazarTakenFromBox) || 0),
-            bakiGiven: isOffDay ? 0 : (Number(bakiGiven) || 0),
-            bakiReceived: isOffDay ? 0 : (Number(bakiReceived) || 0),
             nextBazarAdvance: isOffDay ? 0 : effectiveNextBazarAdvance,
             nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
             nextBhangtiDenominations: isOffDay ? null : nextBhangtiDenominationsPayload,
@@ -500,7 +489,7 @@ function EntryPageInner() {
         localStorage.setItem(draftKey(date), JSON.stringify({
           savedAt: Date.now(),
           isOffDay, mode, denoms, totalDirect, openingBhangti,
-          bazarAdvanceReceived, bazarTakenFromBox, bakiGiven, bakiReceived,
+          bazarAdvanceReceived, bazarTakenFromBox,
           actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
           plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
           nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
@@ -511,7 +500,7 @@ function EntryPageInner() {
     return () => clearTimeout(timer);
   }, [
     editing, viewOnly, date, isOffDay, mode, denoms, totalDirect, openingBhangti,
-    bazarAdvanceReceived, bazarTakenFromBox, bakiGiven, bakiReceived,
+    bazarAdvanceReceived, bazarTakenFromBox,
     actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
     plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
     nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
@@ -528,8 +517,6 @@ function EntryPageInner() {
     setOpeningBhangti(d.openingBhangti ?? 0);
     setBazarAdvanceReceived(d.bazarAdvanceReceived ?? 0);
     setBazarTakenFromBox(d.bazarTakenFromBox ?? 0);
-    setBakiGiven(d.bakiGiven ?? 0);
-    setBakiReceived(d.bakiReceived ?? 0);
     setActualEntryMode(d.actualEntryMode || 'items');
     setActualLines(d.actualLines || []);
     setActualBazarAdjustment(d.actualBazarAdjustment ?? 0);
@@ -804,17 +791,6 @@ function EntryPageInner() {
                   <NumberInput value={openingBhangti} min={0} onValueChange={(n) => setOpeningBhangti(n ?? '')} />
                 </div>
 
-                <div className="field">
-                  <label>{t('Baki given today (sold, not yet paid) (৳)')}</label>
-                  <NumberInput value={bakiGiven} min={0} onValueChange={(n) => setBakiGiven(n ?? '')} />
-                  <p className="step-hint">{t('Counts as a sale today even though the cash isn\'t in the box yet.')}</p>
-                </div>
-                <div className="field">
-                  <label>{t('Baki received today (collected from an earlier sale) (৳)')}</label>
-                  <NumberInput value={bakiReceived} min={0} onValueChange={(n) => setBakiReceived(n ?? '')} />
-                  <p className="step-hint">{t("This cash is in the box (already counted above) but it's NOT today's sale — it was already counted as sales on the day it was originally given.")}</p>
-                </div>
-
                 <div className="step-calc">
                   <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
                   <div className="calc-row"><span>{t('− Opening bhangti')}</span><span>{taka(Number(openingBhangti) || 0)}</span></div>
@@ -825,12 +801,6 @@ function EntryPageInner() {
                         : t('− Unspent bazar advance returned to box (set in the Bazar step)')}</span>
                       <span>{taka(Math.abs(summary.salesAdjustment))}</span>
                     </div>
-                  )}
-                  {Number(bakiReceived) > 0 && (
-                    <div className="calc-row"><span>{t('− Baki received (cash today, not a new sale)')}</span><span>{taka(Number(bakiReceived) || 0)}</span></div>
-                  )}
-                  {Number(bakiGiven) > 0 && (
-                    <div className="calc-row"><span>{t('+ Baki given (sale today, no cash yet)')}</span><span>{taka(Number(bakiGiven) || 0)}</span></div>
                   )}
                   <div className="calc-row result"><span>{t("Today's sales")}</span><span className={summary.totalSales >= 0 ? 'g' : 'r'}>{taka(summary.totalSales)}</span></div>
                 </div>
@@ -967,15 +937,6 @@ function EntryPageInner() {
                 <div className="step-calc">
                   <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
                   <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(summary.totalSales)}</span></div>
-                  {Number(bakiGiven) > 0 && (
-                    <div className="calc-row sub"><span>{t('— includes baki given (not yet in cash)')}</span><span>{taka(bakiGiven)}</span></div>
-                  )}
-                  {Number(bakiReceived) > 0 && (
-                    <div className="calc-row sub"><span>{t('— cash includes baki received today')}</span><span>{taka(bakiReceived)}</span></div>
-                  )}
-                  {bakiBefore != null && (bakiBefore + (Number(bakiGiven) || 0) - (Number(bakiReceived) || 0)) > 0 && (
-                    <div className="calc-row sub"><span>{t('Baki still unpaid after today (in sales, not in cash)')}</span><span>{taka(bakiBefore + (Number(bakiGiven) || 0) - (Number(bakiReceived) || 0))}</span></div>
-                  )}
                 </div>
 
                 <div className="review-section">{t("Today's expense")}</div>

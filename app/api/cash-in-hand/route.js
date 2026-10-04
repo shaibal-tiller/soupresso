@@ -24,14 +24,7 @@ export async function GET(request) {
 
     const { rows } = await client.query(`SELECT * FROM cash_in_hand_ledger ${where} ORDER BY entry_date ASC`, params);
     const settingsRes = await client.query(`SELECT * FROM cash_in_hand_settings WHERE id = 1`);
-    // Baki (credit sales) counted in sales but not yet received as cash: the gap
-    // between "total sales − total expense" and the cash that actually exists.
-    // As of `to` when given (so the entry page can ask "as of yesterday").
-    const bakiRes = await client.query(
-      `SELECT COALESCE(SUM(baki_given - baki_received), 0)::float AS outstanding FROM daily_entries ${to ? 'WHERE entry_date <= $1' : ''}`,
-      to ? [to] : []
-    );
-    return NextResponse.json({ ledger: rows, settings: settingsRes.rows[0], bakiOutstanding: bakiRes.rows[0].outstanding });
+    return NextResponse.json({ ledger: rows, settings: settingsRes.rows[0] });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   } finally {
