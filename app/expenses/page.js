@@ -5,6 +5,8 @@ import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import DatePicker from '../DatePicker';
 import { useChartTip } from '../ChartTooltip';
+import ExpenseGallery from './ExpenseGallery';
+import { GROUP_COLORS, emptyGroupTotals, groupFor } from '@/lib/expense-groups';
 import { cachedFetchJson, peekCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 import { todayStr, shiftDateStr, startOfMonthStr, endOfMonthStr } from '@/lib/dates';
 
@@ -21,17 +23,6 @@ const VIEWS = [
   { key: 'item', label: 'By item' },
   { key: 'day', label: 'By day' },
 ];
-
-// Each bazar item carries an expense type (set in Manage Items): Cost of Goods (needed to make the
-// product), Operational (only spent when the shop opens) or Overhead (costs even when closed).
-// 'Other' is the residual: unitemized days and anything untagged. Colors are validated for categorical
-// use (dataviz skill: CVD-separated, >=3:1 contrast); the residual gets a neutral, not a hue.
-const GROUP_COLORS = { 'Cost of Goods': '#C1502E', Operational: '#3B6FB6', Overhead: '#1F8C5A', Other: '#9C9080' };
-const TYPE_TO_GROUP = { cost_of_goods: 'Cost of Goods', operational: 'Operational', overhead: 'Overhead' };
-const emptyGroupTotals = () => ({ 'Cost of Goods': 0, Operational: 0, Overhead: 0, Other: 0 });
-function groupFor(line) {
-  return TYPE_TO_GROUP[line.expenseType] || 'Other';
-}
 
 function apiUrl({ rangeMode, range, from, to }) {
   if (rangeMode === 'custom' && from && to) return `/api/expenses?from=${from}&to=${to}`;
@@ -53,6 +44,7 @@ export default function ExpensesPage() {
   const [daySort, setDaySort] = useState('desc');
   const [expandedDate, setExpandedDate] = useState(null);
   const [expandedItem, setExpandedItem] = useState(null);
+  const [showGallery, setShowGallery] = useState(false);
 
   const url = apiUrl({ rangeMode, range, from: customFrom, to: customTo });
   const [data, setData] = useState(() => peekCache(url) ?? null);
@@ -236,6 +228,9 @@ export default function ExpensesPage() {
         <button className={rangeMode === 'monthly' ? 'on' : ''} onClick={() => setRangeMode('monthly')} style={{ fontSize: 12, padding: '7px 10px' }}>
           📅 {t('Monthly')}
         </button>
+        <button onClick={() => setShowGallery(true)} style={{ fontSize: 12, padding: '7px 10px' }}>
+          🖼 {t('Gallery')}
+        </button>
       </div>
 
       {rangeMode === 'monthly' && (
@@ -315,7 +310,7 @@ export default function ExpensesPage() {
       {/* ---- Part-to-whole: cost of products vs overhead vs other ---- */}
       {byGroup.length > 0 && (
         <div className="card">
-          <div className="card-title">{t('Cost of products vs. overhead')} — {t(data?.range || '')}</div>
+          <div className="card-title">{t('Cost of Goods vs. Operational vs. Overhead')} — {t(data?.range || '')}</div>
           <div style={{ display: 'flex', height: 26, borderRadius: 6, overflow: 'hidden', gap: 2 }}>
             {byGroup.map((g) => (
               <div
@@ -592,6 +587,7 @@ export default function ExpensesPage() {
       </>
       )}
       {tipView}
+      <ExpenseGallery open={showGallery} onClose={() => setShowGallery(false)} />
     </AppShell>
   );
 }

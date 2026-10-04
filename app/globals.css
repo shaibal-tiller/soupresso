@@ -763,3 +763,36 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
 .chart-tip-row span { display: inline-flex; align-items: center; gap: 6px; opacity: .85; }
 .chart-tip-row i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .chart-tip-row b { font-family: var(--mono); font-weight: 600; }
+
+/* Expense Gallery (app/expenses/ExpenseGallery.js): fullscreen, scrollable, one card per day */
+.gallery-overlay { position: fixed; inset: 0; z-index: 120; background: var(--bg); display: flex; flex-direction: column; }
+.gallery-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--bg2); flex: none; }
+.gallery-close { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border2); background: var(--bg); color: var(--text); font-size: 16px; cursor: pointer; flex: none; }
+.gallery-nav { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+.gallery-nav > button { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border2); background: var(--bg); color: var(--text); font-size: 20px; cursor: pointer; flex: none; }
+.gallery-nav > button:disabled { opacity: .35; cursor: default; }
+.gallery-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 14px 40px; touch-action: pan-y; }
+.gallery-card { max-width: 560px; margin: 0 auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 18px 16px; box-shadow: 0 2px 14px rgba(43,33,24,.08); }
+.gallery-date { font-family: var(--display); font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+.gallery-note { max-width: 560px; margin: 14px auto; text-align: center; color: var(--text2); font-size: 13.5px; }
+.gallery-group { margin-top: 14px; }
+.gallery-group-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+.gallery-group-head i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; margin-right: 7px; }
+.gallery-group-head small { font-weight: 500; color: var(--text3); margin-left: 4px; }
+.gallery-group-head b { font-family: var(--mono); }
+.gallery-item { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: 13.5px; border-bottom: 1px dashed var(--border); }
+.gallery-item:last-child { border-bottom: none; }
+.gallery-item-name { display: flex; flex-direction: column; min-width: 0; color: var(--text); }
+.gallery-item-name small { color: var(--text3); font-size: 11.5px; }
+.gallery-item-name em { color: var(--text2); }
+.gallery-item-amt { font-family: var(--mono); font-weight: 600; flex: none; }
+@keyframes gallerySlideNext { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
+@keyframes gallerySlidePrev { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+@keyframes galleryFade { from { opacity: 0; } to { opacity: 1; } }
+.gallery-slide-next { animation: gallerySlideNext .2s ease; }
+.gallery-slide-prev { animation: gallerySlidePrev .2s ease; }
+.gallery-fade { animation: galleryFade .2s ease; }
+@media (prefers-reduced-motion: reduce) { .gallery-slide-next, .gallery-slide-prev, .gallery-fade { animation: none; } }
+
+/* the calendar button inside the gallery's top bar must not be squeezed by the ‹ › buttons */
+.gallery-nav .date-picker-btn { white-space: nowrap; flex: 0 1 auto; width: auto; min-width: 128px; height: 38px; justify-content: center; }
