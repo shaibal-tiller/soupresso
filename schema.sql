@@ -742,3 +742,58 @@ ALTER TABLE bazar_plan_items ALTER COLUMN quantity TYPE NUMERIC(12,4);
 -- Expenses page groups by it. Rules for the initial values: lib/expense-type-map.js.
 ALTER TABLE bazar_items ADD COLUMN IF NOT EXISTS expense_type TEXT
   CHECK (expense_type IN ('cost_of_goods', 'operational', 'overhead'));
+
+-- BEGIN payment-accounts
+-- 2026-10-06: payment accounts (bKash merchant, City Bank, …) alongside Cash in Hand.
+-- Cash in Hand stays the daily ledger (cash_in_hand_ledger). An account's balance is computed from:
+--   starting_balance + account_sales + transfers in (amount - charge) - transfers out (amount) + account_adjustments
+-- counting only rows dated on/after the account's starting_date (see lib/accounts.js).
+CREATE TABLE IF NOT EXISTS payment_accounts (
+  id               SERIAL PRIMARY KEY,
+  name             TEXT NOT NULL UNIQUE,
+  kind             TEXT NOT NULL DEFAULT 'other' CHECK (kind IN ('bkash', 'bank', 'other')),
+  starting_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+  starting_date    DATE NOT NULL,
+  active           BOOLEAN NOT NULL DEFAULT true,
+  sort_order       INTEGER NOT NULL DEFAULT 0,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- How much of a day's sales went into each account (entered in the daily entry, from 2026-10-06).
+CREATE TABLE IF NOT EXISTS account_sales (
+  entry_date  DATE NOT NULL,
+  account_id  INTEGER NOT NULL REFERENCES payment_accounts(id),
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  PRIMARY KEY (entry_date, account_id)
+);
+
+-- Moves between accounts. from/to NULL = cash in hand. The destination receives amount - charge.
+-- ledger_entry_date remembers which Cash in Hand ledger row the cash side was applied to (so deleting reverses it).
+CREATE TABLE IF NOT EXISTS account_transfers (
+  id                SERIAL PRIMARY KEY,
+  transfer_date     DATE NOT NULL,
+  from_account_id   INTEGER REFERENCES payment_accounts(id),
+  to_account_id     INTEGER REFERENCES payment_accounts(id),
+  amount            NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  charge            NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (charge >= 0),
+  note              TEXT,
+  ledger_entry_date DATE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (from_account_id IS DISTINCT FROM to_account_id),
+  CHECK (charge <= amount)
+);
+CREATE INDEX IF NOT EXISTS idx_account_transfers_date ON account_transfers (transfer_date DESC);
+
+-- Corrections to bring an account's balance in line with the real one (can be negative; a note is required).
+CREATE TABLE IF NOT EXISTS account_adjustments (
+  id          SERIAL PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES payment_accounts(id),
+  adj_date    DATE NOT NULL,
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount <> 0),
+  note        TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Part of total_sales that came in through accounts (not through the cash box). total_sales includes it.
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS digital_sales NUMERIC(12,2) NOT NULL DEFAULT 0;
+-- END payment-accounts

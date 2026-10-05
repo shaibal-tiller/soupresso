@@ -5,6 +5,7 @@ import AppShell from '../AppShell';
 import { useLang } from '../LangProvider';
 import NumberInput from '../NumberInput';
 import PeriodFilter from '../PeriodFilter';
+import Accounts from './Accounts';
 import { initialPeriod, resolvePeriod, rollupLedger } from '@/lib/periods';
 import { todayStr } from '@/lib/dates';
 import { cachedFetchJson, peekCache, invalidateCache } from '@/lib/clientCache';
@@ -140,6 +141,13 @@ export default function CashInHandPage() {
           <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No entries in the tracked range yet.')}</p>
         )}
       </div>
+
+      {!loading && started && (
+        <Accounts
+          cashBalance={latest ? Number(latest.closing_balance) : null}
+          onCashChanged={async () => { invalidateCache(LEDGER_URL); await load(); }}
+        />
+      )}
 
       {loading ? null : !started ? (
         <div className="card">

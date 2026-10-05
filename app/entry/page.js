@@ -10,6 +10,7 @@ import DatePicker from '../DatePicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
 import { todayStr, shiftDateStr, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
 import { DATA_START } from '@/lib/periods';
+import { accountsEnabledFor } from '@/lib/accounts';
 import { cachedFetchJson, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 
 const BAZAR_ITEMS_URL = '/api/bazar-items';
@@ -116,6 +117,10 @@ function EntryPageInner() {
     return fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : todayStr();
   });
   const [editing, setEditing] = useState(false); // locked until user explicitly starts
+  // Payment accounts (bKash, bank…): from 2026-10-06, part of a day's sales can go into an account instead of the box.
+  const [accounts, setAccounts] = useState([]);       // active accounts (and any with sales already saved for this day), with balances
+  const [accountSales, setAccountSales] = useState({}); // accountId -> amount typed for this day
+  const [cashTransfersToday, setCashTransfersToday] = useState(0); // net effect on cash of transfers already saved for this day
   const [viewOnly, setViewOnly] = useState(false); // opened the wizard from a locked day: read-only, nothing can be saved
   const editable = isEntryEditable(date, todayStr()); // older days are locked — corrections go through SQL
   const [step, setStep] = useState(0);
@@ -244,6 +249,7 @@ function EntryPageInner() {
         }
         setNotes(e.notes || '');
         setClosedBy(e.closed_by || []);
+        setAccountSales(Object.fromEntries((data.accountSales || []).map((r) => [r.accountId, Number(r.amount) || 0])));
         // Reconstruct each manual adjustment so re-opening a saved day shows
         // the same totals it was saved with (itemsTotal + adjustment = saved).
         const actualItemsTotal = actualStartLines.reduce((s, l) => s + lineTotal(l), 0);
@@ -264,6 +270,7 @@ function EntryPageInner() {
         setNextBhangtiMarkOverride({});
         setNotes('');
         setClosedBy([]);
+        setAccountSales({});
         setActualBazarAdjustment(0);
         setActualSimpleAmount(0);
         setNextBazarAdjustment(0);
@@ -306,6 +313,17 @@ function EntryPageInner() {
       .then((data) => { setPrevCashInHand(data.ledger?.[0] || null); setCashInHandSettings(data.settings || null); })
       .catch(() => { setPrevCashInHand(null); setCashInHandSettings(null); });
   }, [date]);
+
+  const accountsUrl = `/api/payment-accounts?date=${date}`;
+  useEffect(() => {
+    if (!accountsEnabledFor(date)) { setAccounts([]); setCashTransfersToday(0); return undefined; }
+    let alive = true;
+    cachedFetchJson(accountsUrl)
+      .then((d) => { if (alive) { setAccounts((d.accounts || []).filter((a) => a.active || a.todaySales > 0)); setCashTransfersToday(d.cashTransfersNetToday || 0); } })
+      .catch(() => { if (alive) setAccounts([]); });
+    return () => { alive = false; };
+  }, [date, accountsUrl]);
+  const digitalTotal = accounts.reduce((n, a) => n + (Number(accountSales[a.id]) || 0), 0);
 
   // The opening balance for `date`: yesterday's closing if it's tracked,
   // else the configured starting balance if `date` IS the starting date
@@ -378,6 +396,9 @@ function EntryPageInner() {
     nextBhangti: effectiveNextBhangti,
   });
 
+  // Total sales = what the box shows + what went into accounts. Cash taken home only ever depends on the box.
+  const totalSalesAll = summary.totalSales + digitalTotal;
+
   function bazarPlanPayload(forDate, kind, lines) {
     return fetch('/api/bazar-plan', {
       method: 'POST',
@@ -413,6 +434,7 @@ function EntryPageInner() {
             nextBhangtiDenominations: isOffDay ? null : nextBhangtiDenominationsPayload,
             notes: isOffDay ? (notes || 'Shop closed') : notes,
             closedBy: isOffDay ? [] : closedBy,
+            accountSales: isOffDay ? [] : accounts.map((a) => ({ accountId: a.id, amount: Number(accountSales[a.id]) || 0 })).filter((r) => r.amount > 0),
           }),
         }),
         isOffDay ? Promise.resolve() : bazarPlanPayload(date, 'actual', actualEntryMode === 'items' ? actualLines : []),
@@ -429,6 +451,8 @@ function EntryPageInner() {
         // These three URLs were just overwritten by the saves above — drop
         // them from the cache so the reload below can't show pre-save data.
         invalidateCache(entryUrl(date));
+        invalidateCache(accountsUrl);
+        invalidateCache('/api/cash-in-hand');
         invalidateCache(bazarPlanUrl(date, 'actual'));
         invalidateCache(bazarPlanUrl(tomorrow, 'planned'));
         load(date); // reload to show the updated summary
@@ -493,7 +517,7 @@ function EntryPageInner() {
           actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
           plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
           nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
-          notes, closedBy, step,
+          notes, closedBy, step, accountSales,
         }));
       } catch {}
     }, 400);
@@ -504,7 +528,7 @@ function EntryPageInner() {
     actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
     plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
     nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
-    notes, closedBy, step,
+    notes, closedBy, step, accountSales,
   ]);
 
   function restoreDraft() {
@@ -530,6 +554,7 @@ function EntryPageInner() {
     setNextBhangtiQtyOverride(d.nextBhangtiQtyOverride || {});
     setNextBhangtiMarkOverride(d.nextBhangtiMarkOverride || {});
     setNotes(d.notes || '');
+    setAccountSales(d.accountSales || {});
     setClosedBy(d.closedBy || []);
     setStep(d.step || 0);
     setPendingDraft(null);
@@ -651,6 +676,9 @@ function EntryPageInner() {
                   <div className="card-title">{t('Saved entry')}</div>
                   <div className="step-calc">
                     <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(existingEntry.total_sales)}</span></div>
+                    {Number(existingEntry.digital_sales) > 0 && (
+                      <div className="calc-row sub"><span>{'— '}{t('of which into accounts')}</span><span>{taka(existingEntry.digital_sales)}</span></div>
+                    )}
                     <div className="calc-row"><span>{t('Expense (bazar)')}</span><span style={{ color: 'var(--red)' }}>{taka(existingEntry.bazar_actual_cost)}</span></div>
                     <div className="calc-row"><span>{t('Bazar advance (tomorrow)')}</span><span>{taka(existingEntry.next_bazar_advance)}</span></div>
                     <div className="calc-row"><span>{t('Bhangti in box')}</span><span>{taka(existingEntry.next_bhangti)}</span></div>
@@ -791,6 +819,20 @@ function EntryPageInner() {
                   <NumberInput value={openingBhangti} min={0} onValueChange={(n) => setOpeningBhangti(n ?? '')} />
                 </div>
 
+                {accounts.length > 0 && (
+                  <>
+                    <p className="step-hint" style={{ marginTop: 14 }}>
+                      {t('Sales that went into an account instead of the box (these are not in the count above):')}
+                    </p>
+                    {accounts.map((a) => (
+                      <div className="field" key={a.id}>
+                        <label>{a.name} (৳)</label>
+                        <NumberInput value={accountSales[a.id] ?? ''} min={0} onValueChange={(n) => setAccountSales((prev) => ({ ...prev, [a.id]: n ?? '' }))} />
+                      </div>
+                    ))}
+                  </>
+                )}
+
                 <div className="step-calc">
                   <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
                   <div className="calc-row"><span>{t('− Opening bhangti')}</span><span>{taka(Number(openingBhangti) || 0)}</span></div>
@@ -802,7 +844,15 @@ function EntryPageInner() {
                       <span>{taka(Math.abs(summary.salesAdjustment))}</span>
                     </div>
                   )}
-                  <div className="calc-row result"><span>{t("Today's sales")}</span><span className={summary.totalSales >= 0 ? 'g' : 'r'}>{taka(summary.totalSales)}</span></div>
+                  {digitalTotal > 0 && (
+                    <>
+                      <div className="calc-row"><span>{t('Sales from the box')}</span><span>{taka(summary.totalSales)}</span></div>
+                      {accounts.filter((a) => (Number(accountSales[a.id]) || 0) > 0).map((a) => (
+                        <div className="calc-row" key={a.id}><span>{'+ '}{a.name}</span><span>{taka(Number(accountSales[a.id]) || 0)}</span></div>
+                      ))}
+                    </>
+                  )}
+                  <div className="calc-row result"><span>{t("Today's sales")}</span><span className={totalSalesAll >= 0 ? 'g' : 'r'}>{taka(totalSalesAll)}</span></div>
                 </div>
                 {summary.salesAdjustment !== 0 && (
                   <p className="step-hint" style={{ marginTop: 8 }}>
@@ -936,7 +986,10 @@ function EntryPageInner() {
                 <div className="review-section">{t('Sales')}</div>
                 <div className="step-calc">
                   <div className="calc-row"><span>{t('Total counted')}</span><span>{taka(totalCounted)}</span></div>
-                  <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(summary.totalSales)}</span></div>
+                  <div className="calc-row"><span>{t('Total sales')}</span><span className="g">{taka(totalSalesAll)}</span></div>
+                  {accounts.filter((a) => (Number(accountSales[a.id]) || 0) > 0).map((a) => (
+                    <div className="calc-row sub" key={a.id}><span>{'— '}{t('of which into')} {a.name}</span><span>{taka(Number(accountSales[a.id]) || 0)}</span></div>
+                  ))}
                 </div>
 
                 <div className="review-section">{t("Today's expense")}</div>
@@ -973,12 +1026,39 @@ function EntryPageInner() {
                     <div className="calc-row"><span>{t('Cash in Hand (opening)')}</span><span>{taka(cashInHandOpening)}</span></div>
                     <div className={`calc-row result`}>
                       <span>{t('Cash in Hand (after today)')}</span>
-                      <span className={cashInHandOpening + summary.cashTakenHome >= 0 ? 'g' : 'r'}>
-                        {taka(cashInHandOpening + summary.cashTakenHome)}
+                      <span className={cashInHandOpening + summary.cashTakenHome + cashTransfersToday >= 0 ? 'g' : 'r'}>
+                        {taka(cashInHandOpening + summary.cashTakenHome + cashTransfersToday)}
                       </span>
                     </div>
                   </div>
                 )}
+                {accounts.length > 0 && (() => {
+                  const rows = accounts.map((a) => {
+                    const add = Number(accountSales[a.id]) || 0;
+                    const extra = (a.todayTransfersNet || 0) + (a.todayAdjustments || 0); // transfers / corrections already saved for this day
+                    return { a, before: a.opening, add, extra, after: a.opening + add + extra };
+                  });
+                  const cashAfter = cashInHandOpening != null ? cashInHandOpening + summary.cashTakenHome + cashTransfersToday : null;
+                  const allTogether = rows.reduce((n, r) => n + r.after, 0) + (cashAfter ?? 0);
+                  return (
+                    <>
+                      <div className="review-section">{t('Where the money is after today')}</div>
+                      <div className="step-calc">
+                        {cashAfter != null && (
+                          <div className="calc-row"><span>{t('Cash in Hand')}</span><span>{taka(cashInHandOpening)} + {taka(summary.cashTakenHome)}{cashTransfersToday !== 0 ? ` ${cashTransfersToday > 0 ? '+' : '−'} ${taka(Math.abs(cashTransfersToday))} ${t('transfers')}` : ''} = {taka(cashAfter)}</span></div>
+                        )}
+                        {rows.map((r) => (
+                          <div className="calc-row" key={r.a.id}>
+                            <span>{r.a.name}</span>
+                            <span>{taka(r.before)} + {taka(r.add)}{r.extra !== 0 ? ` ${r.extra > 0 ? '+' : '−'} ${taka(Math.abs(r.extra))} ${t('transfers')}` : ''} = {taka(r.after)}</span>
+                          </div>
+                        ))}
+                        <div className="calc-row result"><span>{t('All together')}</span><span>{taka(allTogether)}</span></div>
+                      </div>
+                      <p className="step-hint" style={{ marginTop: 6 }}>{t('Each account: balance before today + sales entered today ± transfers/corrections made today = balance after.')}</p>
+                    </>
+                  );
+                })()}
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>{t("Who's closing today?")}</label>
                   <div className="chip-select">
@@ -1064,7 +1144,7 @@ function EntryPageInner() {
                 <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, textAlign: 'left' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                     <span style={{ color: 'var(--text2)' }}>{t('Total sales')}</span>
-                    <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>{taka(summary.totalSales)}</strong>
+                    <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>{taka(totalSalesAll)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                     <span style={{ color: 'var(--text2)' }}>{t('Cash taken home')}</span>

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, getPool } from '@/lib/db';
 import { computeCashSummary } from '@/lib/cash-math';
 import { coerceLocaleNumber } from '@/lib/numerals';
 import { todayStrTZ, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
 import { upsertLedgerForEntry } from '@/lib/cash-in-hand-ledger';
+import { accountsEnabledFor } from '@/lib/accounts';
 
 export const dynamic = 'force-dynamic'; // always hits the live database, never statically cached
 
@@ -25,7 +26,13 @@ export async function GET(request) {
       );
 
       if (rows.length) {
-        return NextResponse.json({ entry: rows[0], carryForward: null });
+        // How much of this day's sales went into payment accounts (bKash, bank…); empty before those exist.
+        let accountSales = [];
+        try {
+          const a = await query(`SELECT account_id, amount::float AS amount FROM account_sales WHERE entry_date = $1`, [date]);
+          accountSales = a.rows.map((r) => ({ accountId: r.account_id, amount: r.amount }));
+        } catch (e) { if (e.code !== '42P01') throw e; }
+        return NextResponse.json({ entry: rows[0], carryForward: null, accountSales });
       }
 
       // No entry for this date yet — look up the most recent entry before it
@@ -88,6 +95,7 @@ export async function POST(request) {
     notes,
     isOffDay,
     closedBy,
+    accountSales,
   } = body || {};
 
   if (!entryDate || !/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
@@ -110,6 +118,25 @@ export async function POST(request) {
     }
   }
 
+  // Sales that went into payment accounts instead of the cash box (from 2026-10-06). They count as sales
+  // but never touch the box, so cash taken home is unaffected.
+  const merged = new Map();
+  if (!isOffDay && Array.isArray(accountSales)) {
+    for (const r of accountSales) {
+      const accountId = Number(r?.accountId);
+      const amt = coerceLocaleNumber(r?.amount) ?? 0;
+      if (!accountId) continue;
+      if (!Number.isFinite(amt) || amt < 0) return NextResponse.json({ error: 'account sales must be zero or more' }, { status: 400 });
+      if (amt === 0) continue;
+      merged.set(accountId, Math.round(((merged.get(accountId) || 0) + amt) * 100) / 100);
+    }
+  }
+  const digitalRows = [...merged].map(([accountId, amount]) => ({ accountId, amount }));
+  if (digitalRows.length && !accountsEnabledFor(entryDate)) {
+    return NextResponse.json({ error: 'Sales into accounts can only be entered from 2026-10-06 on.' }, { status: 400 });
+  }
+  const digitalTotal = Math.round(digitalRows.reduce((n, r) => n + r.amount, 0) * 100) / 100;
+
   const summary = computeCashSummary({
     totalCounted: coerceLocaleNumber(totalCounted) ?? 0,
     openingBhangti: coerceLocaleNumber(openingBhangti) ?? 0,
@@ -121,6 +148,19 @@ export async function POST(request) {
   });
 
   try {
+    if (digitalRows.length) {
+      const ids = digitalRows.map((r) => r.accountId);
+      const { rows: accs } = await query(`SELECT id, name, active, to_char(starting_date, 'YYYY-MM-DD') AS starting_date FROM payment_accounts WHERE id = ANY($1)`, [ids]);
+      const { rows: had } = await query(`SELECT account_id FROM account_sales WHERE entry_date = $1`, [entryDate]);
+      const hadSet = new Set(had.map((r) => r.account_id));
+      for (const r of digitalRows) {
+        const a = accs.find((x) => x.id === r.accountId);
+        if (!a) return NextResponse.json({ error: 'Unknown account' }, { status: 400 });
+        if (!a.active && !hadSet.has(a.id)) return NextResponse.json({ error: `${a.name} is deactivated` }, { status: 400 });
+        if (entryDate < a.starting_date) return NextResponse.json({ error: `${a.name} starts on ${a.starting_date}` }, { status: 400 });
+      }
+    }
+
     // If an entry for this date already exists, snapshot it into the audit log
     // before overwriting — so every edit to a past day is traceable.
     const existing = await query(
@@ -134,13 +174,18 @@ export async function POST(request) {
       );
     }
 
-    const { rows } = await query(
+    // The entry and its account sales are saved together or not at all.
+    const dbClient = await getPool().connect();
+    let rows;
+    try {
+      await dbClient.query('BEGIN');
+      const saved = await dbClient.query(
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
          bazar_advance_received, bazar_actual_cost, bazar_taken_from_box, next_bazar_advance, next_bhangti,
-         next_bhangti_denominations,
+         next_bhangti_denominations, digital_sales,
          total_sales, bazar_variance, cash_taken_home, is_off_day, notes, closed_by, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now())
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -153,6 +198,7 @@ export async function POST(request) {
          next_bhangti_denominations = EXCLUDED.next_bhangti_denominations,
          baki_given = 0,      -- credit-sale tracking was removed 2026-10-04; a re-saved day no longer carries it
          baki_received = 0,
+         digital_sales = EXCLUDED.digital_sales,
          total_sales = EXCLUDED.total_sales,
          bazar_variance = EXCLUDED.bazar_variance,
          cash_taken_home = EXCLUDED.cash_taken_home,
@@ -172,14 +218,27 @@ export async function POST(request) {
         coerceLocaleNumber(nextBazarAdvance) ?? 0,
         coerceLocaleNumber(nextBhangti) ?? 0,
         nextBhangtiDenominations ? JSON.stringify(nextBhangtiDenominations) : null,
-        summary.totalSales,
+        digitalTotal,
+        Math.round((summary.totalSales + digitalTotal) * 100) / 100,
         summary.bazarVariance,
         summary.cashTakenHome,
         !!isOffDay,
         notes || null,
         closedByArr,
       ]
-    );
+      );
+      rows = saved.rows;
+      await dbClient.query(`DELETE FROM account_sales WHERE entry_date = $1`, [entryDate]);
+      for (const r of digitalRows) {
+        await dbClient.query(`INSERT INTO account_sales (entry_date, account_id, amount) VALUES ($1, $2, $3)`, [entryDate, r.accountId, r.amount]);
+      }
+      await dbClient.query('COMMIT');
+    } catch (saveErr) {
+      await dbClient.query('ROLLBACK').catch(() => {});
+      throw saveErr;
+    } finally {
+      dbClient.release();
+    }
 
     // Best-effort: advance the cash-in-hand ledger for this day (no-op if
     // tracking isn't active yet, or this day is already confirmed/frozen).
