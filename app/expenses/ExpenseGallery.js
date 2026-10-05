@@ -9,8 +9,24 @@ import { DATA_START } from '@/lib/periods';
 import { unitLabel } from '@/lib/units';
 import { GROUP_COLORS } from '@/lib/expense-groups';
 import { buildDayCard, latestRecordedDate } from '@/lib/expense-gallery';
+import { firstRecordedDate } from '@/lib/expense-cumulative';
+import CumulativeCard from './CumulativeCard';
 
 const URL_ALL = '/api/expenses?range=all';
+
+// Past days rarely change, so the whole history is also kept in localStorage: the gallery opens instantly
+// (even after a reload) from that copy and quietly refreshes it from the server. Small (~tens of KB).
+const STORE_KEY = 'soupresso_gallery_history_v1';
+const MODE_KEY = 'soupresso_gallery_cum_mode';
+function readStored() {
+  try { const v = JSON.parse(localStorage.getItem(STORE_KEY)); return v && v.data && v.data.daily ? v.data : null; } catch { return null; }
+}
+function writeStored(data) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ savedAt: Date.now(), data })); } catch { /* storage full or blocked: just skip */ }
+}
+function readMode() {
+  try { return localStorage.getItem(MODE_KEY) === 'all' ? 'all' : 'month'; } catch { return 'month'; }
+}
 
 // Fullscreen, scrollable overlay: one card per day. Move with the ‹ › buttons, the arrow keys or a
 // swipe; jump with the calendar or Today. Opens on the latest recorded day.
@@ -18,6 +34,7 @@ export default function ExpenseGallery({ open, onClose }) {
   const { t, taka, digits, dateShort } = useLang();
   const today = todayStr();
   const [data, setData] = useState(() => peekCache(URL_ALL) ?? null);
+  const [cumMode, setCumMode] = useState('month');
   const [failed, setFailed] = useState(false);
   const [date, setDate] = useState(null);
   const [slide, setSlide] = useState('');
@@ -28,7 +45,12 @@ export default function ExpenseGallery({ open, onClose }) {
     if (!open) return undefined;
     let alive = true;
     setFailed(false);
-    cachedFetchJson(URL_ALL).then((d) => { if (alive) setData(d); }).catch(() => { if (alive && !peekCache(URL_ALL)) setFailed(true); });
+    setCumMode(readMode());
+    // instant paint from the stored copy if the in-memory cache is empty, then refresh in the background
+    if (!peekCache(URL_ALL)) { const stored = readStored(); if (stored) setData((cur) => cur || stored); }
+    cachedFetchJson(URL_ALL)
+      .then((d) => { if (alive) { setData(d); writeStored(d); } })
+      .catch(() => { if (alive && !peekCache(URL_ALL) && !readStored()) setFailed(true); });
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden'; // the overlay scrolls, the page behind it must not
     return () => { alive = false; document.body.style.overflow = prevOverflow; };
@@ -61,6 +83,8 @@ export default function ExpenseGallery({ open, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const firstDate = useMemo(() => (data ? firstRecordedDate(data.daily || [], data.lines || []) : null), [data]);
+  const pickMode = (m) => { setCumMode(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ } };
   const card = useMemo(() => (data && date ? buildDayCard(date, data.daily || [], data.lines || []) : null), [data, date]);
   if (!open) return null;
 
@@ -99,6 +123,7 @@ export default function ExpenseGallery({ open, onClose }) {
         ) : !card ? (
           <p className="gallery-note">{t('Loading…')}</p>
         ) : (
+          <div className="gallery-cards">
           <div key={date} className={`gallery-card ${slide}`}>
             <div className="gallery-date">{dateShort(date, { weekday: 'long', year: 'numeric' })}</div>
 
@@ -141,6 +166,8 @@ export default function ExpenseGallery({ open, onClose }) {
                 ))}
               </>
             )}
+          </div>
+          <CumulativeCard data={data} date={date} firstDate={firstDate} mode={cumMode} onMode={pickMode} slideClass={slide} />
           </div>
         )}
         <p className="gallery-note" style={{ fontSize: 11.5 }}>{t('Swipe, or use ‹ › / ← → to change day.')}</p>

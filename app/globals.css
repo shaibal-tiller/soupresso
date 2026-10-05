@@ -796,3 +796,31 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
 
 /* the calendar button inside the gallery's top bar must not be squeezed by the ‹ › buttons */
 .gallery-nav .date-picker-btn { white-space: nowrap; flex: 0 1 auto; width: auto; min-width: 128px; height: 38px; justify-content: center; }
+
+/* Expense Gallery: day card + running-total card side by side on wide screens, stacked on phones */
+.gallery-cards { display: grid; grid-template-columns: minmax(0, 560px); justify-content: center; gap: 16px; align-items: start; }
+@media (min-width: 1180px) { .gallery-cards { grid-template-columns: repeat(2, minmax(0, 560px)); } }
+.gallery-cards .gallery-card { margin: 0; width: 100%; }
+.cum-sub { font-size: 12px; color: var(--text3); margin: 0 0 12px; }
+.cum-chart { margin-top: 4px; }
+.cum-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.cum-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
+.cum-axis { font-size: 10.5px; fill: var(--text3); font-family: var(--mono); }
+.cum-hit { fill: transparent; cursor: crosshair; }
+.cum-hit:hover { fill: rgba(43,33,24,.07); }
+.cum-legend { display: flex; gap: 14px; justify-content: center; font-size: 11.5px; color: var(--text2); margin-top: 2px; }
+.cum-legend i, .cum-groups i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+.cum-groups { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text2); }
+.cum-groups b { font-family: var(--mono); color: var(--text); font-weight: 600; }
+.cum-groups small { color: var(--text3); }
+.cum-item { padding: 7px 0 4px; }
+.cum-item-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.cum-item-name { display: flex; align-items: baseline; gap: 7px; min-width: 0; color: var(--text); }
+.cum-item-name em { font-style: normal; font-size: 10.5px; color: var(--text3); font-family: var(--mono); min-width: 14px; }
+.cum-item-name small { color: var(--text3); font-size: 11.5px; }
+.cum-item-name i { font-style: italic; color: var(--text2); }
+.cum-item-amt { font-family: var(--mono); font-weight: 600; flex: none; }
+.cum-item-amt small { color: var(--text3); font-weight: 400; font-size: 11px; margin-left: 4px; }
+.cum-bar { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.cum-bar > div { height: 100%; border-radius: 3px; transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .cum-bar > div { transition: none; } }
