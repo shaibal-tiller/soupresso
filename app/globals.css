@@ -824,3 +824,10 @@ input[aria-invalid='true'] { border-color: var(--red) !important; }
 .cum-bar { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin-top: 4px; }
 .cum-bar > div { height: 100%; border-radius: 3px; transition: width .25s ease; }
 @media (prefers-reduced-motion: reduce) { .cum-bar > div { transition: none; } }
+
+.cum-type { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline; font-size: 13.5px; padding: 5px 0; border-bottom: 1px dashed var(--border); }
+.cum-type:last-child { border-bottom: none; }
+.cum-type span:first-child { display: flex; align-items: center; color: var(--text); font-weight: 600; }
+.cum-type i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 7px; }
+.cum-type-pct { font-family: var(--mono); font-weight: 700; min-width: 40px; text-align: right; }
+.cum-type b { font-family: var(--mono); font-weight: 600; min-width: 80px; text-align: right; }

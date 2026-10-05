@@ -76,6 +76,9 @@ const CumChart = memo(function CumChart({ series }) {
 export default function CumulativeCard({ data, date, firstDate, mode, onMode, slideClass }) {
   const { t, taka, digits, dateShort } = useLang();
   const [showAll, setShowAll] = useState(false);
+  // sub-categories (default) or the plain item ranking; remembered between visits
+  const [detail, setDetail] = useState(() => { try { return localStorage.getItem('soupresso_gallery_cum_detail') === 'item' ? 'item' : 'category'; } catch { return 'category'; } });
+  const pickDetail = (d) => { setDetail(d); try { localStorage.setItem('soupresso_gallery_cum_detail', d); } catch { /* ignore */ } };
   const daily = data.daily || []; const lines = data.lines || [];
 
   const series = useMemo(() => cumulativeSeries(daily, mode, date, firstDate), [daily, mode, date, firstDate]);
@@ -111,38 +114,64 @@ export default function CumulativeCard({ data, date, firstDate, mode, onMode, sl
 
       <CumChart series={series} />
 
-      {breakdown.groups.length > 0 && (
-        <>
-          <div style={{ display: 'flex', height: 12, borderRadius: 5, overflow: 'hidden', gap: 2, margin: '16px 0 8px' }}>
-            {breakdown.groups.map((g) => <div key={g.group} style={{ width: `${Math.max(g.share * 100, 0)}%`, background: GROUP_COLORS[g.group] }} title={`${t(g.group)}: ${taka(g.total)}`} />)}
-          </div>
-          <div className="cum-groups">
-            {breakdown.groups.map((g) => (
-              <span key={g.group}><i style={{ background: GROUP_COLORS[g.group] }} />{t(g.group)} <b>{taka(g.total)}</b> <small>{digits(String(Math.round(g.share * 100)))}%</small></span>
-            ))}
-          </div>
-        </>
-      )}
-
+      {/* Main categories: Cost of Goods / Operational / Overhead and their share of all expense */}
       <div className="gallery-group-head" style={{ marginTop: 16 }}>
-        <span>{t('Expense by item')} <small>({digits(String(breakdown.items.length))})</small></span>
+        <span>{t('Main categories')}</span>
         <b>{taka(breakdown.total)}</b>
       </div>
-      {breakdown.items.length === 0 ? (
-        <p className="gallery-note" style={{ margin: '10px 0' }}>{t('No expense recorded in this period.')}</p>
-      ) : top.map((i, idx) => (
-        <div key={i.key} className="cum-item">
-          <div className="cum-item-top">
-            <span className="cum-item-name"><em>{idx + 1}</em>{i.unitemized ? <i>{t('Unitemized (saved as one total)')}</i> : i.name}{qty(i) && <small>{qty(i)}</small>}</span>
-            <span className="cum-item-amt">{taka(i.total)} <small>{digits(String(Math.round(i.share * 100)))}%</small></span>
-          </div>
-          <div className="cum-bar"><div style={{ width: `${Math.max((i.total / maxItem) * 100, 1.5)}%`, background: GROUP_COLORS[i.group] }} /></div>
+      <div style={{ display: 'flex', height: 12, borderRadius: 5, overflow: 'hidden', gap: 2, margin: '10px 0 6px' }}>
+        {breakdown.byType.map((g) => <div key={g.group} style={{ width: `${Math.max(g.share * 100, 0)}%`, background: GROUP_COLORS[g.group] }} title={`${t(g.group)}: ${taka(g.total)}`} />)}
+      </div>
+      {breakdown.byType.map((g) => (
+        <div key={g.group} className="cum-type">
+          <span><i style={{ background: GROUP_COLORS[g.group] }} />{t(g.group)}</span>
+          <span className="cum-type-pct">{digits(String(Math.round(g.share * 100)))}%</span>
+          <b>{taka(g.total)}</b>
         </div>
       ))}
-      {breakdown.items.length > 10 && (
-        <button type="button" className="btn secondary btn-small" style={{ marginTop: 10 }} onClick={() => setShowAll((v) => !v)}>
-          {showAll ? t('Show top 10') : `${t('Show all')} ${digits(String(breakdown.items.length))}`}
-        </button>
+
+      <div className="toggle-row" style={{ margin: '16px 0 4px' }}>
+        <button className={detail === 'category' ? 'on' : ''} onClick={() => pickDetail('category')} style={{ fontSize: 12, padding: '6px 10px' }}>{t('By sub-category')}</button>
+        <button className={detail === 'item' ? 'on' : ''} onClick={() => pickDetail('item')} style={{ fontSize: 12, padding: '6px 10px' }}>{t('By item')}</button>
+      </div>
+
+      {breakdown.items.length === 0 ? (
+        <p className="gallery-note" style={{ margin: '10px 0' }}>{t('No expense recorded in this period.')}</p>
+      ) : detail === 'category' ? (
+        breakdown.byType.map((g) => (
+          <div key={g.group} className="gallery-group">
+            <div className="gallery-group-head">
+              <span><i style={{ background: GROUP_COLORS[g.group] }} />{t(g.group)} <small>{digits(String(Math.round(g.share * 100)))}%</small></span>
+              <b>{taka(g.total)}</b>
+            </div>
+            {g.categories.map((c, idx) => (
+              <div key={c.category ?? '__u'} className="cum-item">
+                <div className="cum-item-top">
+                  <span className="cum-item-name"><em>{idx + 1}</em>{c.unitemized ? <i>{t('Unitemized (saved as one total)')}</i> : t(c.category)}</span>
+                  <span className="cum-item-amt">{taka(c.total)} <small>{digits(String(Math.round(c.share * 100)))}%</small></span>
+                </div>
+                <div className="cum-bar"><div style={{ width: `${Math.max(c.shareOfType * 100, 1.5)}%`, background: GROUP_COLORS[g.group] }} /></div>
+              </div>
+            ))}
+          </div>
+        ))
+      ) : (
+        <>
+          {top.map((i, idx) => (
+            <div key={i.key} className="cum-item">
+              <div className="cum-item-top">
+                <span className="cum-item-name"><em>{idx + 1}</em>{i.unitemized ? <i>{t('Unitemized (saved as one total)')}</i> : i.name}{qty(i) && <small>{qty(i)}</small>}</span>
+                <span className="cum-item-amt">{taka(i.total)} <small>{digits(String(Math.round(i.share * 100)))}%</small></span>
+              </div>
+              <div className="cum-bar"><div style={{ width: `${Math.max((i.total / maxItem) * 100, 1.5)}%`, background: GROUP_COLORS[i.group] }} /></div>
+            </div>
+          ))}
+          {breakdown.items.length > 10 && (
+            <button type="button" className="btn secondary btn-small" style={{ marginTop: 10 }} onClick={() => setShowAll((v) => !v)}>
+              {showAll ? t('Show top 10') : `${t('Show all')} ${digits(String(breakdown.items.length))}`}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
