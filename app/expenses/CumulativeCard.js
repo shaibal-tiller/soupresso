@@ -26,6 +26,7 @@ const CumChart = memo(function CumChart({ series }) {
   const { bind, view } = useChartTip();
   const days = series.days;
   const n = days.length;
+  if (n === 0) return null; // nothing to draw (a day before the first record)
   const maxY = Math.max(1, ...days.map((d) => Math.max(d.cumSales, d.cumExpense)));
   const plotW = W - PAD.l - PAD.r; const plotH = H - PAD.t - PAD.b;
   const x = (i) => PAD.l + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
@@ -102,7 +103,9 @@ export default function CumulativeCard({ data, date, firstDate, mode, onMode, sl
         <button className={mode === 'all' ? 'on' : ''} onClick={() => onMode('all')} style={{ fontSize: 12, padding: '6px 10px' }}>{t('All time')}</button>
       </div>
       <p className="cum-sub">
-        {mode === 'month' ? monthName : t('All time')} · {dateShort(series.from)} → {dateShort(date)} · {digits(String(series.days.length))} {t('days')}
+        {series.days.length === 0
+          ? `${mode === 'month' ? monthName : t('All time')} · ${dateShort(date)}`
+          : `${mode === 'month' ? monthName : t('All time')} · ${dateShort(series.from)} → ${dateShort(date)} · ${digits(String(series.days.length))} ${t('days')}`}
       </p>
 
       <div className="kpi-row" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 12 }}>
@@ -112,7 +115,13 @@ export default function CumulativeCard({ data, date, firstDate, mode, onMode, sl
         <div className="kpi"><div className="kpi-label">{t('% of sales')}</div><div className="kpi-value">{totals.expensePct != null ? `${digits(String(Math.round(totals.expensePct * 100)))}%` : '—'}</div></div>
       </div>
 
-      <CumChart series={series} />
+      {series.days.length === 0 ? (
+        <p className="gallery-note" style={{ margin: '12px 0' }}>
+          {t('No records yet on this day — your records start on')} {firstDate ? dateShort(firstDate) : '—'}.
+        </p>
+      ) : (
+        <CumChart series={series} />
+      )}
 
       {/* Main categories: Cost of Goods / Operational / Overhead and their share of all expense */}
       <div className="gallery-group-head" style={{ marginTop: 16 }}>
