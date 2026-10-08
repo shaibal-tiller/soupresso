@@ -162,16 +162,30 @@ function ReconcileForm({ ctx, account }) {
   );
 }
 
+// Does this activity row touch the account? (transfers touch both ends; cash is the null end)
+function involves(m, accountId) {
+  if (m.type === 'transfer') return m.fromId === accountId || m.toId === accountId;
+  return m.accountId === accountId;
+}
+
+// The amount as it moved the viewed account: on an account's own tab a transfer out is negative and a transfer in is
+// what arrived (amount − charge); on the All tab it is the plain amount.
+function signedAmount(m, tab) {
+  if (m.type === 'transfer' && typeof tab === 'number') return m.fromId === tab ? -m.amount : m.amount - m.charge;
+  return m.amount;
+}
+
 // Cash in Hand's sibling accounts (bKash merchant, City Bank, …): balances, transfers between them and cash,
 // corrections, and a feed of what moved. Cash stays the ledger below; moves that involve cash are applied to it
 // by the API, so after one of those the page reloads the ledger (onCashChanged).
-export default function Accounts({ cashBalance, onCashChanged }) {
+export default function Accounts({ cashBalance, onCashChanged, cashLedger }) {
   const { t, taka, dateNice } = useLang();
   const [data, setData] = useState(null);
   const [panel, setPanel] = useState(null); // null | 'add' | 'transfer' | { adjust: accountId } | { reconcile: accountId }
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [tab, setTab] = useState('cash'); // 'all' | 'cash' | account id
 
   const load = useCallback(async () => {
     try { setData(await cachedFetchJson(URL_ACCOUNTS)); } catch { setData({ accounts: [], movements: [] }); }
@@ -204,7 +218,11 @@ export default function Accounts({ cashBalance, onCashChanged }) {
   const adjustAccount = panel && panel.adjust ? accounts.find((a) => a.id === panel.adjust) : null;
   const reconcileAccount = panel && panel.reconcile ? accounts.find((a) => a.id === panel.reconcile) : null;
   const moves = data?.movements || [];
-  const shown = showAll ? moves : moves.slice(0, 8);
+  // A tab whose account got deactivated falls back to Cash.
+  const tabAccount = typeof tab === 'number' ? active.find((a) => a.id === tab) : null;
+  const curTab = typeof tab === 'number' && !tabAccount ? 'cash' : tab;
+  const tabMoves = curTab === 'all' ? moves : tabAccount ? moves.filter((m) => involves(m, tabAccount.id)) : [];
+  const shown = showAll ? tabMoves : tabMoves.slice(0, 8);
 
   async function removeMove(m) {
     if (!window.confirm(m.type === 'transfer' ? t('Delete this transfer? Balances (and Cash in Hand, if it was involved) go back.') : t('Delete this correction?'))) return;
@@ -259,33 +277,55 @@ export default function Accounts({ cashBalance, onCashChanged }) {
       {adjustAccount && <AdjustForm ctx={ctx} account={adjustAccount} />}
       {reconcileAccount && <ReconcileForm ctx={ctx} account={reconcileAccount} />}
 
-      {moves.length > 0 && (
+      <div className="toggle-row" style={{ flexWrap: 'wrap', marginTop: 4 }}>
+        <button type="button" className={curTab === 'all' ? 'on' : ''} onClick={() => { setTab('all'); setShowAll(false); }}>{t('All')}</button>
+        <button type="button" className={curTab === 'cash' ? 'on' : ''} onClick={() => { setTab('cash'); setShowAll(false); }}>{t('Cash')}</button>
+        {active.map((a) => (
+          <button type="button" key={a.id} className={curTab === a.id ? 'on' : ''} onClick={() => { setTab(a.id); setShowAll(false); }}>
+            {a.kind === 'bkash' ? 'bKash' : a.name}
+          </button>
+        ))}
+      </div>
+
+      {curTab === 'cash' ? cashLedger : (
         <div className="card">
-          <div className="card-title">{t('Account activity')}</div>
-          <table className="denom-table">
-            <tbody>
-              {shown.map((m, i) => (
-                <tr key={`${m.type}-${m.id ?? i}-${m.date}`}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{dateNice(m.date)}</td>
-                  <td>
-                    {m.type === 'sale' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('sales')}</span></>}
-                    {m.type === 'transfer' && <>{m.from} → {m.to}{m.charge > 0 && <span style={{ color: 'var(--text3)' }}> ({t('charge')} {taka(m.charge)})</span>}{m.note && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{m.note}</div>}</>}
-                    {m.type === 'adjustment' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('correction')}: {m.note}</span></>}
-                    {m.type === 'relay' && (
-                      <span style={{ opacity: m.counted ? 1 : 0.6 }}>
-                        {m.account} <span style={{ color: 'var(--text3)' }}>{t('received')} · {m.sender} ({m.operator}) · {m.time}{m.counted ? '' : ` · ${t('not counted yet')}`}</span>
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ fontFamily: 'var(--mono)', textAlign: 'right', color: m.type === 'adjustment' && m.amount < 0 ? 'var(--red)' : undefined }}>
-                    {m.type === 'sale' || m.type === 'relay' ? '+' : m.type === 'adjustment' && m.amount > 0 ? '+' : ''}{taka(m.amount)}
-                  </td>
-                  <td>{m.type !== 'sale' && m.type !== 'relay' && <button type="button" className="btn secondary btn-small" onClick={() => removeMove(m)} aria-label={t('Delete')}>✕</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {moves.length > 8 && (
+          <div className="card-title">
+            {curTab === 'all' ? t('All account activity') : `${tabAccount?.name || ''} — ${t('Account activity')}`}
+          </div>
+          {tabAccount && (
+            <div className="step-result" style={{ marginBottom: 8 }}><span>{t('Balance')}</span><strong>{taka(tabAccount.balance)}</strong></div>
+          )}
+          {tabMoves.length === 0 ? (
+            <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No activity yet.')}</p>
+          ) : (
+            <table className="denom-table">
+              <tbody>
+                {shown.map((m, i) => {
+                  const amt = signedAmount(m, curTab);
+                  return (
+                    <tr key={`${m.type}-${m.id ?? i}-${m.date}`}>
+                      <td style={{ whiteSpace: 'nowrap' }}>{dateNice(m.date)}</td>
+                      <td>
+                        {m.type === 'sale' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('sales')}</span></>}
+                        {m.type === 'transfer' && <>{m.from} → {m.to}{m.charge > 0 && <span style={{ color: 'var(--text3)' }}> ({t('charge')} {taka(m.charge)})</span>}{m.note && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{m.note}</div>}</>}
+                        {m.type === 'adjustment' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('correction')}: {m.note}</span></>}
+                        {m.type === 'relay' && (
+                          <span style={{ opacity: m.counted ? 1 : 0.6 }}>
+                            {m.account} <span style={{ color: 'var(--text3)' }}>{t('received')} · {m.sender} ({m.operator}) · {m.time}{m.counted ? '' : ` · ${t('not counted yet')}`}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontFamily: 'var(--mono)', textAlign: 'right', color: amt < 0 ? 'var(--red)' : undefined }}>
+                        {amt > 0 ? '+' : amt < 0 ? '−' : ''}{taka(Math.abs(amt))}
+                      </td>
+                      <td>{m.type !== 'sale' && m.type !== 'relay' && <button type="button" className="btn secondary btn-small" onClick={() => removeMove(m)} aria-label={t('Delete')}>✕</button>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {tabMoves.length > 8 && (
             <button type="button" className="btn secondary btn-small" style={{ marginTop: 8 }} onClick={() => setShowAll((v) => !v)}>
               {showAll ? t('Show less') : t('Show more')}
             </button>

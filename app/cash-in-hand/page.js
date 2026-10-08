@@ -117,6 +117,132 @@ export default function CashInHandPage() {
     }
   }
 
+  // The cash ledger: the "Cash" tab of the account tabs (shown once a starting balance is set).
+  const cashLedger = (
+    <>
+      <button type="button" className="btn secondary block" style={{ marginBottom: 16 }} onClick={() => setShowAdjust((v) => !v)}>
+        {showAdjust ? t('Cancel') : t('+ Add reconciliation adjustment')}
+      </button>
+
+      {showAdjust && (
+        <div className="card">
+          <div className="card-title">{t('Reconciliation adjustment')}</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 14 }}>
+            {t('Corrects the running balance from the chosen date forward. Never edits a day\'s own recorded numbers — every adjustment needs an explanation.')}
+          </p>
+          <form onSubmit={handleAddAdjustment}>
+            <div className="field">
+              <label>{t('Date')}</label>
+              <input type="date" value={adjustDate} onChange={(e) => setAdjustDate(e.target.value)} max={todayStr()} required />
+            </div>
+            <div className="field">
+              <label>{t('Amount (৳, can be negative)')}</label>
+              <NumberInput value={adjustAmount} onValueChange={(n) => setAdjustAmount(n == null ? '' : String(n))} placeholder={t('e.g. -200 or 500')} />
+            </div>
+            <div className="field">
+              <label>{t('Note (required)')}</label>
+              <input type="text" value={adjustNote} onChange={(e) => setAdjustNote(e.target.value)} placeholder={t('e.g. corrected a miscount from Sep 10')} required />
+            </div>
+            {adjustError && <div className="status-msg err">{adjustError}</div>}
+            <button type="submit" className="btn block" disabled={savingAdjust || adjustAmount === '' || !adjustNote.trim()}>
+              {savingAdjust ? t('Saving…') : t('Add adjustment')}
+            </button>
+          </form>
+        </div>
+      )}
+
+      <PeriodFilter value={period} onChange={setPeriod} />
+
+      <div className="toggle-row" style={{ marginBottom: 10 }}>
+        <button className={view === 'daily' ? 'on' : ''} onClick={() => setView('daily')}>{t('Daily')}</button>
+        <button className={view === 'weekly' ? 'on' : ''} onClick={() => setView('weekly')}>{t('Weekly')}</button>
+        <button className={view === 'monthly' ? 'on' : ''} onClick={() => setView('monthly')}>{t('Monthly')}</button>
+      </div>
+
+      {summary && (
+        <div className="card" style={{ padding: '12px 14px' }}>
+          <div className="step-calc">
+            <div className="calc-row"><span>{t('Opening')}</span><span>{taka(summary.opening)}</span></div>
+            <div className="calc-row"><span>{t('Cash added (taken home)')}</span><span className={summary.added >= 0 ? 'g' : 'r'}>{summary.added >= 0 ? '+' : ''}{taka(summary.added)}</span></div>
+            {summary.adjusted !== 0 && <div className="calc-row"><span>{t('Adjustments')}</span><span>{taka(summary.adjusted)}</span></div>}
+            <div className="calc-row result"><span>{t('Closing')}</span><span>{taka(summary.closing)}</span></div>
+          </div>
+          <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>
+            {digits(String(summary.days))} {t('days')} · {t('avg per day')} {taka(summary.added / summary.days)}
+          </p>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-title">{view === 'daily' ? t('Ledger') : view === 'weekly' ? t('Weekly ledger') : t('Monthly ledger')}</div>
+        {loading ? (
+          <p style={{ color: 'var(--text2)' }}>{t('Loading…')}</p>
+        ) : inRange.length === 0 ? (
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No days tracked in this period.')}</p>
+        ) : view !== 'daily' ? (
+          <table className="denom-table">
+            <thead>
+              <tr>
+                <th>{view === 'weekly' ? t('Week') : t('Month')}</th>
+                <th>{t('Opening')}</th>
+                <th>{t('Added')}</th>
+                <th>{t('Adj.')}</th>
+                <th>{t('Closing')}</th>
+                <th>{t('Days')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rolled.map((g) => (
+                <tr key={g.key}>
+                  <td>{view === 'weekly' ? `${dateShort(g.from)} – ${dateShort(g.to)}` : monthName(g.key)}{g.pending ? ' *' : ''}</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{taka(g.opening)}</td>
+                  <td style={{ fontFamily: 'var(--mono)', color: g.dayDelta >= 0 ? 'var(--green)' : 'var(--red)' }}>{g.dayDelta >= 0 ? '+' : ''}{taka(g.dayDelta)}</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{g.adjustment !== 0 ? taka(g.adjustment) : '—'}</td>
+                  <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{taka(g.closing)}</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{digits(String(g.days))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="denom-table">
+            <thead>
+              <tr>
+                <th>{t('Date')}</th>
+                <th>{t('Opening')}</th>
+                <th>{t('Day')}</th>
+                <th>{t('Adj.')}</th>
+                <th>{t('Closing')}</th>
+                <th>{t('Status')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...inRange].reverse().map((row) => (
+                <tr key={row.entry_date}>
+                  <td>{dateNice(row.entry_date)}</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{taka(row.opening_balance)}</td>
+                  <td style={{ fontFamily: 'var(--mono)', color: Number(row.day_delta) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {Number(row.day_delta) >= 0 ? '+' : ''}{taka(row.day_delta)}
+                  </td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{Number(row.adjustment_delta) !== 0 ? taka(row.adjustment_delta) : '—'}</td>
+                  <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{taka(row.closing_balance)}</td>
+                  <td>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', color: row.status === 'confirmed' ? 'var(--brand-green)' : 'var(--amber)' }}>
+                      {t(row.status)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {view !== 'daily' && rolled.some((g) => g.pending) && (
+          <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>* {t('includes a day that is still pending')}</p>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <AppShell>
       <div className="card" style={{ textAlign: 'center' }}>
@@ -146,6 +272,7 @@ export default function CashInHandPage() {
         <Accounts
           cashBalance={latest ? Number(latest.closing_balance) : null}
           onCashChanged={async () => { invalidateCache(LEDGER_URL); await load(); }}
+          cashLedger={cashLedger}
         />
       )}
 
@@ -174,130 +301,7 @@ export default function CashInHandPage() {
             </button>
           </form>
         </div>
-      ) : (
-        <>
-          <button type="button" className="btn secondary block" style={{ marginBottom: 16 }} onClick={() => setShowAdjust((v) => !v)}>
-            {showAdjust ? t('Cancel') : t('+ Add reconciliation adjustment')}
-          </button>
-
-          {showAdjust && (
-            <div className="card">
-              <div className="card-title">{t('Reconciliation adjustment')}</div>
-              <p style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 14 }}>
-                {t('Corrects the running balance from the chosen date forward. Never edits a day\'s own recorded numbers — every adjustment needs an explanation.')}
-              </p>
-              <form onSubmit={handleAddAdjustment}>
-                <div className="field">
-                  <label>{t('Date')}</label>
-                  <input type="date" value={adjustDate} onChange={(e) => setAdjustDate(e.target.value)} max={todayStr()} required />
-                </div>
-                <div className="field">
-                  <label>{t('Amount (৳, can be negative)')}</label>
-                  <NumberInput value={adjustAmount} onValueChange={(n) => setAdjustAmount(n == null ? '' : String(n))} placeholder={t('e.g. -200 or 500')} />
-                </div>
-                <div className="field">
-                  <label>{t('Note (required)')}</label>
-                  <input type="text" value={adjustNote} onChange={(e) => setAdjustNote(e.target.value)} placeholder={t('e.g. corrected a miscount from Sep 10')} required />
-                </div>
-                {adjustError && <div className="status-msg err">{adjustError}</div>}
-                <button type="submit" className="btn block" disabled={savingAdjust || adjustAmount === '' || !adjustNote.trim()}>
-                  {savingAdjust ? t('Saving…') : t('Add adjustment')}
-                </button>
-              </form>
-            </div>
-          )}
-
-          <PeriodFilter value={period} onChange={setPeriod} />
-
-          <div className="toggle-row" style={{ marginBottom: 10 }}>
-            <button className={view === 'daily' ? 'on' : ''} onClick={() => setView('daily')}>{t('Daily')}</button>
-            <button className={view === 'weekly' ? 'on' : ''} onClick={() => setView('weekly')}>{t('Weekly')}</button>
-            <button className={view === 'monthly' ? 'on' : ''} onClick={() => setView('monthly')}>{t('Monthly')}</button>
-          </div>
-
-          {summary && (
-            <div className="card" style={{ padding: '12px 14px' }}>
-              <div className="step-calc">
-                <div className="calc-row"><span>{t('Opening')}</span><span>{taka(summary.opening)}</span></div>
-                <div className="calc-row"><span>{t('Cash added (taken home)')}</span><span className={summary.added >= 0 ? 'g' : 'r'}>{summary.added >= 0 ? '+' : ''}{taka(summary.added)}</span></div>
-                {summary.adjusted !== 0 && <div className="calc-row"><span>{t('Adjustments')}</span><span>{taka(summary.adjusted)}</span></div>}
-                <div className="calc-row result"><span>{t('Closing')}</span><span>{taka(summary.closing)}</span></div>
-              </div>
-              <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>
-                {digits(String(summary.days))} {t('days')} · {t('avg per day')} {taka(summary.added / summary.days)}
-              </p>
-            </div>
-          )}
-
-          <div className="card">
-            <div className="card-title">{view === 'daily' ? t('Ledger') : view === 'weekly' ? t('Weekly ledger') : t('Monthly ledger')}</div>
-            {loading ? (
-              <p style={{ color: 'var(--text2)' }}>{t('Loading…')}</p>
-            ) : inRange.length === 0 ? (
-              <p style={{ color: 'var(--text2)', fontSize: 13 }}>{t('No days tracked in this period.')}</p>
-            ) : view !== 'daily' ? (
-              <table className="denom-table">
-                <thead>
-                  <tr>
-                    <th>{view === 'weekly' ? t('Week') : t('Month')}</th>
-                    <th>{t('Opening')}</th>
-                    <th>{t('Added')}</th>
-                    <th>{t('Adj.')}</th>
-                    <th>{t('Closing')}</th>
-                    <th>{t('Days')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rolled.map((g) => (
-                    <tr key={g.key}>
-                      <td>{view === 'weekly' ? `${dateShort(g.from)} – ${dateShort(g.to)}` : monthName(g.key)}{g.pending ? ' *' : ''}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{taka(g.opening)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: g.dayDelta >= 0 ? 'var(--green)' : 'var(--red)' }}>{g.dayDelta >= 0 ? '+' : ''}{taka(g.dayDelta)}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{g.adjustment !== 0 ? taka(g.adjustment) : '—'}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{taka(g.closing)}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{digits(String(g.days))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <table className="denom-table">
-                <thead>
-                  <tr>
-                    <th>{t('Date')}</th>
-                    <th>{t('Opening')}</th>
-                    <th>{t('Day')}</th>
-                    <th>{t('Adj.')}</th>
-                    <th>{t('Closing')}</th>
-                    <th>{t('Status')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...inRange].reverse().map((row) => (
-                    <tr key={row.entry_date}>
-                      <td>{dateNice(row.entry_date)}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{taka(row.opening_balance)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: Number(row.day_delta) >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                        {Number(row.day_delta) >= 0 ? '+' : ''}{taka(row.day_delta)}
-                      </td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{Number(row.adjustment_delta) !== 0 ? taka(row.adjustment_delta) : '—'}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{taka(row.closing_balance)}</td>
-                      <td>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', color: row.status === 'confirmed' ? 'var(--brand-green)' : 'var(--amber)' }}>
-                          {t(row.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {view !== 'daily' && rolled.some((g) => g.pending) && (
-              <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>* {t('includes a day that is still pending')}</p>
-            )}
-          </div>
-        </>
-      )}
+      ) : null}
     </AppShell>
   );
 }
