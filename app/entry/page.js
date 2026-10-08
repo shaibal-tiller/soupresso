@@ -846,7 +846,7 @@ function EntryPageInner() {
                               <>
                                 {relayDay.payments.map((p) => (
                                   <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                                    <span>{p.time} · {p.sender} ({p.operator})</span><span style={{ fontFamily: 'var(--mono)' }}>{taka(p.amount)}</span>
+                                    <span>{p.time || t('time not recorded')} · {p.sender} ({p.operator}){p.trxId ? ` · ${p.trxId}` : ''}</span><span style={{ fontFamily: 'var(--mono)' }}>{taka(p.amount)}</span>
                                   </div>
                                 ))}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4 }}>

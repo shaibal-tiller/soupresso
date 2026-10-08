@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { coerceLocaleNumber } from '@/lib/numerals';
 import { todayStrTZ } from '@/lib/dates';
-import { ACCOUNT_KINDS, ACCOUNTS_START_DATE, summarizeAccount } from '@/lib/accounts';
+import { ACCOUNT_KINDS, ACCOUNTS_START_DATE, summarizeAccount, activityFlags } from '@/lib/accounts';
 import { loadAll } from '@/lib/accounts-db';
 
 export const dynamic = 'force-dynamic';
@@ -41,13 +41,23 @@ export async function GET(request) {
 
     // bKash relay payments belong to the (first active) bKash account; they count only from that account's relay_from.
     const relayAccount = accounts.find((a) => a.kind === 'bkash' && a.active) || accounts.find((a) => a.kind === 'bkash');
+    // Per date: show a day's detailed relay/history rows instead of its typed lump when they add up to it.
+    const sumBy = (rows, key) => rows.reduce((o, r) => { o[r[key]] = (o[r[key]] || 0) + r.amount; return o; }, {});
+    const flags = relayAccount
+      ? activityFlags({
+          salesByDate: sumBy(data.sales.filter((x) => x.account_id === relayAccount.id), 'entry_date'),
+          relayByDate: sumBy(data.relay, 'date'),
+          relayFrom: relayAccount.relay_from,
+        })
+      : {};
     const movements = [
-      ...data.sales.map((s) => ({ type: 'sale', date: s.entry_date, sortKey: `${s.entry_date}|0`, accountId: s.account_id, account: name(s.account_id), amount: s.amount })),
+      ...data.sales.filter((s) => !(s.account_id === relayAccount?.id && flags[s.entry_date]?.hideSale)).map((s) => ({ type: 'sale', date: s.entry_date, sortKey: `${s.entry_date}|0`, accountId: s.account_id, account: name(s.account_id), amount: s.amount })),
       ...data.transfers.map((t) => ({ type: 'transfer', id: t.id, date: t.transfer_date, sortKey: `${t.transfer_date}|1|${String(t.id).padStart(8, '0')}`, fromId: t.from_account_id, toId: t.to_account_id, from: name(t.from_account_id), to: name(t.to_account_id), amount: t.amount, charge: t.charge, note: t.note })),
       ...(relayAccount ? data.relay.map((r) => ({
         type: 'relay', id: r.id, date: r.date, sortKey: `${r.date}|3|${new Date(r.occurred_at).toISOString()}`, accountId: relayAccount.id, account: relayAccount.name,
-        amount: r.amount, sender: r.sender, operator: r.sender_operator, time: r.time,
-        counted: !!relayAccount.relay_from && r.date >= relayAccount.relay_from,
+        amount: r.amount, sender: r.sender, operator: r.sender_operator, time: r.time_known ? r.time : null,
+        source: r.source, trxId: r.trx_id, balanceAfter: r.balance_after,
+        state: flags[r.date]?.relayState || 'not-counted',
       })) : []),
       ...data.adjustments.map((a) => ({ type: 'adjustment', id: a.id, date: a.adj_date, sortKey: `${a.adj_date}|2|${String(a.id).padStart(8, '0')}`, accountId: a.account_id, account: name(a.account_id), amount: a.amount, note: a.note })),
     ].sort((x, y) => y.sortKey.localeCompare(x.sortKey)).slice(0, 300);

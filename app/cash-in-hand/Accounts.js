@@ -310,8 +310,10 @@ export default function Accounts({ cashBalance, onCashChanged, cashLedger }) {
                         {m.type === 'transfer' && <>{m.from} → {m.to}{m.charge > 0 && <span style={{ color: 'var(--text3)' }}> ({t('charge')} {taka(m.charge)})</span>}{m.note && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{m.note}</div>}</>}
                         {m.type === 'adjustment' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('correction')}: {m.note}</span></>}
                         {m.type === 'relay' && (
-                          <span style={{ opacity: m.counted ? 1 : 0.6 }}>
-                            {m.account} <span style={{ color: 'var(--text3)' }}>{t('received')} · {m.sender} ({m.operator}) · {m.time}{m.counted ? '' : ` · ${t('not counted yet')}`}</span>
+                          <span style={{ opacity: m.state === 'not-counted' ? 0.6 : 1 }}>
+                            {m.account} <span style={{ color: 'var(--text3)' }}>{t('received')} · {m.sender} ({m.operator}) · {m.time || t('time not recorded')}
+                              {m.trxId ? ` · ${m.trxId}` : ''}{m.state === 'not-counted' ? ` · ${t('not counted yet')}` : ''}</span>
+                            {m.state === 'in-entry' && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t('included in that day’s entry')}</div>}
                           </span>
                         )}
                       </td>

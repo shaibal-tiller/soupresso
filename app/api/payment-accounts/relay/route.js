@@ -10,7 +10,8 @@ export async function GET(request) {
   const day = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : todayStrTZ();
   try {
     const { rows } = await getPool().query(
-      `SELECT id, to_char(occurred_at AT TIME ZONE 'Asia/Dhaka', 'HH12:MI AM') AS time, amount::float AS amount, sender, sender_operator AS operator
+      `SELECT id, CASE WHEN time_known THEN to_char(occurred_at AT TIME ZONE 'Asia/Dhaka', 'HH12:MI AM') END AS time,
+              amount::float AS amount, sender, sender_operator AS operator, trx_id AS "trxId", source
          FROM bkash_transactions
         WHERE (occurred_at AT TIME ZONE 'Asia/Dhaka')::date = $1::date
         ORDER BY occurred_at`, [day]);

@@ -836,3 +836,18 @@ CREATE INDEX IF NOT EXISTS idx_bkash_transactions_occurred ON bkash_transactions
 -- typed in the daily entry. NULL = relay payments are only recorded (testing). Set by Reconcile on the bKash account.
 ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS relay_from DATE;
 -- END bkash-relay-cutover
+
+-- BEGIN bkash-history
+-- 2026-10-08: payments recorded from before the relay (phone notification history, bKash SMS), plus fields only an SMS has.
+--   source      notification (relay) | history (copied from the phone's notification history) | sms
+--   trx_id      bKash TrxID when known (SMS has it, notifications do not)
+--   balance_after  bKash balance after the payment when known (SMS)
+--   time_known  false when only the date is known (old notification history shows just the date)
+-- History rows have no raw notification, so notification_id may be NULL.
+ALTER TABLE bkash_transactions ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'notification' CHECK (source IN ('notification', 'history', 'sms'));
+ALTER TABLE bkash_transactions ADD COLUMN IF NOT EXISTS trx_id TEXT;
+ALTER TABLE bkash_transactions ADD COLUMN IF NOT EXISTS balance_after NUMERIC(12,2);
+ALTER TABLE bkash_transactions ADD COLUMN IF NOT EXISTS time_known BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE bkash_transactions ALTER COLUMN notification_id DROP NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bkash_transactions_trx_id ON bkash_transactions (trx_id) WHERE trx_id IS NOT NULL;
+-- END bkash-history
