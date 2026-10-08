@@ -3,8 +3,9 @@ import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/auth';
 
 // Runs before every request. Anything not explicitly public requires a
 // valid session cookie, verified server-side (the cookie itself is
-// httpOnly so client JS never touches it).
-const PUBLIC_PATHS = ['/login', '/api/auth/login'];
+// httpOnly so client JS never touches it). The bKash relay webhook has no
+// cookie; the route itself checks a bearer token.
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/bkash/notification'];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;

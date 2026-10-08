@@ -797,3 +797,18 @@ CREATE TABLE IF NOT EXISTS account_adjustments (
 -- Part of total_sales that came in through accounts (not through the cash box). total_sales includes it.
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS digital_sales NUMERIC(12,2) NOT NULL DEFAULT 0;
 -- END payment-accounts
+
+-- BEGIN bkash-notifications
+-- 2026-10-08: raw bKash Merchant notifications forwarded by the Android relay (POST /api/bkash/notification).
+-- Capture only for now: every request is stored as received; parse_status stays 'unprocessed' until the parser exists.
+CREATE TABLE IF NOT EXISTS bkash_notifications (
+  id           SERIAL PRIMARY KEY,
+  received_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  content_type TEXT,
+  raw_body     TEXT NOT NULL,
+  payload      JSONB,
+  parse_status TEXT NOT NULL DEFAULT 'unprocessed' CHECK (parse_status IN ('unprocessed', 'parsed', 'failed', 'ignored')),
+  parse_error  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_bkash_notifications_received ON bkash_notifications (received_at DESC);
+-- END bkash-notifications
