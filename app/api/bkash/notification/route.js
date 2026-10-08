@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { getPool } from '@/lib/db';
+import { processBkashNotification } from '@/lib/bkash';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,8 @@ function tokenMatches(header) {
 }
 
 // Public to the session middleware (the phone has no cookie); guarded by BKASH_WEBHOOK_TOKEN instead.
-// Capture only: stores the request exactly as received. Parsing comes once real samples exist.
+// Stores the request exactly as received, then turns a recognised payment into a transaction.
+// Unrecognised text is kept as a failed notification; a repeated event_id creates no second transaction.
 export async function POST(request) {
   if (!tokenMatches(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -30,6 +32,7 @@ export async function POST(request) {
       `INSERT INTO bkash_notifications (content_type, raw_body, payload) VALUES ($1, $2, $3) RETURNING id`,
       [request.headers.get('content-type'), raw, payload === null ? null : JSON.stringify(payload)]
     );
+    try { await processBkashNotification(rows[0].id, payload); } catch (err) { console.error('bkash parse failed', err); }
     // Message487 keeps an event pending until the reply is { status: 'accepted', event_id } for that event.
     const eventId = typeof payload?.event_id === 'string' ? payload.event_id : undefined;
     return NextResponse.json({ ok: true, id: rows[0].id, status: 'accepted', event_id: eventId });

@@ -812,3 +812,21 @@ CREATE TABLE IF NOT EXISTS bkash_notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_bkash_notifications_received ON bkash_notifications (received_at DESC);
 -- END bkash-notifications
+
+-- BEGIN bkash-transactions
+-- 2026-10-08: one row per parsed bKash payment from the relay. event_id (the relay's unique id for the
+-- notification) is the duplicate guard: the same notification arriving twice creates one row.
+CREATE TABLE IF NOT EXISTS bkash_transactions (
+  id              SERIAL PRIMARY KEY,
+  event_id        TEXT NOT NULL UNIQUE,
+  type            TEXT NOT NULL DEFAULT 'PAYMENT_RECEIVED',
+  amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  occurred_at     TIMESTAMPTZ NOT NULL,
+  sender          TEXT NOT NULL,
+  sender_operator TEXT NOT NULL,
+  sender_last4    TEXT,
+  notification_id INTEGER NOT NULL REFERENCES bkash_notifications(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bkash_transactions_occurred ON bkash_transactions (occurred_at DESC);
+-- END bkash-transactions
