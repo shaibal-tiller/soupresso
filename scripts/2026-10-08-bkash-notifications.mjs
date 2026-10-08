@@ -12,7 +12,9 @@ const schema = fs.readFileSync(path.join(here, '..', 'schema.sql'), 'utf8');
 const block = schema.slice(schema.indexOf('-- BEGIN bkash-notifications'), schema.indexOf('-- END bkash-notifications'));
 if (!block.includes('CREATE TABLE')) throw new Error('bkash-notifications block not found in schema.sql');
 const url = process.env.TARGET_URL || fs.readFileSync(path.join(here, '..', '.env.local'), 'utf8').match(/^DATABASE_URL="?([^"\n]+)"?/m)[1];
-const pool = new pg.Pool({ connectionString: url, ssl: process.env.TARGET_URL ? false : { rejectUnauthorized: false } });
+// Verify the server certificate; plaintext only for a local target (e.g. a Docker restore database).
+const isLocal = ['localhost', '127.0.0.1'].includes(new URL(url).hostname);
+const pool = new pg.Pool({ connectionString: url, ssl: isLocal ? false : { rejectUnauthorized: true } });
 const APPLY = process.argv.includes('--apply');
 const c = await pool.connect();
 try {

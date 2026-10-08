@@ -30,7 +30,9 @@ export async function POST(request) {
       `INSERT INTO bkash_notifications (content_type, raw_body, payload) VALUES ($1, $2, $3) RETURNING id`,
       [request.headers.get('content-type'), raw, payload === null ? null : JSON.stringify(payload)]
     );
-    return NextResponse.json({ ok: true, id: rows[0].id });
+    // Message487 keeps an event pending until the reply is { status: 'accepted', event_id } for that event.
+    const eventId = typeof payload?.event_id === 'string' ? payload.event_id : undefined;
+    return NextResponse.json({ ok: true, id: rows[0].id, status: 'accepted', event_id: eventId });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
