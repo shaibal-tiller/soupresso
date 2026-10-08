@@ -3,23 +3,11 @@ import { getPool } from '@/lib/db';
 import { coerceLocaleNumber } from '@/lib/numerals';
 import { todayStrTZ } from '@/lib/dates';
 import { ACCOUNT_KINDS, ACCOUNTS_START_DATE, summarizeAccount } from '@/lib/accounts';
+import { loadAll } from '@/lib/accounts-db';
 
 export const dynamic = 'force-dynamic';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const D = (col) => `to_char(${col}, 'YYYY-MM-DD')`;
-
-async function loadAll(client) {
-  const [accounts, sales, transfers, adjustments] = await Promise.all([
-    client.query(`SELECT id, name, kind, starting_balance::float AS starting_balance, ${D('starting_date')} AS starting_date, active, sort_order
-                    FROM payment_accounts ORDER BY sort_order ASC, id ASC`),
-    client.query(`SELECT account_id, ${D('entry_date')} AS entry_date, amount::float AS amount FROM account_sales`),
-    client.query(`SELECT id, from_account_id, to_account_id, ${D('transfer_date')} AS transfer_date, amount::float AS amount, charge::float AS charge, note, created_at FROM account_transfers`),
-    client.query(`SELECT id, account_id, ${D('adj_date')} AS adj_date, amount::float AS amount, note, created_at FROM account_adjustments`),
-  ]);
-  return { accounts: accounts.rows, data: { sales: sales.rows, transfers: transfers.rows, adjustments: adjustments.rows } };
-}
-
 // GET /api/payment-accounts?date=YYYY-MM-DD  (default: today)
 // Every account with its balance at the end of `date`, the balance at the start of that day, and what moved on that
 // day — plus the latest movements (sales into accounts, transfers, corrections). Returns an empty list (not an error)
@@ -35,7 +23,11 @@ export async function GET(request) {
 
     const list = accounts.map((a) => {
       const s = summarizeAccount(a, data, day);
-      return { ...a, balance: s.closing, opening: s.opening, todaySales: s.sales, todayTransfersNet: s.transfersNet, todayAdjustments: s.adjustments };
+      const relayDay = a.kind === 'bkash' ? data.relay.filter((r) => r.date === day) : [];
+      return {
+        ...a, balance: s.closing, opening: s.opening, todaySales: s.sales, todayTransfersNet: s.transfersNet, todayAdjustments: s.adjustments,
+        relayFrom: a.relay_from, relayDayCount: relayDay.length, relayDayTotal: Math.round(relayDay.reduce((n, r) => n + r.amount, 0) * 100) / 100,
+      };
     });
 
     // What transfers did to cash in hand on `day` (cash is not an account row, so it is reported separately).
@@ -47,11 +39,18 @@ export async function GET(request) {
     }
     cashTransfersNetToday = Math.round(cashTransfersNetToday * 100) / 100;
 
+    // bKash relay payments belong to the (first active) bKash account; they count only from that account's relay_from.
+    const relayAccount = accounts.find((a) => a.kind === 'bkash' && a.active) || accounts.find((a) => a.kind === 'bkash');
     const movements = [
       ...data.sales.map((s) => ({ type: 'sale', date: s.entry_date, sortKey: `${s.entry_date}|0`, account: name(s.account_id), amount: s.amount })),
       ...data.transfers.map((t) => ({ type: 'transfer', id: t.id, date: t.transfer_date, sortKey: `${t.transfer_date}|1|${String(t.id).padStart(8, '0')}`, from: name(t.from_account_id), to: name(t.to_account_id), amount: t.amount, charge: t.charge, note: t.note })),
+      ...(relayAccount ? data.relay.map((r) => ({
+        type: 'relay', id: r.id, date: r.date, sortKey: `${r.date}|3|${new Date(r.occurred_at).toISOString()}`, account: relayAccount.name,
+        amount: r.amount, sender: r.sender, operator: r.sender_operator, time: r.time,
+        counted: !!relayAccount.relay_from && r.date >= relayAccount.relay_from,
+      })) : []),
       ...data.adjustments.map((a) => ({ type: 'adjustment', id: a.id, date: a.adj_date, sortKey: `${a.adj_date}|2|${String(a.id).padStart(8, '0')}`, account: name(a.account_id), amount: a.amount, note: a.note })),
-    ].sort((x, y) => y.sortKey.localeCompare(x.sortKey)).slice(0, 60);
+    ].sort((x, y) => y.sortKey.localeCompare(x.sortKey)).slice(0, 80);
 
     return NextResponse.json({ date: day, enabledFrom: ACCOUNTS_START_DATE, accounts: list, cashTransfersNetToday, movements });
   } catch (err) {

@@ -323,6 +323,17 @@ function EntryPageInner() {
       .catch(() => { if (alive) setAccounts([]); });
     return () => { alive = false; };
   }, [date, accountsUrl]);
+  // bKash payments the phone relay received on this day (shown beside the bKash amount; the typed amount stays yours to set).
+  const [relayDay, setRelayDay] = useState({ payments: [], total: 0 });
+  const hasBkash = accounts.some((a) => a.kind === 'bkash');
+  useEffect(() => {
+    if (!accountsEnabledFor(date) || !hasBkash) { setRelayDay({ payments: [], total: 0 }); return undefined; }
+    let alive = true;
+    fetch(`/api/payment-accounts/relay?date=${date}`).then((r) => r.json())
+      .then((d) => { if (alive) setRelayDay({ payments: d.payments || [], total: d.total || 0 }); })
+      .catch(() => { if (alive) setRelayDay({ payments: [], total: 0 }); });
+    return () => { alive = false; };
+  }, [date, hasBkash]);
   const digitalTotal = accounts.reduce((n, a) => n + (Number(accountSales[a.id]) || 0), 0);
 
   // The opening balance for `date`: yesterday's closing if it's tracked,
@@ -828,6 +839,26 @@ function EntryPageInner() {
                       <div className="field" key={a.id}>
                         <label>{a.name} (৳)</label>
                         <NumberInput value={accountSales[a.id] ?? ''} min={0} onValueChange={(n) => setAccountSales((prev) => ({ ...prev, [a.id]: n ?? '' }))} />
+                        {a.kind === 'bkash' && (
+                          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text3)' }}>
+                            <div>{t('bKash payments received this day (relay)')}</div>
+                            {relayDay.payments.length === 0 ? <div>{t('No relay payments recorded for this day.')}</div> : (
+                              <>
+                                {relayDay.payments.map((p) => (
+                                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                                    <span>{p.time} · {p.sender} ({p.operator})</span><span style={{ fontFamily: 'var(--mono)' }}>{taka(p.amount)}</span>
+                                  </div>
+                                ))}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                  <strong>{taka(relayDay.total)}</strong>
+                                  <button type="button" className="btn secondary btn-small"
+                                    disabled={Number(accountSales[a.id]) === relayDay.total}
+                                    onClick={() => setAccountSales((prev) => ({ ...prev, [a.id]: relayDay.total }))}>{t('Use this total')}</button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </>

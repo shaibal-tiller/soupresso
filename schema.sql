@@ -830,3 +830,9 @@ CREATE TABLE IF NOT EXISTS bkash_transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_bkash_transactions_occurred ON bkash_transactions (occurred_at DESC);
 -- END bkash-transactions
+
+-- BEGIN bkash-relay-cutover
+-- 2026-10-08: the date (Asia/Dhaka) from which an account's balance counts bKash relay payments instead of the sales
+-- typed in the daily entry. NULL = relay payments are only recorded (testing). Set by Reconcile on the bKash account.
+ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS relay_from DATE;
+-- END bkash-relay-cutover

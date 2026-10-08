@@ -103,13 +103,72 @@ function AdjustForm({ ctx, account }) {
 }
 
 
+function ReconcileForm({ ctx, account }) {
+  const { t, taka, busy, error, call, cancel } = ctx;
+  const [actual, setActual] = useState('');
+  const [check, setCheck] = useState(null); // result of the compare step
+  const [note, setNote] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [err, setErr] = useState(null);
+
+  async function compare() {
+    setChecking(true); setErr(null);
+    try {
+      const res = await fetch(`${URL_ACCOUNTS}/reconcile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId: account.id, actualBalance: actual }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || t('Save failed.'));
+      setCheck(out);
+    } catch (e) { setErr(e.message); setCheck(null); }
+    finally { setChecking(false); }
+  }
+  const diff = check?.difference ?? 0;
+  const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${taka(Math.abs(n))}`;
+  return (
+    <div className="card">
+      <div className="card-title">{t('Reconcile')} — {account.name}</div>
+      <p className="step-hint">{t('Type the balance bKash really shows now. The app compares it with its own number; nothing is changed until you confirm.')}</p>
+      <div className="field"><label>{t('Actual bKash balance (৳)')}</label>
+        <NumberInput value={actual} onValueChange={(n) => { setActual(n == null ? '' : String(n)); setCheck(null); }} /></div>
+      <button className="btn secondary" disabled={checking || actual === ''} onClick={compare}>{checking ? t('Checking…') : t('Check')}</button>
+      {check && (
+        <div style={{ marginTop: 12 }}>
+          <div className="step-result"><span>{t('Ledger balance')}</span><strong>{taka(check.ledger)}</strong></div>
+          <div className="step-result"><span>{t('Actual bKash balance')}</span><strong>{taka(check.actual)}</strong></div>
+          <div className={`insight ${diff === 0 ? 'green' : ''}`} style={{ marginTop: 8 }}>
+            {diff === 0 ? <b>✓ {t('Reconciled')}</b> : <b>⚠ {t('Difference')}: {signed(diff)}</b>}
+          </div>
+          {check.startsRelay && (
+            <p className="step-hint" style={{ marginTop: 8 }}>
+              {t('Confirming starts counting bKash relay payments from today. Earlier relay payments stay recorded but are not counted, and the bKash amount typed in the daily entry from today no longer changes this balance.')}
+            </p>
+          )}
+          {diff !== 0 && (
+            <div className="field" style={{ marginTop: 8 }}><label>{t('Reason for the difference (required)')}</label>
+              <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('e.g. unrecorded cash-in')} /></div>
+          )}
+        </div>
+      )}
+      {(err || error) && <div className="status-msg err">{err || error}</div>}
+      <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+        <button className="btn secondary" onClick={() => cancel()}>{t('Cancel')}</button>
+        {check && (check.startsRelay || diff !== 0) && (
+          <button className="btn" disabled={busy || (diff !== 0 && !note.trim())}
+            onClick={() => call(`${URL_ACCOUNTS}/reconcile`, 'POST', { accountId: account.id, actualBalance: actual, confirm: true, difference: diff, note })}>
+            {busy ? t('Saving…') : diff !== 0 ? t('Add correction & confirm') : t('Confirm')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Cash in Hand's sibling accounts (bKash merchant, City Bank, …): balances, transfers between them and cash,
 // corrections, and a feed of what moved. Cash stays the ledger below; moves that involve cash are applied to it
 // by the API, so after one of those the page reloads the ledger (onCashChanged).
 export default function Accounts({ cashBalance, onCashChanged }) {
   const { t, taka, dateNice } = useLang();
   const [data, setData] = useState(null);
-  const [panel, setPanel] = useState(null); // null | 'add' | 'transfer' | { adjust: accountId }
+  const [panel, setPanel] = useState(null); // null | 'add' | 'transfer' | { adjust: accountId } | { reconcile: accountId }
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -143,6 +202,7 @@ export default function Accounts({ cashBalance, onCashChanged }) {
   // handed to the forms, which live outside this component so a re-render here never wipes what was typed
   const ctx = { t, taka, accounts, active, defaultStart, busy, error, call, cancel: () => setPanel(null) };
   const adjustAccount = panel && panel.adjust ? accounts.find((a) => a.id === panel.adjust) : null;
+  const reconcileAccount = panel && panel.reconcile ? accounts.find((a) => a.id === panel.reconcile) : null;
   const moves = data?.movements || [];
   const shown = showAll ? moves : moves.slice(0, 8);
 
@@ -166,7 +226,18 @@ export default function Accounts({ cashBalance, onCashChanged }) {
                   {a.active ? t('Deactivate') : t('Activate')}
                 </button>
                 <button type="button" className="btn secondary btn-small" onClick={() => { setError(null); setPanel({ adjust: a.id }); }}>{t('Correct')}</button>
+                {a.kind === 'bkash' && a.active && (
+                  <button type="button" className="btn btn-small" onClick={() => { setError(null); setPanel({ reconcile: a.id }); }}>{t('Reconcile')}</button>
+                )}
               </div>
+              {a.kind === 'bkash' && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+                  {a.relayFrom
+                    ? <>{t('Relay payments count from')} {dateNice(a.relayFrom)}</>
+                    : <>{t('Relay testing: payments are recorded but not counted yet')}</>}
+                  {a.relayDayCount > 0 && <> · {t('today')}: {a.relayDayCount} · {taka(a.relayDayTotal)}</>}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -186,6 +257,7 @@ export default function Accounts({ cashBalance, onCashChanged }) {
       {panel === 'add' && <AddForm ctx={ctx} />}
       {panel === 'transfer' && <TransferForm ctx={ctx} />}
       {adjustAccount && <AdjustForm ctx={ctx} account={adjustAccount} />}
+      {reconcileAccount && <ReconcileForm ctx={ctx} account={reconcileAccount} />}
 
       {moves.length > 0 && (
         <div className="card">
@@ -199,11 +271,16 @@ export default function Accounts({ cashBalance, onCashChanged }) {
                     {m.type === 'sale' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('sales')}</span></>}
                     {m.type === 'transfer' && <>{m.from} → {m.to}{m.charge > 0 && <span style={{ color: 'var(--text3)' }}> ({t('charge')} {taka(m.charge)})</span>}{m.note && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{m.note}</div>}</>}
                     {m.type === 'adjustment' && <>{m.account} <span style={{ color: 'var(--text3)' }}>{t('correction')}: {m.note}</span></>}
+                    {m.type === 'relay' && (
+                      <span style={{ opacity: m.counted ? 1 : 0.6 }}>
+                        {m.account} <span style={{ color: 'var(--text3)' }}>{t('received')} · {m.sender} ({m.operator}) · {m.time}{m.counted ? '' : ` · ${t('not counted yet')}`}</span>
+                      </span>
+                    )}
                   </td>
                   <td style={{ fontFamily: 'var(--mono)', textAlign: 'right', color: m.type === 'adjustment' && m.amount < 0 ? 'var(--red)' : undefined }}>
-                    {m.type === 'sale' ? '+' : m.type === 'adjustment' && m.amount > 0 ? '+' : ''}{taka(m.amount)}
+                    {m.type === 'sale' || m.type === 'relay' ? '+' : m.type === 'adjustment' && m.amount > 0 ? '+' : ''}{taka(m.amount)}
                   </td>
-                  <td>{m.type !== 'sale' && <button type="button" className="btn secondary btn-small" onClick={() => removeMove(m)} aria-label={t('Delete')}>✕</button>}</td>
+                  <td>{m.type !== 'sale' && m.type !== 'relay' && <button type="button" className="btn secondary btn-small" onClick={() => removeMove(m)} aria-label={t('Delete')}>✕</button>}</td>
                 </tr>
               ))}
             </tbody>
