@@ -92,6 +92,7 @@ export async function POST(request) {
     nextBazarAdvance,
     nextBhangti,
     nextBhangtiDenominations,
+    bhangtiFromHome,
     notes,
     isOffDay,
     closedBy,
@@ -111,7 +112,7 @@ export async function POST(request) {
 
   const closedByArr = Array.isArray(closedBy) ? closedBy.filter((n) => typeof n === 'string') : [];
 
-  const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, bazarTakenFromBox, nextBazarAdvance, nextBhangti };
+  const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, bazarTakenFromBox, nextBazarAdvance, nextBhangti, bhangtiFromHome };
   for (const [key, val] of Object.entries(nums)) {
     if (coerceLocaleNumber(val) == null && val !== '' && val != null) {
       return NextResponse.json({ error: `${key} must be a number` }, { status: 400 });
@@ -183,9 +184,9 @@ export async function POST(request) {
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
          bazar_advance_received, bazar_actual_cost, bazar_taken_from_box, next_bazar_advance, next_bhangti,
-         next_bhangti_denominations, digital_sales,
+         next_bhangti_denominations, bhangti_from_home, digital_sales,
          total_sales, bazar_variance, cash_taken_home, is_off_day, notes, closed_by, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, now())
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -196,6 +197,7 @@ export async function POST(request) {
          next_bazar_advance = EXCLUDED.next_bazar_advance,
          next_bhangti = EXCLUDED.next_bhangti,
          next_bhangti_denominations = EXCLUDED.next_bhangti_denominations,
+         bhangti_from_home = EXCLUDED.bhangti_from_home,
          baki_given = 0,      -- credit-sale tracking was removed 2026-10-04; a re-saved day no longer carries it
          baki_received = 0,
          digital_sales = EXCLUDED.digital_sales,
@@ -218,6 +220,7 @@ export async function POST(request) {
         coerceLocaleNumber(nextBazarAdvance) ?? 0,
         coerceLocaleNumber(nextBhangti) ?? 0,
         nextBhangtiDenominations ? JSON.stringify(nextBhangtiDenominations) : null,
+        coerceLocaleNumber(bhangtiFromHome) ?? 0,
         digitalTotal,
         Math.round((summary.totalSales + digitalTotal) * 100) / 100,
         summary.bazarVariance,
@@ -244,7 +247,7 @@ export async function POST(request) {
     // tracking isn't active yet, or this day is already confirmed/frozen).
     // Never blocks the entry save itself on a ledger hiccup.
     try {
-      await upsertLedgerForEntry({ query }, entryDate, summary.cashTakenHome);
+      await upsertLedgerForEntry({ query }, entryDate, summary.cashTakenHome, coerceLocaleNumber(bhangtiFromHome) ?? 0);
     } catch (ledgerErr) {
       console.error('cash-in-hand ledger update failed:', ledgerErr.message);
     }

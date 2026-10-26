@@ -128,6 +128,7 @@ function EntryPageInner() {
   const [denoms, setDenoms] = useState(emptyDenoms());
   const [totalDirect, setTotalDirect] = useState('');
   const [openingBhangti, setOpeningBhangti] = useState(0);
+  const [bhangtiFromHome, setBhangtiFromHome] = useState(0);
   const [bazarAdvanceReceived, setBazarAdvanceReceived] = useState(0);
   const [bazarTakenFromBox, setBazarTakenFromBox] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
@@ -220,6 +221,7 @@ function EntryPageInner() {
           setTotalDirect(String(e.total_counted));
         }
         setOpeningBhangti(Number(e.opening_bhangti));
+        setBhangtiFromHome(Number(e.bhangti_from_home) || 0);
         setBazarAdvanceReceived(Number(e.bazar_advance_received));
         setBazarTakenFromBox(Number(e.bazar_taken_from_box) || 0);
         setNextBhangti(Number(e.next_bhangti));
@@ -271,6 +273,7 @@ function EntryPageInner() {
         setNotes('');
         setClosedBy([]);
         setAccountSales({});
+        setBhangtiFromHome(0);
         setActualBazarAdjustment(0);
         setActualSimpleAmount(0);
         setNextBazarAdjustment(0);
@@ -443,6 +446,7 @@ function EntryPageInner() {
             nextBazarAdvance: isOffDay ? 0 : effectiveNextBazarAdvance,
             nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
             nextBhangtiDenominations: isOffDay ? null : nextBhangtiDenominationsPayload,
+            bhangtiFromHome: isOffDay ? 0 : (Number(bhangtiFromHome) || 0),
             notes: isOffDay ? (notes || 'Shop closed') : notes,
             closedBy: isOffDay ? [] : closedBy,
             accountSales: isOffDay ? [] : accounts.map((a) => ({ accountId: a.id, amount: Number(accountSales[a.id]) || 0 })).filter((r) => r.amount > 0),
@@ -523,7 +527,7 @@ function EntryPageInner() {
       try {
         localStorage.setItem(draftKey(date), JSON.stringify({
           savedAt: Date.now(),
-          isOffDay, mode, denoms, totalDirect, openingBhangti,
+          isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
           bazarAdvanceReceived, bazarTakenFromBox,
           actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
           plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
@@ -534,7 +538,7 @@ function EntryPageInner() {
     }, 400);
     return () => clearTimeout(timer);
   }, [
-    editing, viewOnly, date, isOffDay, mode, denoms, totalDirect, openingBhangti,
+    editing, viewOnly, date, isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
     bazarAdvanceReceived, bazarTakenFromBox,
     actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
     plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
@@ -550,6 +554,7 @@ function EntryPageInner() {
     setDenoms({ ...emptyDenoms(), ...(d.denoms || {}) });
     setTotalDirect(d.totalDirect || '');
     setOpeningBhangti(d.openingBhangti ?? 0);
+    setBhangtiFromHome(d.bhangtiFromHome ?? 0);
     setBazarAdvanceReceived(d.bazarAdvanceReceived ?? 0);
     setBazarTakenFromBox(d.bazarTakenFromBox ?? 0);
     setActualEntryMode(d.actualEntryMode || 'items');
@@ -818,6 +823,11 @@ function EntryPageInner() {
                   </div>
                 )}
                 <div className="step-result"><span>{t('Total counted')}</span><strong>{taka(totalCounted)}</strong></div>
+                <div className="field" style={{ marginTop: 14 }}>
+                  <label>{t('Fresh bhangti from Cash in Hand (৳)')}</label>
+                  <NumberInput value={bhangtiFromHome || ''} min={0} onValueChange={(n) => setBhangtiFromHome(n ?? 0)} placeholder="0" />
+                  <p className="step-hint">{t('Only enter if you brought fresh change from home today to put in the box. This will deduct from Cash in Hand.')}</p>
+                </div>
               </div>
             )}
 
@@ -1055,10 +1065,13 @@ function EntryPageInner() {
                 {cashInHandOpening != null && (
                   <div className="step-calc" style={{ marginTop: 10 }}>
                     <div className="calc-row"><span>{t('Cash in Hand (opening)')}</span><span>{taka(cashInHandOpening)}</span></div>
+                    {(Number(bhangtiFromHome) || 0) > 0 && (
+                      <div className="calc-row"><span>{t('− Fresh bhangti put in box')}</span><span style={{ color: 'var(--red)' }}>−{taka(Number(bhangtiFromHome))}</span></div>
+                    )}
                     <div className={`calc-row result`}>
                       <span>{t('Cash in Hand (after today)')}</span>
-                      <span className={cashInHandOpening + summary.cashTakenHome + cashTransfersToday >= 0 ? 'g' : 'r'}>
-                        {taka(cashInHandOpening + summary.cashTakenHome + cashTransfersToday)}
+                      <span className={cashInHandOpening + summary.cashTakenHome + cashTransfersToday - (Number(bhangtiFromHome) || 0) >= 0 ? 'g' : 'r'}>
+                        {taka(cashInHandOpening + summary.cashTakenHome + cashTransfersToday - (Number(bhangtiFromHome) || 0))}
                       </span>
                     </div>
                   </div>
@@ -1069,14 +1082,14 @@ function EntryPageInner() {
                     const extra = (a.todayTransfersNet || 0) + (a.todayAdjustments || 0); // transfers / corrections already saved for this day
                     return { a, before: a.opening, add, extra, after: a.opening + add + extra };
                   });
-                  const cashAfter = cashInHandOpening != null ? cashInHandOpening + summary.cashTakenHome + cashTransfersToday : null;
+                  const cashAfter = cashInHandOpening != null ? cashInHandOpening + summary.cashTakenHome + cashTransfersToday - (Number(bhangtiFromHome) || 0) : null;
                   const allTogether = rows.reduce((n, r) => n + r.after, 0) + (cashAfter ?? 0);
                   return (
                     <>
                       <div className="review-section">{t('Where the money is after today')}</div>
                       <div className="step-calc">
                         {cashAfter != null && (
-                          <div className="calc-row"><span>{t('Cash in Hand')}</span><span>{taka(cashInHandOpening)} + {taka(summary.cashTakenHome)}{cashTransfersToday !== 0 ? ` ${cashTransfersToday > 0 ? '+' : '−'} ${taka(Math.abs(cashTransfersToday))} ${t('transfers')}` : ''} = {taka(cashAfter)}</span></div>
+                          <div className="calc-row"><span>{t('Cash in Hand')}</span><span>{taka(cashInHandOpening)} + {taka(summary.cashTakenHome)}{(Number(bhangtiFromHome) || 0) > 0 ? ` − ${taka(Number(bhangtiFromHome))} ${t('bhangti')}` : ''}{cashTransfersToday !== 0 ? ` ${cashTransfersToday > 0 ? '+' : '−'} ${taka(Math.abs(cashTransfersToday))} ${t('transfers')}` : ''} = {taka(cashAfter)}</span></div>
                         )}
                         {rows.map((r) => (
                           <div className="calc-row" key={r.a.id}>

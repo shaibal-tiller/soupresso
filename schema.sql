@@ -851,3 +851,9 @@ ALTER TABLE bkash_transactions ADD COLUMN IF NOT EXISTS time_known BOOLEAN NOT N
 ALTER TABLE bkash_transactions ALTER COLUMN notification_id DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bkash_transactions_trx_id ON bkash_transactions (trx_id) WHERE trx_id IS NOT NULL;
 -- END bkash-history
+
+-- BEGIN bhangti-from-home
+-- 2026-10-26: cash brought from Cash in Hand (home) and added to the shop box as starting change.
+-- Reduces Cash in Hand for that day: day_delta = cash_taken_home - bhangti_from_home.
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS bhangti_from_home NUMERIC(12,2) NOT NULL DEFAULT 0;
+-- END bhangti-from-home
