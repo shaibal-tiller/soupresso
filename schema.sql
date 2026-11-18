@@ -52,6 +52,19 @@ CREATE TABLE IF NOT EXISTS daily_product_sales (
 
 CREATE INDEX IF NOT EXISTS idx_daily_entries_date ON daily_entries (entry_date DESC);
 
+-- In-progress Daily Entry drafts. One row per entry date: saving again replaces
+-- the previous draft. Rows are deleted when the entry is saved/discarded, and
+-- cleaned up once they are outside the editable window or 72 hours old.
+CREATE TABLE IF NOT EXISTS entry_drafts (
+  entry_date   DATE PRIMARY KEY,
+  payload      JSONB NOT NULL,
+  device_id    TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entry_drafts_updated_at ON entry_drafts (updated_at);
+
 -- Seed menu items (from Soupresso's current menu — edit anytime from the Products tab)
 INSERT INTO menu_items (name, price, sort_order) VALUES
   ('Thai Soup (Chicken & Mushroom)', 60, 1),

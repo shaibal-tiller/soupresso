@@ -8,7 +8,15 @@ import NumberInput from '../NumberInput';
 import BazarItemPicker from '../BazarItemPicker';
 import DatePicker from '../DatePicker';
 import { computeCashSummary, denominationTotal, STANDARD_DENOMINATIONS } from '@/lib/cash-math';
-import { todayStr, shiftDateStr, isEntryEditable, ENTRY_EDIT_WINDOW_DAYS } from '@/lib/dates';
+import {
+  todayStr,
+  shiftDateStr,
+  isEntryEditable,
+  isDraftDateAvailable,
+  ENTRY_EDIT_WINDOW_DAYS,
+  DRAFT_WINDOW_DAYS,
+  DRAFT_RETENTION_HOURS,
+} from '@/lib/dates';
 import { DATA_START } from '@/lib/periods';
 import { accountsEnabledFor } from '@/lib/accounts';
 import { cachedFetchJson, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
@@ -89,8 +97,87 @@ function emptyDenoms() {
   return Object.fromEntries(STANDARD_DENOMINATIONS.map((d) => [d, 0]));
 }
 
+const DRAFT_KEY_PREFIX = 'soupresso-entry-draft:';
+
 function draftKey(d) {
-  return `soupresso-entry-draft:${d}`;
+  return `${DRAFT_KEY_PREFIX}${d}`;
+}
+
+function readLocalDraft(d) {
+  try {
+    const raw = localStorage.getItem(draftKey(d));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(d, payload) {
+  try {
+    localStorage.setItem(draftKey(d), JSON.stringify(payload));
+  } catch {}
+}
+
+function removeLocalDraft(d) {
+  try { localStorage.removeItem(draftKey(d)); } catch {}
+}
+
+function cleanupExpiredLocalDrafts() {
+  try {
+    const today = todayStr();
+    const cutoff = shiftDateStr(today, -DRAFT_WINDOW_DAYS);
+    const maxAgeMs = DRAFT_RETENTION_HOURS * 60 * 60 * 1000;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(DRAFT_KEY_PREFIX)) continue;
+      const d = key.slice(DRAFT_KEY_PREFIX.length);
+      let savedAt = 0;
+      try { savedAt = Number(JSON.parse(localStorage.getItem(key))?.savedAt) || 0; } catch {}
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(d) ||
+        d < cutoff ||
+        d > today ||
+        (savedAt > 0 && Date.now() - savedAt > maxAgeMs)
+      ) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {}
+}
+
+async function fetchServerDraft(d) {
+  try {
+    const res = await fetch(`/api/entry-drafts?date=${d}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.draft || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveServerDraft(d, payload) {
+  const res = await fetch('/api/entry-drafts', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entryDate: d, payload }),
+  });
+  if (!res.ok) throw new Error('Could not save draft');
+  const data = await res.json();
+  const saved = data.draft;
+  // Keep the local copy's server timestamp so this device can tell whether a
+  // draft from another device is newer when the day is opened again.
+  try {
+    const current = readLocalDraft(d);
+    if (current && Number(current.savedAt) === Number(payload.savedAt)) {
+      writeLocalDraft(d, { ...current, serverUpdatedAt: saved.updated_at });
+    }
+  } catch {}
+  return saved;
+}
+
+async function deleteServerDraft(d) {
+  await fetch(`/api/entry-drafts?date=${d}`, { method: 'DELETE' });
 }
 
 const TOTAL_STEPS = 6;
@@ -123,6 +210,7 @@ function EntryPageInner() {
   const [cashTransfersToday, setCashTransfersToday] = useState(0); // net effect on cash of transfers already saved for this day
   const [viewOnly, setViewOnly] = useState(false); // opened the wizard from a locked day: read-only, nothing can be saved
   const editable = isEntryEditable(date, todayStr()); // older days are locked — corrections go through SQL
+  const draftAvailable = isDraftDateAvailable(date, todayStr());
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState('denom');
   const [denoms, setDenoms] = useState(emptyDenoms());
@@ -153,7 +241,7 @@ function EntryPageInner() {
   const [hadExistingEntry, setHadExistingEntry] = useState(false);
   const [existingEntry, setExistingEntry] = useState(null); // raw entry for the summary card
   const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingDraft, setPendingDraft] = useState(null); // draft found in localStorage for the loaded date, awaiting restore/discard
+  const [pendingDraft, setPendingDraft] = useState(null); // newest draft for the loaded date (device or server), awaiting restore/discard
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const pendingActionRef = useRef(null); // navigation/reset to run if the user confirms discarding unsaved edits
   const requestRef = useRef(0); // guards against an older date's slow response clobbering a newer one
@@ -176,13 +264,14 @@ function EntryPageInner() {
       // session instead of refetching on every date change; the four
       // date-scoped requests get the same cache-then-revalidate treatment,
       // which also means a prefetched adjacent day resolves instantly here.
-      const [data, actualData, plannedForTodayData, plannedForTomorrowData, catalogData, recurringData] = await Promise.all([
+      const [data, actualData, plannedForTodayData, plannedForTomorrowData, catalogData, recurringData, serverDraft] = await Promise.all([
         cachedFetchJson(entryUrl(d)),
         cachedFetchJson(bazarPlanUrl(d, 'actual')),
         cachedFetchJson(bazarPlanUrl(d, 'planned')),
         cachedFetchJson(bazarPlanUrl(tomorrow, 'planned')),
         cachedFetchJson(BAZAR_ITEMS_URL),
         cachedFetchJson(BAZAR_RECURRING_URL),
+        fetchServerDraft(d),
       ]);
       if (requestRef.current !== requestId) return; // a newer date was picked meanwhile — discard this whole response
       const catalog = catalogData.items || [];
@@ -287,11 +376,32 @@ function EntryPageInner() {
           setBazarAdvanceReceived(0);
         }
       }
-      try {
-        const rawDraft = localStorage.getItem(draftKey(d));
-        setPendingDraft(rawDraft ? JSON.parse(rawDraft) : null);
-      } catch {
-        setPendingDraft(null);
+      // Prefer whichever draft was saved most recently: this device's copy or
+      // the server copy (which may have come from another device).
+      const draftOk = isDraftDateAvailable(d, todayStr());
+      const localDraft = draftOk ? readLocalDraft(d) : null;
+      if (!draftOk) removeLocalDraft(d);
+
+      if (draftOk && serverDraft) {
+        const serverPayload = {
+          ...(serverDraft.payload || {}),
+          savedAt: Date.parse(serverDraft.updated_at) || Date.now(),
+          serverUpdatedAt: serverDraft.updated_at,
+          source: 'server',
+        };
+        const localAt = Math.max(
+          Date.parse(localDraft?.serverUpdatedAt) || 0,
+          Number(localDraft?.savedAt) || 0
+        );
+        const serverAt = Date.parse(serverDraft.updated_at) || 0;
+        if (!localDraft || serverAt >= localAt) {
+          writeLocalDraft(d, serverPayload);
+          setPendingDraft(serverPayload);
+        } else {
+          setPendingDraft({ ...localDraft, source: 'local' });
+        }
+      } else {
+        setPendingDraft(localDraft ? { ...localDraft, source: 'local' } : null);
       }
     } catch {
       if (requestRef.current === requestId) setMsg({ type: 'err', text: t('Could not load this day.') });
@@ -305,6 +415,9 @@ function EntryPageInner() {
   }, []);
 
   useEffect(() => { load(date); }, [date, load]);
+
+  // Drop local drafts once they fall outside the editable window or are 72h old.
+  useEffect(() => { cleanupExpiredLocalDrafts(); }, []);
 
   // Previous day's cash-in-hand closing balance — used only to project
   // today's running balance live on the Review step (null = not tracked).
@@ -413,6 +526,18 @@ function EntryPageInner() {
   // Total sales = what the box shows + what went into accounts. Cash taken home only ever depends on the box.
   const totalSalesAll = summary.totalSales + digitalTotal;
 
+  function makeDraftPayload() {
+    return {
+      savedAt: Date.now(),
+      isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
+      bazarAdvanceReceived, bazarTakenFromBox,
+      actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
+      plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
+      nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
+      notes, closedBy, step, accountSales,
+    };
+  }
+
   function bazarPlanPayload(forDate, kind, lines) {
     return fetch('/api/bazar-plan', {
       method: 'POST',
@@ -462,7 +587,8 @@ function EntryPageInner() {
         setMsg({ type: 'ok', text: t('Saved successfully!') });
         setHadExistingEntry(true);
         setEditing(false);
-        try { localStorage.removeItem(draftKey(date)); } catch {}
+        removeLocalDraft(date);
+        try { await deleteServerDraft(date); } catch {}
         // These three URLs were just overwritten by the saves above — drop
         // them from the cache so the reload below can't show pre-save data.
         invalidateCache(entryUrl(date));
@@ -492,9 +618,24 @@ function EntryPageInner() {
     }
   }
 
-  function confirmDiscard() {
+  async function saveDraftAndRun() {
     setShowDiscardConfirm(false);
-    try { localStorage.removeItem(draftKey(date)); } catch {}
+    const d = date;
+    if (draftAvailable) {
+      const payload = makeDraftPayload();
+      writeLocalDraft(d, payload);
+      try { await saveServerDraft(d, payload); } catch {}
+    }
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (action) action();
+  }
+
+  async function confirmDiscard() {
+    setShowDiscardConfirm(false);
+    const d = date;
+    removeLocalDraft(d);
+    try { await deleteServerDraft(d); } catch {}
     const action = pendingActionRef.current;
     pendingActionRef.current = null;
     if (action) action();
@@ -519,26 +660,21 @@ function EntryPageInner() {
   }, [editing, viewOnly]);
 
   // Draft safety net: while editing, debounce-save the whole wizard's state
-  // to localStorage so a crash, accidental discard, or closed tab doesn't
-  // lose the entry outright — load() picks it back up as `pendingDraft`.
+  // to this device and the server. The server copy lets another device pick
+  // up the same draft; one row per date, replaced on every save.
   useEffect(() => {
-    if (!editing || viewOnly) return;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(draftKey(date), JSON.stringify({
-          savedAt: Date.now(),
-          isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
-          bazarAdvanceReceived, bazarTakenFromBox,
-          actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
-          plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
-          nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
-          notes, closedBy, step, accountSales,
-        }));
-      } catch {}
-    }, 400);
-    return () => clearTimeout(timer);
+    if (!editing || viewOnly || !draftAvailable) return;
+    const payload = makeDraftPayload();
+    const localTimer = setTimeout(() => writeLocalDraft(date, payload), 400);
+    const serverTimer = setTimeout(() => {
+      saveServerDraft(date, payload).catch(() => {});
+    }, 1000);
+    return () => {
+      clearTimeout(localTimer);
+      clearTimeout(serverTimer);
+    };
   }, [
-    editing, viewOnly, date, isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
+    editing, viewOnly, draftAvailable, date, isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
     bazarAdvanceReceived, bazarTakenFromBox,
     actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
     plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
@@ -577,9 +713,11 @@ function EntryPageInner() {
     setEditing(true);
   }
 
-  function discardDraftPrompt() {
-    try { localStorage.removeItem(draftKey(date)); } catch {}
+  async function discardDraftPrompt() {
+    const d = date;
+    removeLocalDraft(d);
     setPendingDraft(null);
+    try { await deleteServerDraft(d); } catch {}
   }
 
   // Swipe navigation for the wizard steps (touch only — mouse/desktop use the
@@ -661,8 +799,8 @@ function EntryPageInner() {
           <div className="wizard-body">
             {pendingDraft && (
               <div className="insight amber">
-                <b>{t('Unsaved draft found for this day')}</b>
-                <p style={{ margin: '4px 0 10px' }}>{t("You have changes here that were never saved — from a previous session that didn't finish.")}</p>
+                <b>{t('Draft found for this day')}</b>
+                <p style={{ margin: '4px 0 10px' }}>{t('A saved draft for this day was found on this device or another device. Restore it to continue where you left off, or discard it.')}</p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button className="btn secondary" onClick={discardDraftPrompt}>{t('Discard draft')}</button>
                   <button className="btn" onClick={restoreDraft}>{t('Restore draft')}</button>
@@ -677,9 +815,11 @@ function EntryPageInner() {
                   <h3 style={{ color: 'var(--text)', marginBottom: 4 }}>{t('Shop was closed')}</h3>
                   {existingEntry.notes && <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{existingEntry.notes}</p>}
                   {editable ? (
-                    <button className="btn secondary" onClick={() => { setEditing(true); }} style={{ marginTop: 8 }}>
-                      ✎ {t('Edit this day')}
-                    </button>
+                    !pendingDraft && (
+                      <button className="btn secondary" onClick={() => { setEditing(true); }} style={{ marginTop: 8 }}>
+                        ✎ {t('Edit this day')}
+                      </button>
+                    )
                   ) : (
                     <p className="step-hint" style={{ marginTop: 8 }}>
                       🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
@@ -710,9 +850,11 @@ function EntryPageInner() {
                     </div>
                   )}
                   {editable ? (
-                    <button className="btn secondary block" onClick={() => setEditing(true)} style={{ marginTop: 16 }}>
-                      ✎ {t('Edit this entry')}
-                    </button>
+                    !pendingDraft && (
+                      <button className="btn secondary block" onClick={() => setEditing(true)} style={{ marginTop: 16 }}>
+                        ✎ {t('Edit this entry')}
+                      </button>
+                    )
                   ) : (
                     <>
                       <button className="btn secondary block" onClick={() => { setViewOnly(true); setEditing(true); setStep(0); }} style={{ marginTop: 16 }}>
@@ -735,14 +877,16 @@ function EntryPageInner() {
                 </p>
                 {carryForwardFrom && <div className="wizard-badge carry" style={{ marginBottom: 16 }}>{t('Carried forward from')} {dateNice(carryForwardFrom)}</div>}
                 {editable ? (
-                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
-                      ＋ {t('Start entry')}
-                    </button>
-                    <button className="btn secondary" onClick={() => { setEditing(true); setIsOffDay(true); }}>
-                      🚫 {t('Mark off day')}
-                    </button>
-                  </div>
+                  !pendingDraft && (
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button className="btn" onClick={() => { setEditing(true); setIsOffDay(false); }}>
+                        ＋ {t('Start entry')}
+                      </button>
+                      <button className="btn secondary" onClick={() => { setEditing(true); setIsOffDay(true); }}>
+                        🚫 {t('Mark off day')}
+                      </button>
+                    </div>
+                  )
                 ) : (
                   <p className="step-hint">
                     🔒 {t('This day is locked — only the last')} {num(ENTRY_EDIT_WINDOW_DAYS)} {t('days can be edited here.')}
@@ -1211,9 +1355,12 @@ function EntryPageInner() {
           <div className="modal-overlay" onClick={cancelDiscard}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
               <h3>{t('Discard unsaved changes?')}</h3>
-              <p>{t("This entry hasn't been saved yet — leaving now will lose what you've entered.")}</p>
+              <p>{t("This entry hasn't been saved yet. Save it as a draft to continue later, or discard it.")}</p>
               <div className="modal-actions">
                 <button className="btn secondary" onClick={cancelDiscard}>{t('Keep editing')}</button>
+                {draftAvailable && (
+                  <button className="btn" onClick={saveDraftAndRun}>{t('Save draft & leave')}</button>
+                )}
                 <button className="btn" style={{ background: 'var(--red)' }} onClick={confirmDiscard}>{t('Discard')}</button>
               </div>
             </div>
