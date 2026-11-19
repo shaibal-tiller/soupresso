@@ -51,9 +51,9 @@ export async function GET(request) {
          FROM daily_entries WHERE ${dateFilter} ORDER BY entry_date ASC`,
         params
       ),
-      // Weekly aggregates (Mon-Sun weeks)
+      // Weekly aggregates (Sun-Sat weeks, matching the PeriodFilter and calendar)
       query(
-        `SELECT date_trunc('week', entry_date)::date AS week_start,
+        `SELECT (date_trunc('week', entry_date + INTERVAL '1 day') - INTERVAL '1 day')::date AS week_start,
                 SUM(total_sales) AS total_sales,
                 SUM(cash_taken_home) AS total_take_home,
                 SUM(bazar_actual_cost) AS total_expense,

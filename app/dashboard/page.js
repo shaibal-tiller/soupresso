@@ -30,6 +30,9 @@ export default function DashboardPage() {
   const [data, setData] = useState(() => peekCache(dashUrl(initialPeriod(todayStr(), 'preset', 'month'))) ?? null);
   const [loading, setLoading] = useState(() => peekCache(dashUrl(initialPeriod(todayStr(), 'preset', 'month'))) === undefined);
   const requestRef = useRef(0);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [cashInHand, setCashInHand] = useState(() => peekCache('/api/cash-in-hand') ?? null);
 
   useEffect(() => {
@@ -40,24 +43,29 @@ export default function DashboardPage() {
     const url = dashUrl(period);
     const requestId = ++requestRef.current;
     const cached = peekCache(url);
-    if (cached) {
-      // Instant paint from cache; still revalidate below in case it's stale.
+    if (cached !== undefined) {
+      // Instant paint from cache; always revalidate below so saved entries
+      // can't leave old numbers on screen for the whole cache TTL.
       setData(cached);
       setLoading(false);
     } else {
       setLoading(true);
     }
-    cachedFetchJson(url)
+    setError(null);
+    setNotice(null);
+    cachedFetchJson(url, { ttlMs: 0 })
       .then((fresh) => {
         if (requestRef.current !== requestId) return; // a newer range was picked meanwhile
         setData(fresh);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
         if (requestRef.current !== requestId) return;
         setLoading(false);
+        if (cached !== undefined) setNotice(t('Could not refresh — showing saved numbers.'));
+        else setError(err?.message || t('Could not load this range.'));
       });
-  }, [period]);
+  }, [period, reloadKey, t]);
 
   // Once the selected range has loaded, warm the other range pills in the
   // background so clicking between them feels instant after the first visit.
@@ -65,14 +73,23 @@ export default function DashboardPage() {
     if (loading) return;
     runWhenIdle(() => {
       if (period.mode !== 'preset') return;
-      for (const r of PRESETS) {
-        if (r.key !== period.preset) prefetchJson(`/api/dashboard?range=${r.key}`);
+      const i = PRESETS.findIndex((r) => r.key === period.preset);
+      for (const r of [PRESETS[i - 1], PRESETS[i + 1]]) {
+        if (r) prefetchJson(`/api/dashboard?range=${r.key}`);
       }
     });
   }, [period, loading]);
 
   // First paint (nothing to show yet) gets a full-page loader; later period
   // switches keep the filter on screen and dim the content instead.
+  if (!data && error) return (
+    <AppShell>
+      <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>
+        <div style={{ marginBottom: 14 }}>{error}</div>
+        <button className="btn" onClick={() => setReloadKey((k) => k + 1)}>{t('Retry')}</button>
+      </div>
+    </AppShell>
+  );
   if (loading && !data) return <AppShell><div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>{t('Loading…')}</div></AppShell>;
 
   const s = data?.summary || {};
@@ -107,6 +124,7 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <PeriodFilter value={period} onChange={setPeriod} />
+      {notice && <div className="card" style={{ marginBottom: 12, fontSize: 12, color: 'var(--amber)' }}>{notice}</div>}
       <div style={{ opacity: loading ? 0.55 : 1, transition: 'opacity .15s' }}>
 
       {/* KPIs */}

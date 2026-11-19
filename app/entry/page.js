@@ -19,7 +19,7 @@ import {
 } from '@/lib/dates';
 import { DATA_START } from '@/lib/periods';
 import { accountsEnabledFor } from '@/lib/accounts';
-import { cachedFetchJson, invalidateCache, prefetchJson, runWhenIdle } from '@/lib/clientCache';
+import { cachedFetchJson, invalidateCache, invalidateCachePrefix, prefetchJson, runWhenIdle } from '@/lib/clientCache';
 
 const BAZAR_ITEMS_URL = '/api/bazar-items';
 const BAZAR_RECURRING_URL = '/api/bazar-recurring-items';
@@ -601,6 +601,7 @@ function EntryPageInner() {
         invalidateCache('/api/cash-in-hand');
         invalidateCache(bazarPlanUrl(date, 'actual'));
         invalidateCache(bazarPlanUrl(tomorrow, 'planned'));
+        invalidateCachePrefix('/api/dashboard');
         load(date); // reload to show the updated summary
       }
     } catch {

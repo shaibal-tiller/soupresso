@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import LangToggle from './LangToggle';
 import { useLang } from './LangProvider';
@@ -50,9 +51,9 @@ export default function AppShell({ children }) {
         </div>
         <div className="sidenav-links">
           {TABS.map((tab) => (
-            <a key={tab.href} href={tab.href} className={pathname.startsWith(tab.href) ? 'active' : ''}>
+            <Link key={tab.href} href={tab.href} className={pathname.startsWith(tab.href) ? 'active' : ''}>
               {t(tab.label)}
-            </a>
+            </Link>
           ))}
         </div>
         <div className="sidenav-footer">
@@ -104,14 +105,14 @@ export default function AppShell({ children }) {
         </div>
         <div className="sidenav-links">
           {TABS.map((tab) => (
-            <a
+            <Link
               key={tab.href}
               href={tab.href}
               className={pathname.startsWith(tab.href) ? 'active' : ''}
               onClick={() => setDrawerOpen(false)}
             >
               {t(tab.label)}
-            </a>
+            </Link>
           ))}
         </div>
       </nav>
