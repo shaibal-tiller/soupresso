@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS daily_entries (
   bazar_advance_received NUMERIC(12,2) NOT NULL DEFAULT 0, -- = yesterday's next_bazar_advance
   bazar_actual_cost   NUMERIC(12,2) NOT NULL DEFAULT 0,
   bazar_taken_from_box NUMERIC(12,2) NOT NULL DEFAULT 0, -- of a shortfall (actual > advance), how much the chef took directly from the box himself, vs. fronted from his own pocket and reimbursed from the box now
+  other_cash_out_before_counting NUMERIC(12,2) NOT NULL DEFAULT 0, -- direct box payments (vendor, LPG, etc.) taken before counting — adds to salesAdjustment but does not affect chef's settlement
 
   -- Step 4: set aside for tomorrow
   next_bazar_advance  NUMERIC(12,2) NOT NULL DEFAULT 0,   -- given to chef today, for tomorrow's shopping
@@ -95,6 +96,9 @@ ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS closed_by TEXT[] NOT NULL DEF
 
 -- If your database already has daily_entries without bazar_taken_from_box, run this:
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS bazar_taken_from_box NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+-- If your database already has daily_entries without other_cash_out_before_counting, run this:
+ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS other_cash_out_before_counting NUMERIC(12,2) NOT NULL DEFAULT 0;
 
 -- If your database already has daily_entries without next_bhangti_denominations, run this:
 ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS next_bhangti_denominations JSONB;

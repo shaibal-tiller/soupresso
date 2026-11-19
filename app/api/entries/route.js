@@ -89,6 +89,7 @@ export async function POST(request) {
     bazarAdvanceReceived,
     bazarActualCost,
     bazarTakenFromBox,
+    otherCashOutBeforeCounting,
     nextBazarAdvance,
     nextBhangti,
     nextBhangtiDenominations,
@@ -112,7 +113,7 @@ export async function POST(request) {
 
   const closedByArr = Array.isArray(closedBy) ? closedBy.filter((n) => typeof n === 'string') : [];
 
-  const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, bazarTakenFromBox, nextBazarAdvance, nextBhangti, bhangtiFromHome };
+  const nums = { totalCounted, openingBhangti, bazarAdvanceReceived, bazarActualCost, bazarTakenFromBox, otherCashOutBeforeCounting, nextBazarAdvance, nextBhangti, bhangtiFromHome };
   for (const [key, val] of Object.entries(nums)) {
     if (coerceLocaleNumber(val) == null && val !== '' && val != null) {
       return NextResponse.json({ error: `${key} must be a number` }, { status: 400 });
@@ -144,6 +145,7 @@ export async function POST(request) {
     bazarAdvanceReceived: coerceLocaleNumber(bazarAdvanceReceived) ?? 0,
     bazarActualCost: coerceLocaleNumber(bazarActualCost) ?? 0,
     bazarTakenFromBox: coerceLocaleNumber(bazarTakenFromBox) ?? 0,
+    otherCashOutBeforeCounting: coerceLocaleNumber(otherCashOutBeforeCounting) ?? 0,
     nextBazarAdvance: coerceLocaleNumber(nextBazarAdvance) ?? 0,
     nextBhangti: coerceLocaleNumber(nextBhangti) ?? 0,
   });
@@ -183,10 +185,11 @@ export async function POST(request) {
       const saved = await dbClient.query(
       `INSERT INTO daily_entries (
          entry_date, denominations, total_counted, opening_bhangti,
-         bazar_advance_received, bazar_actual_cost, bazar_taken_from_box, next_bazar_advance, next_bhangti,
+         bazar_advance_received, bazar_actual_cost, bazar_taken_from_box, other_cash_out_before_counting,
+         next_bazar_advance, next_bhangti,
          next_bhangti_denominations, bhangti_from_home, digital_sales,
          total_sales, bazar_variance, cash_taken_home, is_off_day, notes, closed_by, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, now())
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19, now())
        ON CONFLICT (entry_date) DO UPDATE SET
          denominations = EXCLUDED.denominations,
          total_counted = EXCLUDED.total_counted,
@@ -194,6 +197,7 @@ export async function POST(request) {
          bazar_advance_received = EXCLUDED.bazar_advance_received,
          bazar_actual_cost = EXCLUDED.bazar_actual_cost,
          bazar_taken_from_box = EXCLUDED.bazar_taken_from_box,
+         other_cash_out_before_counting = EXCLUDED.other_cash_out_before_counting,
          next_bazar_advance = EXCLUDED.next_bazar_advance,
          next_bhangti = EXCLUDED.next_bhangti,
          next_bhangti_denominations = EXCLUDED.next_bhangti_denominations,
@@ -217,6 +221,7 @@ export async function POST(request) {
         coerceLocaleNumber(bazarAdvanceReceived) ?? 0,
         coerceLocaleNumber(bazarActualCost) ?? 0,
         coerceLocaleNumber(bazarTakenFromBox) ?? 0,
+        coerceLocaleNumber(otherCashOutBeforeCounting) ?? 0,
         coerceLocaleNumber(nextBazarAdvance) ?? 0,
         coerceLocaleNumber(nextBhangti) ?? 0,
         nextBhangtiDenominations ? JSON.stringify(nextBhangtiDenominations) : null,

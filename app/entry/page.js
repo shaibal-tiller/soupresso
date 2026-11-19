@@ -219,6 +219,7 @@ function EntryPageInner() {
   const [bhangtiFromHome, setBhangtiFromHome] = useState(0);
   const [bazarAdvanceReceived, setBazarAdvanceReceived] = useState(0);
   const [bazarTakenFromBox, setBazarTakenFromBox] = useState(0);
+  const [otherCashOutBeforeCounting, setOtherCashOutBeforeCounting] = useState(0);
   const [nextBhangti, setNextBhangti] = useState(0);
   const [nextBhangtiMode, setNextBhangtiMode] = useState('denom'); // 'denom' | 'total' — independent of today's count mode
   const [bazarCatalog, setBazarCatalog] = useState([]);
@@ -313,6 +314,7 @@ function EntryPageInner() {
         setBhangtiFromHome(Number(e.bhangti_from_home) || 0);
         setBazarAdvanceReceived(Number(e.bazar_advance_received));
         setBazarTakenFromBox(Number(e.bazar_taken_from_box) || 0);
+        setOtherCashOutBeforeCounting(Number(e.other_cash_out_before_counting) || 0);
         setNextBhangti(Number(e.next_bhangti));
         // nextBhangtiMode must follow next_bhangti_denominations (tomorrow's
         // bhangti breakdown), NOT e.denominations (today's box count) — they
@@ -356,6 +358,7 @@ function EntryPageInner() {
         setDenoms(emptyDenoms());
         setTotalDirect('');
         setBazarTakenFromBox(0);
+        setOtherCashOutBeforeCounting(0);
         setNextBhangti(0);
         setNextBhangtiQtyOverride({});
         setNextBhangtiMarkOverride({});
@@ -519,6 +522,7 @@ function EntryPageInner() {
     bazarAdvanceReceived: Number(bazarAdvanceReceived) || 0,
     bazarActualCost: effectiveBazarActualCost,
     bazarTakenFromBox: Number(bazarTakenFromBox) || 0,
+    otherCashOutBeforeCounting: Number(otherCashOutBeforeCounting) || 0,
     nextBazarAdvance: effectiveNextBazarAdvance,
     nextBhangti: effectiveNextBhangti,
   });
@@ -530,7 +534,7 @@ function EntryPageInner() {
     return {
       savedAt: Date.now(),
       isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
-      bazarAdvanceReceived, bazarTakenFromBox,
+      bazarAdvanceReceived, bazarTakenFromBox, otherCashOutBeforeCounting,
       actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
       plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
       nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
@@ -568,6 +572,7 @@ function EntryPageInner() {
             bazarAdvanceReceived: isOffDay ? 0 : (Number(bazarAdvanceReceived) || 0),
             bazarActualCost: isOffDay ? 0 : effectiveBazarActualCost,
             bazarTakenFromBox: isOffDay ? 0 : (Number(bazarTakenFromBox) || 0),
+            otherCashOutBeforeCounting: isOffDay ? 0 : (Number(otherCashOutBeforeCounting) || 0),
             nextBazarAdvance: isOffDay ? 0 : effectiveNextBazarAdvance,
             nextBhangti: isOffDay ? 0 : effectiveNextBhangti,
             nextBhangtiDenominations: isOffDay ? null : nextBhangtiDenominationsPayload,
@@ -675,7 +680,7 @@ function EntryPageInner() {
     };
   }, [
     editing, viewOnly, draftAvailable, date, isOffDay, mode, denoms, totalDirect, openingBhangti, bhangtiFromHome,
-    bazarAdvanceReceived, bazarTakenFromBox,
+    bazarAdvanceReceived, bazarTakenFromBox, otherCashOutBeforeCounting,
     actualEntryMode, actualLines, actualBazarAdjustment, actualSimpleAmount,
     plannedEntryMode, plannedLines, nextBazarAdjustment, nextSimpleAmount,
     nextBhangtiMode, nextBhangti, nextBhangtiQtyOverride, nextBhangtiMarkOverride,
@@ -693,6 +698,7 @@ function EntryPageInner() {
     setBhangtiFromHome(d.bhangtiFromHome ?? 0);
     setBazarAdvanceReceived(d.bazarAdvanceReceived ?? 0);
     setBazarTakenFromBox(d.bazarTakenFromBox ?? 0);
+    setOtherCashOutBeforeCounting(d.otherCashOutBeforeCounting ?? 0);
     setActualEntryMode(d.actualEntryMode || 'items');
     setActualLines(d.actualLines || []);
     setActualBazarAdjustment(d.actualBazarAdjustment ?? 0);
@@ -1094,6 +1100,15 @@ function EntryPageInner() {
                       ? `${t('Chef returns:')} ${taka(Math.abs(summary.bazarVariance))}`
                       : t('Exact — no variance')}
                   </span>
+                </div>
+                <div className="field" style={{ marginTop: 14 }}>
+                  <label>{t('Other cash taken from box before counting (৳)')}</label>
+                  <NumberInput value={otherCashOutBeforeCounting} min={0} onValueChange={(n) => setOtherCashOutBeforeCounting(n ?? 0)} placeholder="0" />
+                  <p className="step-hint">
+                    {Number(otherCashOutBeforeCounting) > 0
+                      ? `${taka(Number(otherCashOutBeforeCounting))} ${t('taken from box before counting — added back to sales total')}`
+                      : t('e.g. paid an LPG vendor or supplier directly from the box before counting — adds back to your sales total')}
+                  </p>
                 </div>
               </div>
             )}
